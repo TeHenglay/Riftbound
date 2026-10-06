@@ -1,4 +1,4 @@
-# Elemental Roguelike
+# Riftbound
 
 A Hades-style roguelike for Roblox: build a skill loadout during a run and merge elements into fusion skills.
 
