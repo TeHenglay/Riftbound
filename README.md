@@ -1,33 +1,70 @@
 # Riftbound
 
-A Hades-style roguelike for Roblox: build a skill loadout during a run and merge elements into fusion skills.
+A Hades-style roguelike for Roblox where you collect element skills and fuse
+pairs of them into new skills at the Forge.
 
-## Run it in Studio
+## Status
 
-1. Install [Rokit](https://github.com/rojo-rbx/rokit), then run `rokit install` in this folder (installs Rojo, Selene, StyLua).
-2. Install the Rojo plugin in Roblox Studio (`rojo plugin install`).
-3. Open a new **Baseplate** place in Studio.
-4. Run `rojo serve` here, then click **Connect** in the Rojo plugin. The code syncs into Studio live.
-5. Press **Play**.
+Step (a) is done: the element and fusion system, combat, HUD and a test arena.
+Next up: (b) room-by-room runs and real enemies, (c) the reward-choice screen
+after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 
-## Controls
+## Controls (playtest)
 
-| Key | Action |
-|---|---|
-| Left click | Attack |
-| Right click | Special |
-| Q | Cast (long range) |
-| Space | Dash |
-| 1-6 | Debug: infuse Fire / Ice / Lightning / Wind / Earth / Shadow into the selected slot |
-| Tab | Debug: change the selected slot |
-| F | Debug: fuse two elements at level 2 or higher on the selected slot |
+| Input | Action |
+| --- | --- |
+| WASD | Move |
+| Hold left mouse | Rift Bolt (basic attack, aims at cursor) |
+| Q / E | Equipped skills |
+| Shift | Dash |
+| F | Interact (take a shrine's skill, open the Forge) |
+| Mouse wheel | Zoom |
 
-Try it: press 1 twice and 2 twice (Fire 2 + Ice 2 on Attack), press F to make **Steam Burst**, then hit the training dummies.
+## How fusion works
 
-## Layout
+- Five elements: Fire, Water, Earth, Air, Lightning. Each grants one base skill.
+- Fusing two base skills of different elements consumes both and gives the
+  fused skill at the higher of the two levels (+1 if you already own it).
+- Every pair has a fusion (10 total), e.g. Fire + Water = Steam Cloud.
+- Elemental reactions: Lightning on a Soaked enemy deals x1.5 ("Conduct"),
+  Fire on Soaked x1.25, Air on Burning x1.3, Earth on Stunned x1.4.
+- To add a fusion or skill, add one entry to
+  `src/ReplicatedStorage/Riftbound/Skills.lua`; `Merge.lua` picks up any skill
+  with two elements automatically.
 
-- `src/shared` — data everyone reads: `Elements`, `Skills`, `Fusions` (recipe table), `Types`, `Remotes`.
-- `src/server/Services` — `LoadoutService` (run loadout, infuse, fuse), `CombatService` (cooldowns, hit detection, damage), `StatusEffects` (Burn, Chill, Shock, Knockback, Armor, Drain), `DummyService` (training dummies).
-- `src/client` — top-down camera, input, and a placeholder HUD.
+## Code layout
 
-Adding a fusion is one entry in `src/shared/Fusions.luau`.
+`src/` mirrors the Studio hierarchy (Rojo naming: `.server.lua` = Script,
+`.client.lua` = LocalScript, plain `.lua` = ModuleScript).
+
+- `ReplicatedStorage/Riftbound/` – shared data: `Elements`, `Skills`, `Merge`
+- `ServerScriptService/Riftbound/`
+  - `Main` – remotes, casting (the server validates every cast and cooldown)
+  - `BuildService` – owned skills, slots, levels, fusion
+  - `SkillEffects` – hit detection, damage and visuals per skill kind
+  - `Enemies` – enemy registry, damage, status effects, test dummy rig
+  - `TestArena` – shrines, Forge and dummy respawns; Studio-only debug hook
+- `StarterPlayer/StarterPlayerScripts/Riftbound/` – `ClientMain`, `CameraRig`
+  (top-down camera), `Controls`, `HUD` (skill bar, skill list, Forge screen)
+
+## Tools
+
+Needs Roblox Studio open with its MCP server enabled.
+
+```bash
+node tools/sync.js
+```
+
+Pushes everything in `src/` into the open place.
+
+```bash
+node tools/rbx.js luau @tools/BuildTestArena.luau
+```
+
+Rebuilds the test arena (Edit mode).
+
+```bash
+node tools/rbx.js luau @tools/tests/SkillSmokeTest.luau Server
+```
+
+During Play, casts every skill at the dummies and checks fusion.
