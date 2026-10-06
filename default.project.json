@@ -3,19 +3,19 @@
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": {
-      "Shared": {
-        "$path": "src/shared"
+      "Riftbound": {
+        "$path": "src/ReplicatedStorage/Riftbound"
       }
     },
     "ServerScriptService": {
-      "Server": {
-        "$path": "src/server"
+      "Riftbound": {
+        "$path": "src/ServerScriptService/Riftbound"
       }
     },
     "StarterPlayer": {
       "StarterPlayerScripts": {
-        "Client": {
-          "$path": "src/client"
+        "Riftbound": {
+          "$path": "src/StarterPlayer/StarterPlayerScripts/Riftbound"
         }
       }
     }
