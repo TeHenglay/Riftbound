@@ -1315,17 +1315,17 @@ local function launchRiftBolt(e)
 	local core = neonPart(Vector3.one, RIFT.White)
 	local mesh = Instance.new("SpecialMesh")
 	mesh.MeshType = Enum.MeshType.Sphere
-	mesh.Scale = Vector3.new(0.38, 0.38, 2.1)
+	mesh.Scale = Vector3.new(0.55, 0.55, 2.8)
 	mesh.Parent = core
 	core.Parent = root
 	local shell = neonPart(Vector3.one, RIFT.Main)
 	shell.Transparency = 0.55
 	local shellMesh = mesh:Clone()
-	shellMesh.Scale = Vector3.new(0.75, 0.75, 2.8)
+	shellMesh.Scale = Vector3.new(1.15, 1.15, 3.8)
 	shellMesh.Parent = shell
 	shell.Parent = root
 	local emitters = {
-		emitter(root, { Enabled = true, Texture = TEX.Glow, Locked = true, Rate = 40, Size = ns(0, 2.4, 1, 1.4), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.1, 0.14), Color = cs(RIFT.Lilac, RIFT.Main), Light = 1 }),
+		emitter(root, { Enabled = true, Texture = TEX.Glow, Locked = true, Rate = 40, Size = ns(0, 3.4, 1, 2), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.1, 0.14), Color = cs(RIFT.Lilac, RIFT.Main), Light = 1 }),
 		emitter(root, { Enabled = true, Texture = TEX.Sparkles, Rate = 30, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.25, 0.4), Speed = NumberRange.new(1, 3), Spread = Vector2.new(180, 180), Color = cs(RIFT.Lilac, RIFT.Pink), Light = 1 }),
 		emitter(root, { Enabled = true, Texture = TEX.Shard, Rate = 10, Size = ns(0, 0.4, 1, 0), Lifetime = NumberRange.new(0.2, 0.3), Speed = NumberRange.new(2, 4), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-300, 300), Color = cs(RIFT.Lilac, RIFT.Main), Light = 0.8 }),
 	}
@@ -1337,7 +1337,7 @@ local function launchRiftBolt(e)
 		a0.Parent, a1.Parent = root, root
 		local trail = Instance.new("Trail")
 		trail.Attachment0, trail.Attachment1 = a0, a1
-		trail.Lifetime = 0.16
+		trail.Lifetime = 0.22
 		trail.Color = cs(RIFT.White, color)
 		trail.Transparency = ns(0, 0.05, 1, 1)
 		trail.LightEmission = 1
@@ -1484,9 +1484,9 @@ local function onShield(e)
 	bubble.Parent = folder
 	tween(bubble, 0.2, { Size = Vector3.one * SIZE }, Enum.EasingStyle.Back)
 	local sheen = bubble:Clone()
-	sheen.Material = Enum.Material.Glass
-	sheen.Color = RIFT.Lilac
-	sheen.Transparency = 0.88
+	sheen.Material = Enum.Material.Neon
+	sheen.Color = RIFT.Main
+	sheen.Transparency = 0.86
 	sheen.Parent = folder
 	tween(sheen, 0.2, { Size = Vector3.one * (SIZE - 0.3) }, Enum.EasingStyle.Back)
 	-- Spinning rune circle on the floor under you.
@@ -1498,13 +1498,14 @@ local function onShield(e)
 	runeDecal.Transparency = 0.15
 	runeDecal.Parent = rune
 	local emitters = {
-		emitter(bubble, { Enabled = true, Texture = TEX.Sparkles, Shape = Enum.ParticleEmitterShape.Sphere, Style = Enum.ParticleEmitterShapeStyle.Surface, Rate = 24, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(0.3, 0.8), Color = cs(RIFT.White, RIFT.Lilac), Light = 1 }),
+		emitter(bubble, { Enabled = true, Texture = TEX.Glow, Shape = Enum.ParticleEmitterShape.Sphere, Style = Enum.ParticleEmitterShapeStyle.Surface, Rate = 30, Size = ns(0, 1.6, 1, 0), Transparency = ns(0, 0.5, 1, 1), Lifetime = NumberRange.new(0.3, 0.5), Color = cs(RIFT.Lilac, RIFT.Main), Light = 1 }),
+		emitter(bubble, { Enabled = true, Texture = TEX.Sparkles, Shape = Enum.ParticleEmitterShape.Sphere, Style = Enum.ParticleEmitterShapeStyle.Surface, Rate = 40, Size = ns(0, 0.7, 1, 0), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(0.3, 0.8), Color = cs(RIFT.White, RIFT.Lilac), Light = 1 }),
 		emitter(rune, { Enabled = true, Texture = TEX.Glow, Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface, Rate = 18, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(2, 4), Color = cs(RIFT.Lilac, RIFT.Main), Light = 1 }),
 	}
 	local light = Instance.new("PointLight")
 	light.Color = RIFT.Main
 	light.Range = 12
-	light.Brightness = 1.6
+	light.Brightness = 2.4
 	light.Shadows = false
 	light.Parent = bubble
 	burst(root.Position, {
@@ -1549,7 +1550,7 @@ local function onBlocked(e)
 		s.Bubble.Size = Vector3.one * 9.4
 		tween(s.Bubble, 0.2, { Size = Vector3.one * 8.5, Color = RIFT.Main })
 		s.Light.Brightness = 5
-		tween(s.Light, 0.25, { Brightness = 1.6 })
+		tween(s.Light, 0.25, { Brightness = 2.4 })
 	end
 	local look = CFrame.lookAt(at, at + toward)
 	burst(look, {
