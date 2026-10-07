@@ -10,7 +10,7 @@
 --   Volume  0-1 (multiplied by the sound's group volume)
 --   Pitch   number, or { min, max } for a random pitch each play (also speeds it up)
 --   Length  seconds before the sound fades out (trims long library takes)
---   Start   seconds into the file to start from
+--   Start   seconds into the file to start from (per-file values go in SoundLibrary.Starts)
 --   Group   "SFX" (default), "UI", "Music" or "Ambient"
 --   Range   studs before a 3D sound fades to silence (default 140)
 --   Gap     minimum seconds between two plays of this sound (stops stacking)
@@ -25,7 +25,7 @@ SoundLibrary.Sounds = {
 	RiftBoltHit = { Id = 9116275998, Volume = 0.25, Pitch = { 1.4, 1.7 }, Length = 0.3 },
 
 	-- Fire -----------------------------------------------------------------
-	FireCast = { Ids = { 9114446852, 9114446802, 9114444008 }, Volume = 0.55, Pitch = { 0.95, 1.1 }, Length = 0.9 },
+	FireCast = { Ids = { 9114446852, 9114446802 }, Volume = 0.55, Pitch = { 0.95, 1.1 }, Length = 0.9 },
 	FireExplode = { Id = 9114554567, Volume = 0.6, Pitch = { 1, 1.15 }, Length = 1.6 },
 	FanTheFlames = { Id = 9114446277, Volume = 0.5, Pitch = 1.1, Length = 1 },
 
@@ -69,7 +69,7 @@ SoundLibrary.Sounds = {
 	ShieldUp = { Id = 9125646705, Volume = 0.35, Pitch = 1.2, Length = 0.6 },
 	BlockHit = { Ids = { 9119072660, 9119072674 }, Volume = 0.55, Pitch = { 0.95, 1.05 }, Length = 0.8 },
 	Parry = { Id = 9119747138, Volume = 0.6, Pitch = 1.15, Length = 0.8, Layer = { "ParryRing" } },
-	ParryRing = { Id = 9116394545, Volume = 0.45, Pitch = 1.4, Length = 1.2 },
+	ParryRing = { Id = 9116394545, Volume = 0.9, Pitch = 1.4, Length = 1.2 },
 	ShieldBreak = { Id = 9114855870, Volume = 0.6, Pitch = 0.8, Length = 1.2 },
 
 	-- Player ---------------------------------------------------------------
@@ -90,10 +90,10 @@ SoundLibrary.Sounds = {
 
 	-- Flask, loot and progression ------------------------------------------
 	FlaskDrink = { Ids = { 9114171855, 9114172114 }, Volume = 0.5, Pitch = 1, Group = "UI" },
-	Heal = { Id = 9116394545, Volume = 0.45, Pitch = 1.1, Length = 1.5 },
+	Heal = { Id = 9116394545, Volume = 0.9, Pitch = 1.1, Length = 1.5 },
 	Coin = { Id = 9113849375, Volume = 0.3, Pitch = { 1.2, 1.4 }, Length = 0.35, Gap = 0.06, Group = "UI" },
-	XpPickup = { Id = 9116395085, Volume = 0.2, Pitch = { 1.5, 1.8 }, Length = 0.5, Gap = 0.06, Group = "UI" },
-	ItemPickup = { Id = 9125646934, Volume = 0.35, Pitch = 1.3, Length = 0.7, Group = "UI" },
+	XpPickup = { Id = 9116395085, Volume = 0.4, Pitch = { 1.5, 1.8 }, Length = 0.5, Gap = 0.06, Group = "UI" },
+	ItemPickup = { Id = 9116395089, Volume = 0.45, Pitch = 1.6, Length = 0.6, Group = "UI" },
 	LevelUp = { Id = 9119447936, Volume = 0.6, Pitch = 1, Length = 2.5, Layer = { "LevelUpGlow" } },
 	LevelUpGlow = { Id = 9116395089, Volume = 0.5, Pitch = 0.9, Length = 2.5 },
 	StatUp = { Id = 9116394876, Volume = 0.4, Pitch = 1.25, Length = 0.8, Group = "UI" },
@@ -101,7 +101,7 @@ SoundLibrary.Sounds = {
 	SkillUp = { Id = 9116395089, Volume = 0.5, Pitch = 1.3, Length = 1.2, Group = "UI" },
 
 	-- Forge ----------------------------------------------------------------
-	ForgeOpen = { Id = 9125646712, Volume = 0.4, Pitch = 0.9, Length = 1.2, Group = "UI" },
+	ForgeOpen = { Id = 9125646712, Volume = 0.45, Pitch = 0.9, Length = 1.4, Group = "UI" },
 	Fuse = { Id = 9113445305, Volume = 0.55, Pitch = 0.9, Length = 1.5, Group = "UI", Layer = { "FuseShimmer" } },
 	FuseShimmer = { Id = 9119447936, Volume = 0.5, Pitch = 1.15, Length = 2, Group = "UI" },
 
@@ -114,6 +114,33 @@ SoundLibrary.Sounds = {
 	MusicExplore = { Id = 92586093726730, Volume = 0.8, Group = "Music" }, -- "The Sunken Vault (Dungeon Ambience)"
 	MusicCombat = { Id = 1848159364, Volume = 0.7, Group = "Music" }, -- APM "Darkness On The Edge Of Time D"
 	AmbientRift = { Id = 9125351615, Volume = 0.5, Group = "Ambient" }, -- low otherworldly rumble
+}
+
+-- Leading silence to skip in each file (seconds into the file), measured in
+-- Studio with an AudioAnalyzer: the time the level first passes 0.005, minus 0.02.
+SoundLibrary.Starts = {
+	[9113840530] = 0.68, -- Dash
+	[9113840096] = 0.64, -- Dash
+	[9125646705] = 0.34, -- ShieldUp
+	[9125646712] = 0.7, -- ForgeOpen
+	[9125629904] = 0.73, -- Blizzard
+	[9114172114] = 0.3, -- FlaskDrink
+	[9114171855] = 0.17, -- FlaskDrink
+	[9118884046] = 0.26, -- Evaporate
+	[9114856749] = 0.46, -- Shatter
+	[9119447936] = 0.3, -- LevelUp, FuseShimmer
+	[9125645963] = 0.3, -- MeteorFall
+	[9113074084] = 0.19, -- SteamLoop
+	[9125550012] = 0.17, -- MagnetHum
+	[9125871203] = 0.17, -- BoulderCrash
+	[9118609396] = 0.24, -- GroundSlam
+	[9118882814] = 0.19, -- SteamBurst
+	[9120985853] = 0.21, -- ZapFirst, PlasmaCharge
+	[9118762653] = 0.09, -- Freeze
+	[9114855870] = 0.17, -- ShieldBreak, HuskDeath
+	[9120021794] = 0.15, -- ThunderCrack
+	[9112752570] = 0.11, -- LavaLoop
+	[9114446277] = 0.09, -- FanTheFlames
 }
 
 -- Which sound plays for each SkillFx event (Type) of each skill.

@@ -99,7 +99,8 @@ local function start(name, parent, looped)
 	end
 	lastPlayed[name] = now
 
-	local sound = template(pickId(def)):Clone()
+	local id = pickId(def)
+	local sound = template(id):Clone()
 	sound.Name = name
 	sound.Volume = def.Volume or 0.5
 	sound.PlaybackSpeed = pickPitch(def)
@@ -108,8 +109,9 @@ local function start(name, parent, looped)
 	sound.RollOffMode = Enum.RollOffMode.InverseTapered
 	sound.RollOffMinDistance = 15
 	sound.RollOffMaxDistance = def.Range or DEFAULT_RANGE
-	if def.Start then
-		sound.TimePosition = def.Start
+	local offset = Library.Starts[id] or def.Start
+	if offset then
+		sound.TimePosition = offset
 	end
 	sound.Parent = parent
 	sound:Play()
