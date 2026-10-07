@@ -43,11 +43,11 @@ SoundLibrary.Sounds = {
 	RockBurst = { Ids = { 125274851800597, 76835142099932 }, Volume = 0.6, Pitch = { 0.95, 1.05 } },
 
 	-- Air ------------------------------------------------------------------
-	WindBlast = { Ids = { 121640170557771, 107022836228252 }, Volume = 0.6 },
+	WindBlast = { Ids = { 121640170557771, 107022836228252 }, Volume = 1 },
 
 	-- Lightning ------------------------------------------------------------
 	ZapFirst = { Id = 125995775704384, Volume = 0.5 },
-	Zap = { Ids = { 140188901214206, 98616821053616 }, Volume = 0.4, Pitch = { 0.95, 1.15 }, Gap = 0.05 },
+	Zap = { Ids = { 140188901214206, 98616821053616 }, Volume = 0.8, Pitch = { 0.95, 1.15 }, Gap = 0.05 },
 	ThunderCrack = { Ids = { 72222857358993, 82693638856993 }, Volume = 0.6, Gap = 0.25, Layer = { "ZapFirst" } },
 
 	-- Fusions --------------------------------------------------------------
@@ -79,8 +79,8 @@ SoundLibrary.Sounds = {
 	-- Dash and block -------------------------------------------------------
 	Dash = { Ids = { 107387920423978, 88587059173651 }, Volume = 0.45, Pitch = { 1, 1.1 } },
 	ShieldUp = { Id = 101879415748134, Volume = 0.45 },
-	BlockHit = { Ids = { 101818717362356, 112846838372417 }, Volume = 0.5 },
-	Parry = { Ids = { 131956829341009, 75621315180857 }, Volume = 0.6, Layer = { "ParryRing" } },
+	BlockHit = { Ids = { 101818717362356, 112846838372417 }, Volume = 0.9 },
+	Parry = { Ids = { 131956829341009, 75621315180857 }, Volume = 0.9 },
 	ParryRing = { Id = 9116394545, Volume = 0.9, Pitch = 1.4, Length = 1.2 },
 	ShieldBreak = { Id = 94090259757453, Volume = 0.55 },
 
@@ -92,7 +92,7 @@ SoundLibrary.Sounds = {
 	EnemySpawn = { Id = 74487219785978, Volume = 0.45, Layer = { "EarthRumble" } },
 	HuskWindup = { Ids = { 9113980644, 9113980319 }, Volume = 0.45, Pitch = { 1.05, 1.2 }, Length = 0.6 },
 	HuskSlam = { Id = 9118598279, Volume = 0.6, Pitch = { 0.9, 1 }, Length = 0.6 },
-	EnemyHit = { Ids = { 122689329097985, 110670570771801, 123504504510960 }, Volume = 0.35, Pitch = { 0.95, 1.1 }, Gap = 0.08 },
+	EnemyHit = { Ids = { 122689329097985, 110670570771801, 123504504510960 }, Volume = 0.25, Pitch = { 0.95, 1.1 }, Gap = 0.08 },
 	HuskDeath = { Id = 99233433897004, Volume = 0.5 },
 
 	-- Elemental reactions --------------------------------------------------
@@ -117,7 +117,7 @@ SoundLibrary.Sounds = {
 	FuseShimmer = { Id = 107149510023542, Volume = 0.55, Group = "UI" },
 
 	-- UI -------------------------------------------------------------------
-	UIClick = { Ids = { 106642438444356, 127006080624447 }, Volume = 0.35, Group = "UI", Gap = 0.03 },
+	UIClick = { Ids = { 106642438444356, 127006080624447 }, Volume = 0.5, Group = "UI", Gap = 0.03 },
 	UIHover = { Id = 135028017202421, Volume = 0.15, Group = "UI", Gap = 0.05 },
 	UIDeny = { Id = 83910226909070, Volume = 0.45, Group = "UI" },
 
@@ -144,7 +144,7 @@ SoundLibrary.Starts = {
 	[9125645963] = 0.3, -- MeteorFall
 	[9113074084] = 0.39, -- SteamLoop
 	[9125550012] = 0.28, -- MagnetHum
-	[9120698917] = 2.19, -- MagnetPull: its suck-in peaks at 2.94 s, so it lands ~0.6 s after the Magnet event
+	[9120698917] = 2.55, -- MagnetPull: its suck-in peaks at 2.94 s file time; measured in game to land with the blast
 	[9125871203] = 0.28, -- BoulderCrash
 	[9118609396] = 0.24, -- GroundSlam
 	[9118882814] = 0.19, -- SteamBurst
