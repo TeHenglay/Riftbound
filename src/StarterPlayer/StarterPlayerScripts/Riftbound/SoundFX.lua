@@ -7,6 +7,10 @@
 --   Notify / OpenForge   fusing, new skills, item pickups, the Forge screen
 --   PlayerGui buttons    click and hover
 -- Music crossfades from exploring to combat while Rift Husks are close by.
+-- Your own casts play their cast sound instantly (it hooks CastAnimator.Play, which
+-- Controls calls the moment you press the key) instead of waiting for the server.
+-- Every sound file is loaded once into a template at startup and cloned to play,
+-- so nothing has to load at the moment it is needed.
 -- Other scripts can also call SoundFX.Play("Name") or SoundFX.PlayAt("Name", position).
 local CollectionService = game:GetService("CollectionService")
 local ContentProvider = game:GetService("ContentProvider")
@@ -33,6 +37,8 @@ local groups: { [string]: SoundGroup } = {}
 local lastPlayed = {}
 local anchor -- invisible part at the origin; 3D sounds play from attachments on it
 local rng = Random.new()
+local templates = {} -- [asset id] = loaded Sound to clone
+local predicted = {} -- [skill id] = os.clock() of a cast sound played locally
 
 local function group(name)
 	return groups[name or "SFX"] or groups.SFX
@@ -43,7 +49,22 @@ local function pickId(def)
 	if def.Ids then
 		id = def.Ids[rng:NextInteger(1, #def.Ids)]
 	end
-	return "rbxassetid://" .. tostring(id)
+	return id
+end
+
+local templateFolder
+
+local function template(id)
+	local t = templates[id]
+	if not t then
+		t = Instance.new("Sound")
+		t.Name = tostring(id)
+		t.SoundId = "rbxassetid://" .. tostring(id)
+		t.Volume = 0
+		t.Parent = templateFolder
+		templates[id] = t
+	end
+	return t
 end
 
 local function pickPitch(def)
@@ -78,9 +99,8 @@ local function start(name, parent, looped)
 	end
 	lastPlayed[name] = now
 
-	local sound = Instance.new("Sound")
+	local sound = template(pickId(def)):Clone()
 	sound.Name = name
-	sound.SoundId = pickId(def)
 	sound.Volume = def.Volume or 0.5
 	sound.PlaybackSpeed = pickPitch(def)
 	sound.Looped = looped == true
@@ -270,6 +290,10 @@ local function onSkillFx(e)
 	end
 	local skill = type(e.Skill) == "string" and Library.Skills[e.Skill]
 	local entry = skill and skill[e.Type]
+	if e.Type == "Cast" and e.Caster == player and os.clock() - (predicted[e.Skill] or 0) < 1 then
+		predicted[e.Skill] = nil
+		return -- already played locally the moment you cast
+	end
 	if entry and position then
 		runEntry(entry, e, position)
 	end
@@ -496,19 +520,36 @@ end
 
 ---------------------------------------------------------------------------
 
+-- Loads every sound file into its template: short effects first, music last.
 local function preload()
-	local list = {}
-	for name, def in Library.Sounds do
+	local effects, long = {}, {}
+	for _, def in Library.Sounds do
 		for _, id in def.Ids or { def.Id } do
-			local s = Instance.new("Sound")
-			s.Name = name
-			s.SoundId = "rbxassetid://" .. tostring(id)
-			table.insert(list, s)
+			local list = if def.Group == "Music" or def.Group == "Ambient" then long else effects
+			table.insert(list, template(id))
 		end
 	end
-	ContentProvider:PreloadAsync(list)
-	for _, s in list do
-		s:Destroy()
+	ContentProvider:PreloadAsync(effects)
+	ContentProvider:PreloadAsync(long)
+end
+
+-- Plays your own cast sound the instant Controls starts the cast animation.
+local function hookLocalCasts()
+	local ok, CastAnimator = pcall(require, script.Parent:WaitForChild("CastAnimator", 5))
+	if not ok or type(CastAnimator) ~= "table" or type(CastAnimator.Play) ~= "function" then
+		return
+	end
+	local play = CastAnimator.Play
+	CastAnimator.Play = function(character, skillId, ...)
+		if character ~= nil and character == player.Character and type(skillId) == "string" then
+			local skill = Library.Skills[skillId]
+			local root = character:FindFirstChild("HumanoidRootPart")
+			if skill and skill.Cast and root then
+				predicted[skillId] = os.clock()
+				pcall(runEntry, skill.Cast, {}, root.Position)
+			end
+		end
+		return play(character, skillId, ...)
 	end
 end
 
@@ -531,7 +572,11 @@ function SoundFX.Init(Remotes)
 	anchor.CFrame = CFrame.new()
 	anchor.Parent = workspace
 
+	templateFolder = Instance.new("Folder")
+	templateFolder.Name = "RiftboundSoundTemplates"
+	templateFolder.Parent = SoundService
 	task.spawn(preload)
+	hookLocalCasts()
 
 	Remotes:WaitForChild("SkillFx").OnClientEvent:Connect(function(e)
 		local ok, err = pcall(onSkillFx, e)
