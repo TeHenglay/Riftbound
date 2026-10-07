@@ -48,7 +48,7 @@ SoundLibrary.Sounds = {
 	SteamBurst = { Id = 9118882814, Volume = 0.5, Pitch = 0.85, Length = 1.4 },
 	SteamLoop = { Id = 9113074084, Volume = 0.3, Pitch = 0.75 },
 	MeteorFall = { Id = 9125645963, Volume = 0.55, Pitch = 0.7, Length = 1 },
-	MeteorImpact = { Id = 9114224675, Volume = 0.75, Pitch = { 0.95, 1.05 }, Length = 2.6, Layer = { "FireExplode" } },
+	MeteorImpact = { Id = 9117876706, Volume = 0.75, Pitch = { 0.95, 1.05 }, Length = 2.6, Layer = { "FireExplode" } },
 	LavaLoop = { Id = 9112752570, Volume = 0.3, Pitch = 0.45 },
 	FireTornadoLoop = { Id = 9120610106, Volume = 0.45, Pitch = 0.8 },
 	PlasmaCharge = { Id = 9120985853, Volume = 0.45, Pitch = 0.8, Length = 0.5 },
