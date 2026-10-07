@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Elements = require(Shared:WaitForChild("Elements"))
 local Skills = require(Shared:WaitForChild("Skills"))
 local Enemies = require(script.Parent.Enemies)
+local ProgressionService = require(script.Parent.ProgressionService)
 
 local DEFAULT_RANGE = 60
 local GROUND_OFFSET = 2.9 -- HumanoidRootPart height above the floor for a standard avatar
@@ -263,7 +264,7 @@ end
 function Kinds.Zone(ctx)
 	local def = ctx.Def
 	local center = ctx.Target
-	local tickDamage = (def.TickDamage or 0) * Skills.DamageMult(ctx.Level)
+	local tickDamage = (def.TickDamage or 0) * Skills.DamageMult(ctx.Level) * ctx.PowerMult
 	local isStorm = table.find(def.Elements, "Lightning") ~= nil
 
 	local zone = disc(center + Vector3.new(0, 0.2, 0), 1, ctx.Color, 0.55)
@@ -371,11 +372,13 @@ function SkillEffects.Cast(player, id, level, targetPos)
 		target = Vector3.new(origin.X, target.Y, origin.Z) + dir * range
 	end
 
+	local powerMult = ProgressionService.DamageMult(player)
 	Kinds[def.Kind]({
 		Player = player,
 		Def = def,
 		Level = level,
-		Damage = def.Damage * Skills.DamageMult(level),
+		Damage = def.Damage * Skills.DamageMult(level) * powerMult,
+		PowerMult = powerMult,
 		Color = Elements.ColorOf(def.Elements),
 		Origin = origin,
 		Target = target,

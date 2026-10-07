@@ -39,6 +39,8 @@ local function spawnAt(marker)
 		Chase = not training,
 		Regen = training,
 		Damage = 6,
+		Xp = if training then nil else 15,
+		Gold = if training then nil else { 4, 8 },
 		Color = if training then Color3.fromRGB(95, 80, 70) else Color3.fromRGB(60, 40, 90),
 	})
 	model:FindFirstChildOfClass("Humanoid").Died:Connect(function()
@@ -55,6 +57,7 @@ end
 -- e.g. ServerStorage.RiftboundDebug:Invoke("Grant", player, "Fireball").
 if RunService:IsStudio() then
 	local SkillEffects = require(script.Parent.SkillEffects)
+	local ProgressionService = require(script.Parent.ProgressionService)
 	local debugHook = Instance.new("BindableFunction")
 	debugHook.Name = "RiftboundDebug"
 	debugHook.OnInvoke = function(action, ...)
@@ -68,6 +71,12 @@ if RunService:IsStudio() then
 			return SkillEffects.Cast(...)
 		elseif action == "Enemies" then
 			return Enemies.GetAll()
+		elseif action == "AddXp" then
+			return ProgressionService.AddXp(...)
+		elseif action == "AddGold" then
+			return ProgressionService.AddGold(...)
+		elseif action == "Progress" then
+			return ProgressionService.Get(...)
 		end
 		return nil
 	end

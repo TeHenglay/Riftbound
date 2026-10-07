@@ -20,6 +20,18 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 | F | Interact (take a shrine's skill, open the Forge) |
 | Mouse wheel | Zoom |
 
+## Levels, XP and gold
+
+- Rift Husks drop XP orbs (blue) and gold coins when they die: 15 XP and 4-8
+  gold each. Walk near a drop and it flies to you.
+- XP needed per level: `40 * level ^ 1.35` (40, 102, 176, 260, ...), up to level 50.
+- Each level gives +10 max health (fully healed on level up) and +5% skill damage.
+- Level and gold show above the skill bar, in the top-right corner and in the player list.
+- Gold isn't spent on anything yet. `ProgressionService.SpendGold` is ready for a shop.
+- Progress resets when you leave; saving comes with the meta-progression step.
+- Tuning: curve and bonuses are in `src/ReplicatedStorage/Riftbound/Progression.lua`;
+  drop amounts per enemy are in `TestArena.server.lua` (`Xp`, `Gold`).
+
 ## How fusion works
 
 - Five elements: Fire, Water, Earth, Air, Lightning. Each grants one base skill.

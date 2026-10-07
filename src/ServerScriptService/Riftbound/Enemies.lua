@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Elements = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Elements"))
+local Drops = require(script.Parent.Drops)
 
 local TAG = "RiftEnemy"
 local SHOCK_AMP = 1.2
@@ -294,7 +295,8 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -------------------------------------------------------------------------------
--- Test dummies. opts: Name, Health, Speed, Chase (bool), Damage, Color, Regen
+-- Test dummies. opts: Name, Health, Speed, Chase (bool), Damage, Color, Regen,
+-- Xp (number) and Gold (number or {min, max}) dropped on death
 -------------------------------------------------------------------------------
 
 local function nearestPlayerRoot(pos, maxDist)
@@ -397,6 +399,13 @@ function Enemies.SpawnDummy(cframe, opts)
 	Enemies.Register(model)
 
 	hum.Died:Connect(function()
+		local gold = opts.Gold
+		if type(gold) == "table" then
+			gold = math.random(gold[1], gold[2])
+		end
+		if (opts.Xp or 0) > 0 or (gold or 0) > 0 then
+			Drops.Spawn(root.Position, opts.Xp, gold, root.Position.Y - 2)
+		end
 		for _, p in model:GetDescendants() do
 			if p:IsA("BasePart") and p ~= root then
 				TweenService:Create(p, TweenInfo.new(0.6), { Transparency = 1, Size = p.Size * 0.3 }):Play()

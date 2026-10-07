@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local BuildService = require(script.Parent.BuildService)
+local ProgressionService = require(script.Parent.ProgressionService)
 local SkillEffects = require(script.Parent.SkillEffects)
 
 local remotes = Shared:FindFirstChild("Remotes") or Instance.new("Folder")
@@ -31,11 +32,19 @@ end
 BuildService.OnNotify = function(player, text, color)
 	Notify:FireClient(player, text, color)
 end
+ProgressionService.OnNotify = BuildService.OnNotify
 
-Players.PlayerAdded:Connect(BuildService.Init)
-Players.PlayerRemoving:Connect(BuildService.Remove)
-for _, player in Players:GetPlayers() do
+local function onPlayerAdded(player)
 	BuildService.Init(player)
+	ProgressionService.Init(player)
+end
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(function(player)
+	BuildService.Remove(player)
+	ProgressionService.Remove(player)
+end)
+for _, player in Players:GetPlayers() do
+	onPlayerAdded(player)
 end
 
 GetBuild.OnServerInvoke = function(player)
