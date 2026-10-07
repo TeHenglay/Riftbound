@@ -117,22 +117,23 @@ SoundLibrary.Sounds = {
 }
 
 -- Leading silence to skip in each file (seconds into the file), measured in
--- Studio with an AudioAnalyzer: the time the level first passes 0.005, minus 0.02.
+-- Studio with an AudioAnalyzer: just before the level first passes 0.005 (0.02 for
+-- the slow fade-ins, so they are loud straight away).
 SoundLibrary.Starts = {
-	[9113840530] = 0.68, -- Dash
-	[9113840096] = 0.64, -- Dash
-	[9125646705] = 0.34, -- ShieldUp
-	[9125646712] = 0.7, -- ForgeOpen
-	[9125629904] = 0.73, -- Blizzard
-	[9114172114] = 0.3, -- FlaskDrink
+	[9113840530] = 0.96, -- Dash
+	[9113840096] = 0.92, -- Dash
+	[9125646705] = 0.79, -- ShieldUp
+	[9125646712] = 1.26, -- ForgeOpen
+	[9125629904] = 0.83, -- Blizzard
+	[9114172114] = 0.47, -- FlaskDrink
 	[9114171855] = 0.17, -- FlaskDrink
-	[9118884046] = 0.26, -- Evaporate
+	[9118884046] = 0.49, -- Evaporate
 	[9114856749] = 0.46, -- Shatter
 	[9119447936] = 0.3, -- LevelUp, FuseShimmer
 	[9125645963] = 0.3, -- MeteorFall
-	[9113074084] = 0.19, -- SteamLoop
-	[9125550012] = 0.17, -- MagnetHum
-	[9125871203] = 0.17, -- BoulderCrash
+	[9113074084] = 0.39, -- SteamLoop
+	[9125550012] = 0.28, -- MagnetHum
+	[9125871203] = 0.28, -- BoulderCrash
 	[9118609396] = 0.24, -- GroundSlam
 	[9118882814] = 0.19, -- SteamBurst
 	[9120985853] = 0.21, -- ZapFirst, PlasmaCharge
@@ -141,6 +142,7 @@ SoundLibrary.Starts = {
 	[9120021794] = 0.15, -- ThunderCrack
 	[9112752570] = 0.11, -- LavaLoop
 	[9114446277] = 0.09, -- FanTheFlames
+	[9114446802] = 0.17, -- FireCast
 }
 
 -- Which sound plays for each SkillFx event (Type) of each skill.
