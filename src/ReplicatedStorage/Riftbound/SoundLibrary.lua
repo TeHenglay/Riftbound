@@ -52,7 +52,8 @@ SoundLibrary.Sounds = {
 	LavaLoop = { Id = 9112752570, Volume = 0.3, Pitch = 0.45 },
 	FireTornadoLoop = { Id = 9120610106, Volume = 0.45, Pitch = 0.8 },
 	PlasmaCharge = { Id = 9120985853, Volume = 0.45, Pitch = 0.8, Length = 0.5 },
-	PlasmaExplode = { Id = 9114554766, Volume = 0.65, Pitch = 1.05, Length = 1.6, Layer = { "PlasmaCrackle" } },
+	-- "Time Warp Big Explosion" (the user's pick, 2026-10-07): a tonal boom with a long tail.
+	PlasmaExplode = { Id = 9126102254, Volume = 0.7, Pitch = 1, Length = 2.5, Layer = { "PlasmaCrackle" } },
 	PlasmaCrackle = { Id = 9116274415, Volume = 0.45, Pitch = 1, Length = 1.2 },
 	BoulderRoll = { Id = 9118661490, Volume = 0.55, Pitch = 0.7, Length = 1.6 },
 	BoulderCrash = { Id = 9125871203, Volume = 0.6, Pitch = 0.9, Length = 1.6 },
