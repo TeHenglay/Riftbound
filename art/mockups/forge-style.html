@@ -1,0 +1,304 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@500;700&family=EB+Garamond:ital,wght@0,500;1,400&family=Merriweather:wght@400;700&family=Oswald:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #07050a;
+    --slab: #120c14;
+    --slab2: #1d1320;
+    --bronze: #a8773f;
+    --gold: #e9c27a;
+    --parch: #f1e3c6;
+    --ash: #9c8a7b;
+    --rift: #b26cff;
+    --rift-hot: #e7c8ff;
+    --fire: #ff6a2b;
+    --water: #3c9cff;
+    --earth: #c08446;
+    --good: #8fe36b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background:
+      radial-gradient(ellipse at 50% 120%, rgba(178,108,255,.35), transparent 60%),
+      radial-gradient(ellipse at 15% 20%, rgba(255,106,43,.10), transparent 40%),
+      linear-gradient(160deg, #2a2034 0%, #140d18 55%, #0a070c 100%);
+    font-family: Merriweather, serif; color: var(--parch);
+    position: relative;
+  }
+  /* faint floor cracks in the world behind */
+  .world { position: absolute; inset: 0; opacity: .35; }
+
+  /* ---------- the Forge window ---------- */
+  .forge { position: absolute; left: 330px; top: 38px; width: 640px; height: 640px; }
+  .banner {
+    position: absolute; left: -40px; right: -40px; top: 0; height: 96px;
+    background: linear-gradient(180deg, #2a1a2c, #0d0810);
+    clip-path: polygon(3% 0, 97% 0, 100% 30%, 98% 100%, 2% 100%, 0 30%);
+    border-top: 2px solid var(--bronze);
+  }
+  .banner-bg {
+    position: absolute; left: -40px; right: -40px; top: 0; height: 96px;
+    background: linear-gradient(180deg, #2a1a2c, #0d0810);
+    clip-path: polygon(3% 0, 97% 0, 100% 30%, 98% 100%, 2% 100%, 0 30%);
+    border-top: 2px solid var(--bronze);
+  }
+  .banner { background: none !important; border: 0 !important; }
+  .banner h1 {
+    font-family: 'Bodoni Moda', serif; font-weight: 500; font-size: 34px;
+    letter-spacing: .55em; text-align: center; padding-top: 18px; color: var(--parch);
+    text-shadow: 0 0 18px rgba(178,108,255,.6);
+  }
+  .banner p {
+    font-family: 'EB Garamond', serif; font-size: 13px; letter-spacing: .12em; text-transform: uppercase;
+    text-align: center; color: var(--gold); margin-top: 2px;
+  }
+  .body {
+    position: absolute; left: 0; right: 0; top: 104px; bottom: 0;
+    background:
+      linear-gradient(115deg, transparent 62%, rgba(255,255,255,.035) 62%, rgba(255,255,255,.035) 70%, transparent 70%),
+      linear-gradient(180deg, var(--slab2), var(--ink));
+    clip-path: polygon(0 0, 100% 0, 100% 94%, 96% 100%, 4% 100%, 0 94%);
+  }
+  .choose {
+    position: absolute; left: 34px; top: 120px;
+    font-family: 'Bodoni Moda', serif; font-size: 22px; letter-spacing: .08em; color: var(--parch);
+  }
+  .choose small { display:block; width: 46px; height: 2px; background: var(--fire); margin-top: 6px; }
+
+  .row {
+    position: absolute; left: 26px; right: 26px; height: 132px;
+    background: linear-gradient(90deg, rgba(255,106,43,.10), rgba(0,0,0,.35) 45%);
+    border: 1px solid rgba(168,119,63,.45);
+    clip-path: polygon(0 0, 97% 0, 100% 18%, 100% 100%, 3% 100%, 0 82%);
+  }
+  .row.sel { border-color: var(--fire); background: linear-gradient(90deg, rgba(255,106,43,.28), rgba(0,0,0,.25) 55%); }
+  .row h2 { position: absolute; left: 150px; top: 20px; font-family: 'Bodoni Moda', serif; font-weight: 500; font-size: 21px; letter-spacing: .06em; font-variant: small-caps; }
+  .row .desc { position: absolute; left: 150px; top: 52px; right: 24px; font-size: 13px; line-height: 1.45; color: #d9c9ad; }
+  .row .desc b { color: #fff; }
+  .row .stat { position: absolute; left: 150px; bottom: 16px; right: 40px; font-family: Oswald, sans-serif; font-size: 13px; letter-spacing: .06em; color: var(--ash); display: flex; justify-content: space-between; }
+  .row .stat span:last-child { color: var(--good); }
+  .row .tag { position: absolute; right: 22px; top: 18px; font-family: Oswald; font-size: 11px; letter-spacing: .2em; color: var(--rift-hot); border: 1px solid var(--rift); padding: 2px 8px; }
+
+  .shard { position: absolute; left: 20px; top: 10px; width: 112px; height: 112px; }
+
+  /* ---------- HUD ---------- */
+  .vitals { position: absolute; left: 22px; top: 22px; }
+  .hp {
+    position: absolute; left: 70px; top: 20px; width: 250px; height: 22px;
+    background: #2a070c; border: 2px solid var(--ink);
+    clip-path: polygon(0 0, 96% 0, 100% 50%, 96% 100%, 0 100%);
+    box-shadow: inset 0 0 0 1px var(--bronze);
+  }
+  .hp i { position: absolute; inset: 2px 30% 2px 2px; background: linear-gradient(180deg, #ff5a4e, #a3121f 60%, #6e0914); }
+  .hp b { position: absolute; width: 100%; text-align: center; font-family: Oswald; font-size: 13px; top: 1px; letter-spacing: .08em; text-shadow: 0 1px 2px #000; }
+  .xp { position: absolute; left: 76px; top: 48px; width: 200px; height: 5px; background: #0b0710; }
+  .xp i { position: absolute; inset: 0 62% 0 0; background: linear-gradient(90deg, #5a22b0, var(--rift-hot)); box-shadow: 0 0 8px var(--rift); }
+  .xp-l { white-space: nowrap; position: absolute; left: 76px; top: 56px; font-family: Oswald; font-size: 10px; letter-spacing: .2em; color: var(--ash); }
+
+  .gold { position: absolute; right: 26px; top: 22px; display: flex; align-items: center; gap: 8px; font-family: 'Bodoni Moda'; font-size: 26px; color: var(--gold); text-shadow: 0 2px 0 #000; }
+
+  .abilities { position: absolute; left: 26px; bottom: 22px; }
+  .ab { position: absolute; width: 74px; text-align: center; }
+  .ab .k { display: inline-block; margin-top: -6px; font-family: Oswald; font-size: 11px; letter-spacing: .15em; padding: 1px 8px; background: var(--ink); border: 1px solid var(--bronze); color: var(--gold); position: relative; }
+  .ab .n { font-family: 'EB Garamond'; font-size: 13px; margin-top: 2px; }
+
+  .note {
+    position: absolute; right: 22px; bottom: 20px; width: 255px; font-family: 'EB Garamond', serif; font-size: 14px; line-height: 1.35; color: var(--ash);
+    border-left: 2px solid var(--rift); padding-left: 12px;
+  }
+  .note b { color: var(--parch); font-family: Oswald; font-weight: 500; letter-spacing: .12em; font-size: 12px; display:block; margin-bottom: 4px; }
+
+  /* ---------- textures ---------- */
+  .tex { isolation: isolate; }
+  .tex::before, .tex::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+  .tex::before { background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='b'><feTurbulence type='fractalNoise' baseFrequency='.012' numOctaves='5' seed='7' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='gamma' exponent='2.2'/><feFuncG type='gamma' exponent='2.2'/><feFuncB type='gamma' exponent='2.2'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23b)'/></svg>"), url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='300'><g stroke='white' stroke-opacity='.10' stroke-width='1' fill='none'><path d='M10 40 l120 -22'/><path d='M60 210 l180 -40'/><path d='M250 60 l130 30'/><path d='M300 250 l90 -70'/><path d='M20 280 l60 -10'/><path d='M150 120 l40 8 l30 -14'/></g><g stroke='black' stroke-opacity='.55' stroke-width='1.2' fill='none'><path d='M330 0 l-14 30 l8 18 l-20 34'/><path d='M0 150 l26 6 l12 -10 l30 14'/></g></svg>"); background-size: 600px 600px, 400px 300px; mix-blend-mode: multiply; opacity: .55; }
+  .tex::after  { background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); mix-blend-mode: overlay; opacity: .55; }
+  .row.tex::before { opacity: .45; }
+  .row.tex::after { opacity: .16; mix-blend-mode: soft-light; }
+  .rough { filter: url(#chip); }
+  .vignette { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at 50% 45%, transparent 45%, rgba(0,0,0,.75) 100%); }
+  .paint { position: absolute; inset: 0; pointer-events: none; opacity: .5; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><filter id='b'><feTurbulence type='fractalNoise' baseFrequency='.012' numOctaves='5' seed='7' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/><feComponentTransfer><feFuncR type='gamma' exponent='2.2'/><feFuncG type='gamma' exponent='2.2'/><feFuncB type='gamma' exponent='2.2'/></feComponentTransfer></filter><rect width='100%' height='100%' filter='url(%23b)'/></svg>"); background-size: 900px 900px; mix-blend-mode: multiply; }
+  .paint2 { position: absolute; inset: 0; pointer-events: none; opacity: .35; background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); mix-blend-mode: overlay; }
+</style>
+</head>
+<body>
+
+<!-- Reusable art: shard frame + inked element glyphs -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="chip" x="-2%" y="-2%" width="104%" height="104%">
+      <feTurbulence type="fractalNoise" baseFrequency=".045" numOctaves="3" seed="11" result="t"/>
+      <feDisplacementMap in="SourceGraphic" in2="t" scale="7" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="grit"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" result="g"/><feColorMatrix in="g" type="saturate" values="0" result="gg"/><feComposite in="gg" in2="SourceGraphic" operator="in" result="m"/><feBlend in="SourceGraphic" in2="m" mode="multiply"/></filter>
+    <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><line x1="0" y1="0" x2="0" y2="6" stroke="#07050a" stroke-width="1.6" stroke-opacity=".55"/></pattern>
+    <linearGradient id="bronzeMetal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e2b170"/><stop offset=".45" stop-color="#9a6a33"/><stop offset=".55" stop-color="#c58c4a"/><stop offset="1" stop-color="#5c3a17"/></linearGradient>
+    <filter id="rough"><feTurbulence baseFrequency=".9" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="2.2"/></filter>
+    <!-- Crystal shard frame: an uneven hexagon held by bronze clamps -->
+    <symbol id="shard" viewBox="0 0 112 112">
+      <polygon points="56,3 102,28 98,86 56,109 12,84 9,26" fill="#07050a" stroke="#07050a" stroke-width="6"/>
+      <polygon points="56,8 97,30 93,83 56,103 17,81 14,29" style="fill: var(--c1)"/>
+      <polygon points="56,8 97,30 93,83 56,103 17,81 14,29" style="fill: var(--c2)" opacity=".85" clip-path="url(#lowerHalf)"/>
+      <polygon points="56,8 97,30 93,83 56,103 17,81 14,29" fill="url(#hatch)" clip-path="url(#lowerHalf)" opacity=".6"/>
+      <polygon points="56,8 97,30 93,83 56,103 17,81 14,29" fill="url(#shade)" stroke="#e9c27a" stroke-width="2.5" filter="url(#grit)"/>
+      <polygon points="56,16 88,34 85,78 56,94 25,77 23,34" fill="none" stroke="#a8773f" stroke-width="1.2" opacity=".8"/>
+      <!-- clamps -->
+      <path d="M44 1 h24 v9 h-24z M44 102 h24 v9 h-24z" fill="url(#bronzeMetal)" stroke="#07050a" stroke-width="2" filter="url(#grit)"/>
+      <circle cx="49" cy="5.5" r="1.6" fill="#2a1a08"/><circle cx="63" cy="5.5" r="1.6" fill="#2a1a08"/>
+      <circle cx="49" cy="106.5" r="1.6" fill="#2a1a08"/><circle cx="63" cy="106.5" r="1.6" fill="#2a1a08"/>
+      <!-- rift fissure -->
+      <polyline points="14,29 30,44 26,58 40,70" fill="none" stroke="#e7c8ff" stroke-width="1.6" filter="url(#glow)"/>
+    </symbol>
+    <clipPath id="lowerHalf"><polygon points="112,30 112,112 0,112 0,86"/></clipPath>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".55"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<svg class="world" width="1280" height="720">
+  <g stroke="#b26cff" stroke-width="2" fill="none" filter="url(#glow)" opacity=".7">
+    <polyline points="40,700 120,610 160,630 240,520"/>
+    <polyline points="1240,120 1150,200 1170,240 1090,330"/>
+    <polyline points="1010,690 1080,600 1060,560"/>
+  </g>
+</svg>
+
+<div class="paint"></div><div class="paint2"></div><div class="vignette"></div>
+
+<!-- ===== HUD: vitals ===== -->
+<div class="vitals">
+  <svg width="74" height="74" viewBox="0 0 112 112" style="position:absolute;left:0;top:0">
+    <polygon points="56,3 102,28 98,86 56,109 12,84 9,26" fill="#07050a"/>
+    <polygon points="56,8 97,30 93,83 56,103 17,81 14,29" fill="#1d0f2c" stroke="#e9c27a" stroke-width="3"/>
+    <polyline points="14,29 30,44 26,58 40,70" fill="none" stroke="#e7c8ff" stroke-width="2" filter="url(#glow)"/>
+    <text x="56" y="44" text-anchor="middle" font-family="Oswald" font-size="13" letter-spacing="3" fill="#e9c27a">LV</text>
+    <text x="56" y="80" text-anchor="middle" font-family="Bodoni Moda" font-size="40" fill="#f1e3c6">7</text>
+  </svg>
+  <div class="hp tex"><i></i><b>77 / 110</b></div>
+  <div class="xp"><i></i></div>
+  <div class="xp-l">38%  ·  RIFT ESSENCE</div>
+</div>
+
+<div class="gold">
+  <svg width="34" height="34" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="#07050a"/><circle cx="20" cy="20" r="15" fill="#e9b450" stroke="#7a4d12" stroke-width="2"/><polygon points="20,9 27,20 20,31 13,20" fill="#3b1470" stroke="#e7c8ff" stroke-width="1.5"/></svg>
+  214
+</div>
+
+<!-- ===== The Forge ===== -->
+<div class="forge">
+  <div class="banner-bg tex rough"></div>
+  <div class="banner">
+    <h1>THE FORGE</h1>
+    <p>Where the rift tears, elements bleed into one another</p>
+  </div>
+  <!-- bronze clamps on the banner corners -->
+  <svg width="720" height="110" style="position:absolute;left:-40px;top:-6px;pointer-events:none">
+    <g fill="url(#bronzeMetal)" stroke="#07050a" stroke-width="2" filter="url(#grit)">
+      <path d="M8 34 l26 -26 h18 l-26 26z"/><path d="M712 34 l-26 -26 h-18 l26 26z"/>
+      <path d="M300 2 h120 l-8 9 h-104z"/>
+    </g>
+    <g fill="#2a1a08"><circle cx="318" cy="6" r="2"/><circle cx="360" cy="6" r="2"/><circle cx="402" cy="6" r="2"/></g>
+    <polyline points="60,104 160,99 200,106 330,100 380,106 520,99 660,105" fill="none" stroke="#b26cff" stroke-width="2" filter="url(#glow)"/>
+  </svg>
+
+  <div class="body tex rough"></div>
+  <!-- hairline cracks across the slab -->
+  <svg width="640" height="540" style="position:absolute;left:0;top:104px;pointer-events:none">
+    <g fill="none" stroke="#000" stroke-opacity=".7" stroke-width="1.3">
+      <polyline points="640,40 600,62 610,90 572,118"/>
+      <polyline points="0,380 30,372 44,392 80,386"/>
+      <polyline points="400,540 410,512 396,496 420,470"/>
+    </g>
+    <g fill="none" stroke="#b26cff" stroke-width="1.4" filter="url(#glow)" opacity=".85">
+      <polyline points="640,40 600,62 610,90"/>
+      <polyline points="400,540 410,512 396,496"/>
+    </g>
+  </svg>
+  <div class="choose">Choose one fusion<small></small></div>
+
+  <!-- Row 1: selected -->
+  <div class="row sel tex" style="top:170px">
+    <svg class="shard" style="--c1:#ff7a3a;--c2:#3c9cff"><use href="#shard"/></svg>
+    <!-- steam glyph: flame over wave, inked -->
+    <svg class="shard" viewBox="0 0 112 112">
+      <g stroke="#07050a" stroke-width="4" stroke-linejoin="round" filter="url(#rough)">
+        <path d="M30 72 q13 -12 26 0 q13 12 26 0 v10 q-13 12 -26 0 q-13 -12 -26 0z" fill="#9fd2ff"/>
+        <path d="M56 26 q14 16 8 28 q8 -4 6 -12 q10 12 2 26 q-6 10 -16 10 q-10 0 -16 -10 q-8 -14 4 -26 q0 8 6 12 q-6 -14 6 -28z" fill="#ffb067"/>
+        <path d="M56 48 q6 8 2 16 q-6 4 -8 -2 q-2 -6 6 -14z" fill="#fff3d0" stroke-width="2.5"/>
+      </g>
+    </svg>
+    <h2>Steam Cloud</h2>
+    <div class="tag">FIRE + WATER</div>
+    <div class="desc">Fuse <b>Fireball</b> and <b>Tidal Wave</b>. A scalding cloud that <b>Burns</b> and <b>Slows</b> everything inside.</div>
+    <div class="stat"><span>▸ Damage per tick</span><span>9  ·  5 sec</span></div>
+  </div>
+
+  <!-- Row 2 -->
+  <div class="row tex" style="top:316px">
+    <svg class="shard" style="--c1:#ff7a3a;--c2:#7a4a1e"><use href="#shard"/></svg>
+    <svg class="shard" viewBox="0 0 112 112">
+      <g stroke="#07050a" stroke-width="4" stroke-linejoin="round" filter="url(#rough)">
+        <path d="M24 84 l14 -30 l10 12 l10 -26 l12 22 l8 -10 l12 32z" fill="#7a4a1e"/>
+        <path d="M44 84 q4 -14 12 -18 q8 4 12 18z" fill="#ff7a2b"/>
+        <circle cx="70" cy="34" r="6" fill="#ffcf6b"/><circle cx="40" cy="40" r="4" fill="#ffcf6b"/>
+      </g>
+    </svg>
+    <h2>Magma Burst</h2>
+    <div class="tag">FIRE + EARTH</div>
+    <div class="desc">Fuse <b>Fireball</b> and <b>Stone Spike</b>. The ground erupts in molten rock and leaves enemies <b>Burning</b>.</div>
+    <div class="stat"><span>▸ Strike Damage</span><span>55</span></div>
+  </div>
+
+  <!-- Row 3 -->
+  <div class="row tex" style="top:462px">
+    <svg class="shard" style="--c1:#3c9cff;--c2:#5b3b16"><use href="#shard"/></svg>
+    <svg class="shard" viewBox="0 0 112 112">
+      <g stroke="#07050a" stroke-width="4" stroke-linejoin="round" filter="url(#rough)">
+        <ellipse cx="56" cy="72" rx="32" ry="12" fill="#5b3b16"/>
+        <path d="M30 70 q8 -10 16 0 q8 10 16 0 q8 -10 18 0" fill="none" stroke="#3c9cff" stroke-width="5"/>
+        <path d="M48 40 q8 -14 16 0 q-8 10 -16 0z" fill="#9fd2ff"/>
+      </g>
+    </svg>
+    <h2>Mud Trap</h2>
+    <div class="tag">WATER + EARTH</div>
+    <div class="desc">Fuse <b>Tidal Wave</b> and <b>Stone Spike</b>. A sticky swamp that nearly stops enemies and <b>Soaks</b> them.</div>
+    <div class="stat"><span>▸ Slow</span><span>70%</span></div>
+  </div>
+</div>
+
+<!-- ===== HUD: ability shards ===== -->
+<div class="abilities">
+  <div class="ab" style="left:0;bottom:12px">
+    <svg width="74" height="74" style="--c1:#c69bff;--c2:#3b1470"><use href="#shard"/></svg>
+    <div class="k">LMB</div><div class="n">Rift Bolt</div>
+  </div>
+  <div class="ab" style="left:84px;bottom:22px">
+    <svg width="74" height="74" style="--c1:#ffb067;--c2:#2a5fa8"><use href="#shard"/></svg>
+    <div class="k">Q</div><div class="n">Steam Cloud</div>
+  </div>
+  <div class="ab" style="left:168px;bottom:22px">
+    <svg width="74" height="74" style="--c1:#ffe36b;--c2:#7a5a0e"><use href="#shard"/></svg>
+    <div class="k">E</div><div class="n">Spark Bolt</div>
+  </div>
+  <div class="ab" style="left:252px;bottom:12px">
+    <svg width="74" height="74" style="--c1:#6b4a8f;--c2:#140a20"><use href="#shard"/></svg>
+    <div class="k">SHIFT</div><div class="n">Dash</div>
+  </div>
+</div>
+
+<div class="note">
+  <b>RIFTBOUND STYLE — MOCKUP v2 (TEXTURED)</b>
+  Shattered obsidian slabs held by bronze clamps. Glowing rift cracks instead of Greek-key borders. Crystal-shard icons with inked, hand-drawn glyphs. Each screen takes the colour of its element. Textures: stone grain, chipped edges, scratches, hammered bronze and ink hatching.
+</div>
+
+</body>
+</html>

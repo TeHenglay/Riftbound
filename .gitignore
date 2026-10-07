@@ -2,3 +2,6 @@
 /*.rbxlx
 /*.lock
 /Packages
+
+# Intermediate HTML used to render UI art
+art/ui/_src/
