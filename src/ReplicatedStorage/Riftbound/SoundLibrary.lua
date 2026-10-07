@@ -60,8 +60,12 @@ SoundLibrary.Sounds = {
 	Freeze = { Id = 9118762653, Volume = 0.4, Pitch = 1.4, Length = 0.8, Gap = 0.1 },
 	LeapWhoosh = { Id = 9125647922, Volume = 0.45, Pitch = 0.75, Length = 0.9 },
 	GroundSlam = { Id = 9118609396, Volume = 0.75, Pitch = { 0.85, 0.95 }, Length = 2 },
-	MagnetHum = { Id = 9125550012, Volume = 0.5, Pitch = 1.2 },
-	MagnetBlast = { Id = 9116274992, Volume = 0.55, Pitch = 0.9, Length = 1.4, Layer = { "RockBurst" } },
+	MagnetHum = { Id = 9125550012, Volume = 0.7, Pitch = 1.2 },
+	-- The pull: a reversed whoosh sucking in, with a rising electric reversed zap on top.
+	MagnetPull = { Id = 9120698917, Volume = 0.8, Pitch = 1.25, Length = 0.8, Layer = { "MagnetPullZap" } },
+	MagnetPullZap = { Id = 9120984466, Volume = 0.5, Pitch = 0.9, Length = 0.8 },
+	MagnetBlast = { Id = 9116274992, Volume = 0.55, Pitch = 0.9, Length = 1.4, Layer = { "RockBurst", "MagnetBoom" } },
+	MagnetBoom = { Id = 9114224675, Volume = 0.6, Pitch = 1.1, Length = 1.8 },
 	StormLoop = { Id = 9112853422, Volume = 0.4, Pitch = 1 },
 
 	-- Dash and block -------------------------------------------------------
@@ -171,7 +175,7 @@ SoundLibrary.Skills = {
 	FrostGale = { Cone = { { "Blizzard", After = "Windup" } } },
 	ChainShock = { Bolt = { { "ZapFirst", If = "First" }, { "Zap", Unless = "First" } } },
 	Sandstorm = { Leap = "LeapWhoosh", LeapSlam = "GroundSlam" },
-	MagnetQuake = { Magnet = { { "MagnetHum", For = "PullTime" } }, MagnetBlast = "MagnetBlast" },
+	MagnetQuake = { Magnet = { "MagnetPull", { "MagnetHum", For = "PullTime" } }, MagnetBlast = "MagnetBlast" },
 	Thunderstorm = {
 		Zone = { "ZapFirst", { "StormLoop", For = "Duration" } },
 		Bolt = { { "ThunderCrack", If = "Strike" }, { "Zap", Unless = "Strike" } },
