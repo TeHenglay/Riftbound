@@ -54,7 +54,7 @@ SoundLibrary.Sounds = {
 	FireTornadoLoop = { Id = 9120610106, Volume = 0.45, Pitch = 0.8 },
 	PlasmaCharge = { Id = 9120985853, Volume = 0.45, Pitch = 0.8, Length = 0.5 },
 	-- "Time Warp Big Explosion" (the user's pick, 2026-10-07): a tonal boom with a long tail.
-	PlasmaExplode = { Ids = { 9126102254, 9126102397, 9126102402, 9126102430, 9126102562, 9126102564 }, Volume = 0.7, Pitch = 1, Length = 2.5, Layer = { "PlasmaCrackle" } },
+	PlasmaExplode = { Ids = { 9126102254, 9126102397, 9126102402, 9126102562 }, Volume = 0.7, Pitch = 1, Length = 2.5, Layer = { "PlasmaCrackle" } },
 	PlasmaCrackle = { Id = 9116274415, Volume = 0.45, Pitch = 1, Length = 1.2 },
 	BoulderRoll = { Id = 9118661490, Volume = 0.55, Pitch = 0.7, Length = 1.6 },
 	BoulderCrash = { Id = 9125871203, Volume = 0.6, Pitch = 0.9, Length = 1.6 },
@@ -140,6 +140,7 @@ SoundLibrary.Starts = {
 	[9125645963] = 0.3, -- MeteorFall
 	[9113074084] = 0.39, -- SteamLoop
 	[9125550012] = 0.28, -- MagnetHum
+	[9120698917] = 2.19, -- MagnetPull: its suck-in peaks at 2.94 s, so it lands ~0.6 s after the Magnet event
 	[9125871203] = 0.28, -- BoulderCrash
 	[9118609396] = 0.24, -- GroundSlam
 	[9118882814] = 0.19, -- SteamBurst
