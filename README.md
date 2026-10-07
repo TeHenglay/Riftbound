@@ -106,6 +106,27 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   drop chances in `TestArena.server.lua` (`Loot`).
 - The arrow tab on the Arsenal panel slides it off-screen and back.
 
+## Sound
+
+- Every sound is listed in `src/ReplicatedStorage/Riftbound/SoundLibrary.lua`:
+  71 Roblox-licensed audio assets (Pro Sound Effects for effects, APM and
+  DistroKid for music), so nothing needs uploading and nothing gets moderated.
+- `SoundFX.lua` (client, started by `SoundBoot.client.lua`) plays them by
+  listening to signals the game already sends: the `SkillFx` remote (casts,
+  explosions, zones, bolts, shield, heal, level up), Rift Husk attributes
+  (`SpawnAt`, `AttackAt`, `HitAt`, `Reaction`, `Status_Freeze`, death), the local
+  player's health, `Gold`, `Xp`, `FlaskCharges` and `StatPoints`, the dash's
+  LinearVelocity, `Notify` toasts (fuse, new skill, item pickup), `OpenForge`
+  and every GuiButton (click and hover; set a button's `Silent` attribute to mute it).
+- 3D sounds are heard from your character, not the high camera.
+- Music: "The Sunken Vault" while exploring, crossfading to APM's "Darkness On
+  The Edge Of Time" while a Rift Husk is within 60 studs or you are fighting.
+  A low rift rumble plays underneath.
+- Volumes per group (SFX, UI, Music, Ambient) are in `SoundLibrary.GroupVolumes`;
+  `SoundFX.SetVolume("Music", 0)` changes one at runtime.
+- To give a new skill sound, add an entry to `SoundLibrary.Skills` keyed by the
+  skill id and the `SkillFx` event type it fires.
+
 ## How fusion works
 
 - Five elements: Fire, Water, Earth, Air, Lightning. Each grants one base skill.
