@@ -5,6 +5,12 @@
 -- every creator (uploader "ProSoundEffects"); music comes from Roblox's licensed
 -- APM and DistroKid catalogues. All are public, free and safe to ship.
 --
+-- Most spell, combat, pickup and UI sounds are from "Pixel Combat" by Helton Yan
+-- (heltonyan.itch.io/pixelcombat), CC BY 4.0: the game must credit
+-- "Sound effects: Helton Yan - Pixel Combat". The player-death sting is from
+-- Chequered Ink's 400 Sounds Pack (free for commercial use). Both were uploaded
+-- privately by the owner.
+--
 -- Sound fields:
 --   Id      one asset id, or Ids = { ... } to pick one at random each play
 --   Volume  0-1 (multiplied by the sound's group volume)
@@ -21,47 +27,47 @@ SoundLibrary.GroupVolumes = { SFX = 0.8, UI = 0.6, Music = 0.3, Ambient = 0.35 }
 
 SoundLibrary.Sounds = {
 	-- Rift Bolt (basic attack) --------------------------------------------
-	RiftBoltCast = { Ids = { 9125648149, 9125648134, 9125647857 }, Volume = 0.3, Pitch = { 1.15, 1.35 }, Length = 0.45 },
-	RiftBoltHit = { Id = 9116275998, Volume = 0.25, Pitch = { 1.4, 1.7 }, Length = 0.3 },
+	RiftBoltCast = { Ids = { 121658823184534, 104866894029516 }, Volume = 0.35, Pitch = { 0.95, 1.1 } },
+	RiftBoltHit = { Ids = { 131282479801015, 94011801957710 }, Volume = 0.35, Pitch = { 0.95, 1.1 } },
 
 	-- Fire -----------------------------------------------------------------
-	FireCast = { Ids = { 9114446852, 9114446802 }, Volume = 0.55, Pitch = { 0.95, 1.1 }, Length = 0.9, Layer = { "FireIgnite" } },
-	FireIgnite = { Id = 134098720731900, Volume = 0.4, Pitch = { 0.95, 1.1 } },
-	FireExplode = { Id = 9114554567, Volume = 0.6, Pitch = { 1, 1.15 }, Length = 1.6 },
-	FanTheFlames = { Id = 9114446277, Volume = 0.5, Pitch = 1.1, Length = 1 },
+	FireCast = { Ids = { 134192015548215, 82915708772884 }, Volume = 0.5, Pitch = { 0.95, 1.05 } },
+	FireExplode = { Ids = { 136419750833913, 123327994066045 }, Volume = 0.6, Pitch = { 0.95, 1.05 } },
+	FanTheFlames = { Id = 74658953263791, Volume = 0.5 },
 
 	-- Water ----------------------------------------------------------------
-	WaveCrash = { Ids = { 9120589380, 9120585252 }, Volume = 0.6, Pitch = { 0.9, 1 }, Length = 1.8 },
+	WaveCrash = { Ids = { 107926517306411, 71001287937181 }, Volume = 0.6 },
 
 	-- Earth ----------------------------------------------------------------
 	EarthRumble = { Id = 9125869504, Volume = 0.3, Pitch = 0.8, Length = 0.5 },
-	RockBurst = { Ids = { 9118612665, 9118613208, 9118614058 }, Volume = 0.65, Pitch = { 0.95, 1.1 }, Length = 1.6 },
+	RockBurst = { Ids = { 125274851800597, 76835142099932 }, Volume = 0.6, Pitch = { 0.95, 1.05 } },
 
 	-- Air ------------------------------------------------------------------
-	WindBlast = { Id = 9120769331, Volume = 0.6, Pitch = { 1, 1.15 }, Length = 1.4 },
+	WindBlast = { Ids = { 121640170557771, 107022836228252 }, Volume = 0.6 },
 
 	-- Lightning ------------------------------------------------------------
-	ZapFirst = { Id = 9120985853, Volume = 0.5, Pitch = { 1, 1.1 }, Length = 0.8 },
-	Zap = { Ids = { 9114277338, 9114277403, 9114277601 }, Volume = 0.4, Pitch = { 1.05, 1.3 }, Length = 0.45, Gap = 0.05 },
-	ThunderCrack = { Id = 9120021794, Volume = 0.55, Pitch = { 1, 1.15 }, Length = 2.2, Gap = 0.25, Layer = { "ZapFirst" } },
+	ZapFirst = { Id = 125995775704384, Volume = 0.5 },
+	Zap = { Ids = { 140188901214206, 98616821053616 }, Volume = 0.4, Pitch = { 0.95, 1.15 }, Gap = 0.05 },
+	ThunderCrack = { Ids = { 72222857358993, 82693638856993 }, Volume = 0.6, Gap = 0.25, Layer = { "ZapFirst" } },
 
 	-- Fusions --------------------------------------------------------------
 	SteamBurst = { Id = 9118882814, Volume = 0.5, Pitch = 0.85, Length = 1.4 },
 	SteamLoop = { Id = 9113074084, Volume = 0.3, Pitch = 0.75 },
 	MeteorFall = { Id = 9125645963, Volume = 0.55, Pitch = 0.7, Length = 1 },
-	MeteorImpact = { Id = 9117876706, Volume = 0.75, Pitch = { 0.95, 1.05 }, Length = 2.6, Layer = { "FireExplode" } },
+	MeteorImpact = { Ids = { 132877989312932, 121728950168783 }, Volume = 0.75, Layer = { "FireExplode" } },
 	LavaLoop = { Id = 9112752570, Volume = 0.3, Pitch = 0.45 },
+	TornadoStart = { Id = 134709600120862, Volume = 0.6 },
 	FireTornadoLoop = { Id = 9120610106, Volume = 0.45, Pitch = 0.8 },
-	PlasmaCharge = { Id = 9120985853, Volume = 0.45, Pitch = 0.8, Length = 0.5 },
+	PlasmaCharge = { Id = 119095676067671, Volume = 0.45 },
 	-- "Time Warp Big Explosion" (the user's pick, 2026-10-07): a tonal boom with a long tail.
 	PlasmaExplode = { Ids = { 9126102254, 9126102397, 9126102402, 9126102562 }, Volume = 0.7, Pitch = 1, Length = 2.5, Layer = { "PlasmaCrackle" } },
 	PlasmaCrackle = { Id = 9116274415, Volume = 0.45, Pitch = 1, Length = 1.2 },
 	BoulderRoll = { Id = 9118661490, Volume = 0.55, Pitch = 0.7, Length = 1.6 },
 	BoulderCrash = { Id = 9125871203, Volume = 0.6, Pitch = 0.9, Length = 1.6 },
 	Blizzard = { Id = 9125629904, Volume = 0.6, Pitch = { 1, 1.1 }, Length = 1.4 },
-	Freeze = { Id = 9118762653, Volume = 0.4, Pitch = 1.4, Length = 0.8, Gap = 0.1 },
-	LeapWhoosh = { Id = 9125647922, Volume = 0.45, Pitch = 0.75, Length = 0.9 },
-	GroundSlam = { Id = 9118609396, Volume = 0.75, Pitch = { 0.85, 0.95 }, Length = 2 },
+	Freeze = { Id = 127850345401771, Volume = 0.45, Gap = 0.1 },
+	LeapWhoosh = { Id = 130019457938272, Volume = 0.5 },
+	GroundSlam = { Ids = { 87106924395745, 107272277405763 }, Volume = 1 },
 	MagnetHum = { Id = 9125550012, Volume = 0.7, Pitch = 1.2 },
 	-- The pull: a reversed whoosh sucking in, with a rising electric reversed zap on top.
 	MagnetPull = { Id = 9120698917, Volume = 0.8, Pitch = 1.25, Length = 0.8, Layer = { "MagnetPullZap" } },
@@ -71,51 +77,49 @@ SoundLibrary.Sounds = {
 	StormLoop = { Id = 9112853422, Volume = 0.4, Pitch = 1 },
 
 	-- Dash and block -------------------------------------------------------
-	Dash = { Ids = { 78604589937896, 92464911438350 }, Volume = 0.5, Pitch = { 1, 1.15 } },
-	ShieldUp = { Id = 9125646705, Volume = 0.35, Pitch = 1.2, Length = 0.6 },
-	BlockHit = { Ids = { 81094520848547, 132939625189797 }, Volume = 0.5, Pitch = { 0.95, 1.05 } },
-	Parry = { Id = 85569261928454, Volume = 0.6, Pitch = 1.05, Layer = { "ParryRing" } },
+	Dash = { Ids = { 107387920423978, 88587059173651 }, Volume = 0.45, Pitch = { 1, 1.1 } },
+	ShieldUp = { Id = 101879415748134, Volume = 0.45 },
+	BlockHit = { Ids = { 101818717362356, 112846838372417 }, Volume = 0.5 },
+	Parry = { Ids = { 131956829341009, 75621315180857 }, Volume = 0.6, Layer = { "ParryRing" } },
 	ParryRing = { Id = 9116394545, Volume = 0.9, Pitch = 1.4, Length = 1.2 },
-	ShieldBreak = { Id = 9114855870, Volume = 0.6, Pitch = 0.8, Length = 1.2 },
+	ShieldBreak = { Id = 94090259757453, Volume = 0.55 },
 
 	-- Player ---------------------------------------------------------------
-	PlayerHurt = { Id = 120701013465274, Volume = 0.4, Pitch = { 0.95, 1.1 }, Gap = 0.2, Group = "UI" },
+	PlayerHurt = { Ids = { 103166448217609, 107796053988946 }, Volume = 0.4, Gap = 0.2, Group = "UI" },
 	PlayerDeath = { Id = 132026278313234, Volume = 0.5, Pitch = 1, Group = "UI" },
 
 	-- Rift Husk ------------------------------------------------------------
-	EnemySpawn = { Id = 9125646252, Volume = 0.35, Pitch = 0.7, Length = 1.2, Layer = { "EarthRumble" } },
+	EnemySpawn = { Id = 74487219785978, Volume = 0.45, Layer = { "EarthRumble" } },
 	HuskWindup = { Ids = { 9113980644, 9113980319 }, Volume = 0.45, Pitch = { 1.05, 1.2 }, Length = 0.6 },
 	HuskSlam = { Id = 9118598279, Volume = 0.6, Pitch = { 0.9, 1 }, Length = 0.6 },
-	EnemyHit = { Ids = { 137090049192245, 90038469311667, 118579190178152 }, Volume = 0.35, Pitch = { 0.9, 1.1 }, Gap = 0.08 },
-	HuskDeath = { Id = 122406276676583, Volume = 0.55, Pitch = { 0.9, 1 } },
+	EnemyHit = { Ids = { 122689329097985, 110670570771801, 123504504510960 }, Volume = 0.35, Pitch = { 0.95, 1.1 }, Gap = 0.08 },
+	HuskDeath = { Id = 99233433897004, Volume = 0.5 },
 
 	-- Elemental reactions --------------------------------------------------
-	Conduct = { Id = 9116276946, Volume = 0.5, Pitch = 1.1, Length = 0.9 },
+	Conduct = { Id = 103594791893189, Volume = 0.5 },
 	Evaporate = { Id = 9118884046, Volume = 0.45, Pitch = 1, Length = 1 },
-	Shatter = { Id = 9114856749, Volume = 0.55, Pitch = 1.1, Length = 1 },
+	Shatter = { Id = 139281192599338, Volume = 0.55 },
 
 	-- Flask, loot and progression ------------------------------------------
-	FlaskDrink = { Id = 114035183226389, Volume = 0.5, Pitch = 1, Group = "UI" },
-	Heal = { Id = 123157256954304, Volume = 1, Pitch = 1 },
-	Coin = { Ids = { 104650372355217, 94029063108814 }, Volume = 0.35, Pitch = { 0.95, 1.1 }, Gap = 0.06, Group = "UI" },
-	XpPickup = { Id = 9116395085, Volume = 0.4, Pitch = { 1.5, 1.8 }, Length = 0.5, Gap = 0.06, Group = "UI" },
-	ItemPickup = { Id = 85897743052008, Volume = 0.5, Pitch = 1, Group = "UI" },
-	LevelUp = { Id = 80017307806858, Volume = 0.5, Pitch = 1 },
-	StatUp = { Id = 107634744540824, Volume = 0.7, Pitch = 1, Group = "UI" },
-	SkillGet = { Id = 103047157708778, Volume = 0.5, Pitch = 1, Group = "UI" },
-	SkillUp = { Id = 103047157708778, Volume = 0.5, Pitch = 1.12, Group = "UI" },
+	FlaskDrink = { Id = 82906633107249, Volume = 0.5, Group = "UI" },
+	Heal = { Id = 85950268306860, Volume = 0.5 },
+	Coin = { Ids = { 125999707019231, 127129474740504 }, Volume = 0.35, Gap = 0.06, Group = "UI" },
+	XpPickup = { Id = 132955985344340, Volume = 0.25, Pitch = { 1, 1.15 }, Gap = 0.06, Group = "UI" },
+	ItemPickup = { Id = 138333127230518, Volume = 0.5, Group = "UI" },
+	LevelUp = { Id = 126004530261272, Volume = 0.55 },
+	StatUp = { Id = 107096409622186, Volume = 0.5, Group = "UI" },
+	SkillGet = { Id = 98451543907155, Volume = 0.5, Group = "UI" },
+	SkillUp = { Id = 98451543907155, Volume = 0.5, Pitch = 1.12, Group = "UI" },
 
 	-- Forge ----------------------------------------------------------------
-	ForgeOpen = { Id = 120637296784356, Volume = 0.7, Pitch = 1, Group = "UI" },
+	ForgeOpen = { Id = 100752369665842, Volume = 0.5, Group = "UI" },
 	Fuse = { Id = 9113445305, Volume = 0.55, Pitch = 0.9, Length = 1.5, Group = "UI", Layer = { "FuseShimmer" } },
-	FuseShimmer = { Id = 96619546080061, Volume = 0.6, Pitch = 1, Group = "UI" },
+	FuseShimmer = { Id = 107149510023542, Volume = 0.55, Group = "UI" },
 
 	-- UI -------------------------------------------------------------------
-	-- UI, pickups, hits, block, dash and stingers below come from Chequered Ink's
-	-- 400 Sounds Pack (free for commercial use), uploaded privately by the owner.
-	UIClick = { Id = 122103286542040, Volume = 0.5, Pitch = { 0.97, 1.05 }, Group = "UI", Gap = 0.03 },
-	UIHover = { Id = 107074263612423, Volume = 0.25, Pitch = 1, Group = "UI", Gap = 0.05 },
-	UIDeny = { Id = 71838626443614, Volume = 0.8, Pitch = 1, Group = "UI" },
+	UIClick = { Ids = { 106642438444356, 127006080624447 }, Volume = 0.35, Group = "UI", Gap = 0.03 },
+	UIHover = { Id = 135028017202421, Volume = 0.15, Group = "UI", Gap = 0.05 },
+	UIDeny = { Id = 83910226909070, Volume = 0.45, Group = "UI" },
 
 	-- Music and ambience -----------------------------------------------------
 	MusicExplore = { Id = 92586093726730, Volume = 0.8, Group = "Music" }, -- "The Sunken Vault (Dungeon Ambience)"
@@ -173,7 +177,7 @@ SoundLibrary.Skills = {
 		Cast = "FireCast",
 		Meteor = { "MeteorFall", { "MeteorImpact", After = "Delay" }, { "LavaLoop", After = "Delay", For = "Duration" } },
 	},
-	Firestorm = { Cast = "FireCast", Tornado = { "WindBlast", { "FireTornadoLoop", For = "Duration" } } },
+	Firestorm = { Cast = "FireCast", Tornado = { "TornadoStart", { "FireTornadoLoop", For = "Duration" } } },
 	PlasmaLance = { Cast = "PlasmaCharge", ProjectileEnd = "PlasmaExplode" },
 	MudTrap = { Roller = { { "BoulderRoll", After = "Windup" } }, RollerEnd = "BoulderCrash" },
 	FrostGale = { Cone = { { "Blizzard", After = "Windup" } } },

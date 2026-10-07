@@ -109,8 +109,12 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 ## Sound
 
 - Every sound is listed in `src/ReplicatedStorage/Riftbound/SoundLibrary.lua`:
-  71 Roblox-licensed audio assets (Pro Sound Effects for effects, APM and
-  DistroKid for music), so nothing needs uploading and nothing gets moderated.
+  most spell, combat, pickup and UI sounds are from Helton Yan's "Pixel Combat"
+  pack (CC BY 4.0, uploaded privately by the owner); the rest are Roblox-licensed
+  Pro Sound Effects, plus APM and DistroKid music.
+- **Credit required:** "Sound effects: Helton Yan - Pixel Combat"
+  (https://heltonyan.itch.io/pixelcombat) must appear in the game description or
+  a credits screen.
 - `SoundFX.lua` (client, started by `SoundBoot.client.lua`) plays them by
   listening to signals the game already sends: the `SkillFx` remote (casts,
   explosions, zones, bolts, shield, heal, level up), Rift Husk attributes
