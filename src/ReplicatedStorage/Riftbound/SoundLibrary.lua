@@ -25,7 +25,8 @@ SoundLibrary.Sounds = {
 	RiftBoltHit = { Id = 9116275998, Volume = 0.25, Pitch = { 1.4, 1.7 }, Length = 0.3 },
 
 	-- Fire -----------------------------------------------------------------
-	FireCast = { Ids = { 9114446852, 9114446802 }, Volume = 0.55, Pitch = { 0.95, 1.1 }, Length = 0.9 },
+	FireCast = { Ids = { 9114446852, 9114446802 }, Volume = 0.55, Pitch = { 0.95, 1.1 }, Length = 0.9, Layer = { "FireIgnite" } },
+	FireIgnite = { Id = 134098720731900, Volume = 0.4, Pitch = { 0.95, 1.1 } },
 	FireExplode = { Id = 9114554567, Volume = 0.6, Pitch = { 1, 1.15 }, Length = 1.6 },
 	FanTheFlames = { Id = 9114446277, Volume = 0.5, Pitch = 1.1, Length = 1 },
 
@@ -70,23 +71,23 @@ SoundLibrary.Sounds = {
 	StormLoop = { Id = 9112853422, Volume = 0.4, Pitch = 1 },
 
 	-- Dash and block -------------------------------------------------------
-	Dash = { Ids = { 9113840530, 9113840096 }, Volume = 0.45, Pitch = { 1.15, 1.3 }, Length = 0.5 },
+	Dash = { Ids = { 78604589937896, 92464911438350 }, Volume = 0.5, Pitch = { 1, 1.15 } },
 	ShieldUp = { Id = 9125646705, Volume = 0.35, Pitch = 1.2, Length = 0.6 },
-	BlockHit = { Ids = { 9119072660, 9119072674 }, Volume = 0.55, Pitch = { 0.95, 1.05 }, Length = 0.8 },
-	Parry = { Id = 9119747138, Volume = 0.6, Pitch = 1.15, Length = 0.8, Layer = { "ParryRing" } },
+	BlockHit = { Ids = { 81094520848547, 132939625189797 }, Volume = 0.5, Pitch = { 0.95, 1.05 } },
+	Parry = { Id = 85569261928454, Volume = 0.6, Pitch = 1.05, Layer = { "ParryRing" } },
 	ParryRing = { Id = 9116394545, Volume = 0.9, Pitch = 1.4, Length = 1.2 },
 	ShieldBreak = { Id = 9114855870, Volume = 0.6, Pitch = 0.8, Length = 1.2 },
 
 	-- Player ---------------------------------------------------------------
-	PlayerHurt = { Id = 9113520892, Volume = 0.45, Pitch = { 0.9, 1.1 }, Length = 0.5, Gap = 0.2, Group = "UI" },
-	PlayerDeath = { Id = 9125652949, Volume = 0.6, Pitch = 1, Group = "UI" },
+	PlayerHurt = { Id = 120701013465274, Volume = 0.4, Pitch = { 0.95, 1.1 }, Gap = 0.2, Group = "UI" },
+	PlayerDeath = { Id = 132026278313234, Volume = 0.5, Pitch = 1, Group = "UI" },
 
 	-- Rift Husk ------------------------------------------------------------
 	EnemySpawn = { Id = 9125646252, Volume = 0.35, Pitch = 0.7, Length = 1.2, Layer = { "EarthRumble" } },
 	HuskWindup = { Ids = { 9113980644, 9113980319 }, Volume = 0.45, Pitch = { 1.05, 1.2 }, Length = 0.6 },
 	HuskSlam = { Id = 9118598279, Volume = 0.6, Pitch = { 0.9, 1 }, Length = 0.6 },
-	EnemyHit = { Id = 9118623491, Volume = 0.3, Pitch = { 0.85, 1.15 }, Length = 0.4, Gap = 0.08 },
-	HuskDeath = { Id = 9114855870, Volume = 0.55, Pitch = { 1, 1.15 }, Length = 1.4 },
+	EnemyHit = { Ids = { 137090049192245, 90038469311667, 118579190178152 }, Volume = 0.35, Pitch = { 0.9, 1.1 }, Gap = 0.08 },
+	HuskDeath = { Id = 122406276676583, Volume = 0.55, Pitch = { 0.9, 1 } },
 
 	-- Elemental reactions --------------------------------------------------
 	Conduct = { Id = 9116276946, Volume = 0.5, Pitch = 1.1, Length = 0.9 },
@@ -94,26 +95,27 @@ SoundLibrary.Sounds = {
 	Shatter = { Id = 9114856749, Volume = 0.55, Pitch = 1.1, Length = 1 },
 
 	-- Flask, loot and progression ------------------------------------------
-	FlaskDrink = { Ids = { 9114171855, 9114172114 }, Volume = 0.5, Pitch = 1, Group = "UI" },
-	Heal = { Id = 9116394545, Volume = 0.9, Pitch = 1.1, Length = 1.5 },
-	Coin = { Id = 9113849375, Volume = 0.3, Pitch = { 1.2, 1.4 }, Length = 0.35, Gap = 0.06, Group = "UI" },
+	FlaskDrink = { Id = 114035183226389, Volume = 0.5, Pitch = 1, Group = "UI" },
+	Heal = { Id = 123157256954304, Volume = 1, Pitch = 1 },
+	Coin = { Ids = { 104650372355217, 94029063108814 }, Volume = 0.35, Pitch = { 0.95, 1.1 }, Gap = 0.06, Group = "UI" },
 	XpPickup = { Id = 9116395085, Volume = 0.4, Pitch = { 1.5, 1.8 }, Length = 0.5, Gap = 0.06, Group = "UI" },
-	ItemPickup = { Id = 9116395089, Volume = 0.45, Pitch = 1.6, Length = 0.6, Group = "UI" },
-	LevelUp = { Id = 9119447936, Volume = 0.6, Pitch = 1, Length = 2.5, Layer = { "LevelUpGlow" } },
-	LevelUpGlow = { Id = 9116395089, Volume = 0.5, Pitch = 0.9, Length = 2.5 },
-	StatUp = { Id = 9116394876, Volume = 0.4, Pitch = 1.25, Length = 0.8, Group = "UI" },
-	SkillGet = { Id = 9116395089, Volume = 0.5, Pitch = 1.1, Length = 1.5, Group = "UI" },
-	SkillUp = { Id = 9116395089, Volume = 0.5, Pitch = 1.3, Length = 1.2, Group = "UI" },
+	ItemPickup = { Id = 85897743052008, Volume = 0.5, Pitch = 1, Group = "UI" },
+	LevelUp = { Id = 80017307806858, Volume = 0.5, Pitch = 1 },
+	StatUp = { Id = 107634744540824, Volume = 0.7, Pitch = 1, Group = "UI" },
+	SkillGet = { Id = 103047157708778, Volume = 0.5, Pitch = 1, Group = "UI" },
+	SkillUp = { Id = 103047157708778, Volume = 0.5, Pitch = 1.12, Group = "UI" },
 
 	-- Forge ----------------------------------------------------------------
-	ForgeOpen = { Id = 9125646712, Volume = 0.45, Pitch = 0.9, Length = 1.4, Group = "UI" },
+	ForgeOpen = { Id = 120637296784356, Volume = 0.7, Pitch = 1, Group = "UI" },
 	Fuse = { Id = 9113445305, Volume = 0.55, Pitch = 0.9, Length = 1.5, Group = "UI", Layer = { "FuseShimmer" } },
-	FuseShimmer = { Id = 9119447936, Volume = 0.5, Pitch = 1.15, Length = 2, Group = "UI" },
+	FuseShimmer = { Id = 96619546080061, Volume = 0.6, Pitch = 1, Group = "UI" },
 
 	-- UI -------------------------------------------------------------------
-	UIClick = { Id = 9119717523, Volume = 0.45, Pitch = { 1, 1.1 }, Group = "UI", Gap = 0.03 },
-	UIHover = { Id = 9119717529, Volume = 0.12, Pitch = 1.6, Group = "UI", Gap = 0.05 },
-	UIDeny = { Id = 9119717523, Volume = 0.4, Pitch = 0.6, Group = "UI" },
+	-- UI, pickups, hits, block, dash and stingers below come from Chequered Ink's
+	-- 400 Sounds Pack (free for commercial use), uploaded privately by the owner.
+	UIClick = { Id = 122103286542040, Volume = 0.5, Pitch = { 0.97, 1.05 }, Group = "UI", Gap = 0.03 },
+	UIHover = { Id = 107074263612423, Volume = 0.25, Pitch = 1, Group = "UI", Gap = 0.05 },
+	UIDeny = { Id = 71838626443614, Volume = 0.8, Pitch = 1, Group = "UI" },
 
 	-- Music and ambience -----------------------------------------------------
 	MusicExplore = { Id = 92586093726730, Volume = 0.8, Group = "Music" }, -- "The Sunken Vault (Dungeon Ambience)"
