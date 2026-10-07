@@ -62,17 +62,17 @@ const G = {
   SteamCloud: `<path d="M60 170 q-24 0 -24 -24 q0 -26 30 -26 q6 -34 44 -34 q30 0 42 26 q36 -6 44 26 q24 4 24 28 q0 22 -28 22z" fill="#e6eef5"/>
     <path d="M96 168 q8 -24 0 -40 q22 14 18 40z M150 168 q6 -20 -2 -34 q20 12 16 34z" fill="#ff8a3a" stroke-width="5"/>
     <path d="M60 196 q20 -12 40 0 q20 12 40 0 q20 -12 40 0" fill="none" stroke="#3c9cff" stroke-width="9"/>`,
-  MagmaBurst: `<path d="M34 206 L80 116 L104 146 L128 84 L156 140 L172 120 L222 206Z" fill="#6e4220"/>
-    <path d="M92 206 q12 -40 36 -50 q26 10 36 50z" fill="#ff6a2b"/><path d="M116 206 q4 -22 12 -28 q10 8 12 28z" fill="#ffe08a" stroke-width="5"/>
-    <circle cx="164" cy="68" r="11" fill="#ffb347"/><circle cx="96" cy="74" r="8" fill="#ffb347"/><circle cx="132" cy="48" r="6" fill="#ffe08a"/>`,
+  MagmaBurst: `<path d="M54 50 L146 132" stroke="#7a1e08" stroke-width="48"/><path d="M60 56 L146 132" stroke="#ff6a2b" stroke-width="30"/><path d="M70 64 L146 132" stroke="#ffe08a" stroke-width="14"/>
+    <ellipse cx="150" cy="212" rx="78" ry="16" fill="#ff6a2b"/><ellipse cx="150" cy="210" rx="46" ry="8" fill="#ffe08a" stroke-width="4"/>
+    <circle cx="158" cy="146" r="40" fill="#4a2a1a"/><path d="M138 128 l18 12 l-6 18 M170 132 l10 22" fill="none" stroke="#ff8a3a" stroke-width="6"/>`,
   Firestorm: `<circle cx="128" cy="132" r="70" fill="none" stroke="#ff6a2b" stroke-width="22"/>
     <path d="M128 132 m-70 0 q20 -26 0 -46 q30 10 34 34 M128 132 m70 0 q-20 26 0 46 q-30 -10 -34 -34 M128 132 m0 -70 q26 20 46 0 q-10 30 -34 34 M128 132 m0 70 q-26 -20 -46 0 q10 -30 34 -34" fill="#ffb347" stroke-width="5"/>
     <circle cx="128" cy="132" r="20" fill="#bff7e6"/>`,
   PlasmaLance: `<path d="M40 216 L196 60" stroke="#ff6a2b" stroke-width="26"/><path d="M40 216 L196 60" stroke="#ffe94a" stroke-width="9"/>
     <path d="M196 60 L224 32 L210 74 Z" fill="#ffe94a"/><path d="M78 150 l18 -6 l-6 18 l18 -6" fill="none" stroke="#fffbe0" stroke-width="5"/>`,
-  MudTrap: `<ellipse cx="128" cy="166" rx="92" ry="36" fill="#6b4524"/><ellipse cx="128" cy="160" rx="70" ry="22" fill="#8a5a2e" stroke-width="5"/>
-    <path d="M70 160 q14 -12 28 0 q14 12 28 0 q14 -12 28 0 q14 12 28 0" fill="none" stroke="#3c9cff" stroke-width="8"/>
-    <path d="M110 96 q18 -34 36 0 q-18 22 -36 0z" fill="#9fd2ff"/>`,
+  MudTrap: `<path d="M36 206 q44 -18 88 0 q44 18 100 -4" fill="none" stroke="#8a5a2e" stroke-width="16"/>
+    <circle cx="146" cy="124" r="64" fill="#6b4524"/><circle cx="124" cy="104" r="10" fill="#a0805e" stroke-width="5"/><circle cx="168" cy="142" r="12" fill="#a0805e" stroke-width="5"/><circle cx="158" cy="90" r="6" fill="#a0805e" stroke-width="4"/>
+    <path d="M30 98 h34 M22 126 h40 M30 154 h34" stroke="#e8f8ff" stroke-width="9"/>`,
   FrostGale: `<g fill="none" stroke-linecap="round"><path d="M128 46 V210 M57 87 L199 169 M57 169 L199 87" stroke="#07050a" stroke-width="26"/>
     <path d="M128 46 V210 M57 87 L199 169 M57 169 L199 87" stroke="#e8f8ff" stroke-width="13"/>
     <path d="M106 62 l22 20 l22 -20 M106 194 l22 -20 l22 20" stroke="#07050a" stroke-width="16"/><path d="M106 62 l22 20 l22 -20 M106 194 l22 -20 l22 20" stroke="#7cc4ff" stroke-width="7"/></g>
@@ -80,22 +80,29 @@ const G = {
   ChainShock: `<rect x="44" y="96" width="76" height="44" rx="22" fill="none" stroke="#9fd2ff" stroke-width="16"/>
     <rect x="136" y="116" width="76" height="44" rx="22" fill="none" stroke="#3c9cff" stroke-width="16"/>
     <path d="M118 60 L96 104 L128 104 L108 150 L158 92 L126 92 L144 60Z" fill="#ffe94a"/>`,
-  Sandstorm: `<path d="M64 80 h120 M48 112 h150 M70 144 h110 M94 176 h70 M116 206 h30" stroke="#d9a768" stroke-width="16"/>
-    <path d="M190 80 q26 16 0 32 M200 112 q20 16 -18 32" fill="none" stroke="#9ff0d8" stroke-width="8"/>
-    <g fill="#ffd79a" stroke-width="3"><circle cx="58" cy="140" r="6"/><circle cx="196" cy="168" r="5"/><circle cx="80" cy="192" r="5"/></g>`,
+  Sandstorm: `<path d="M36 214 L60 150 L84 214 Z M82 214 L108 128 L134 214 Z M122 214 L148 128 L174 214 Z M172 214 L196 150 L220 214Z" fill="#c08446"/>
+    <path d="M128 30 V100" stroke="#9ff0d8" stroke-width="18"/><path d="M96 78 L128 114 L160 78" fill="none" stroke="#9ff0d8" stroke-width="18"/>`,
   MagnetQuake: `<path d="M74 60 v70 q0 54 54 54 q54 0 54 -54 v-70 h-36 v70 q0 18 -18 18 q-18 0 -18 -18 v-70z" fill="#c08446"/>
     <path d="M74 60 h36 v26 h-36z M146 60 h36 v26 h-36z" fill="#ffe94a"/>
     <path d="M40 222 l30 -14 l20 12 l26 -16 l24 16 l28 -14 l22 12 l26 -10" fill="none" stroke-width="8"/>`,
   Thunderstorm: `<path d="M66 128 q-26 0 -26 -26 q0 -28 32 -28 q8 -34 48 -34 q34 0 46 28 q38 -4 46 30 q22 6 22 30 q0 24 -30 24z" fill="#8f9bb8"/>
     <path d="M130 140 L108 188 L134 188 L118 228 L162 172 L136 172 L152 140Z" fill="#ffe94a"/>
     <path d="M76 160 l-10 22 M198 160 l-8 18" stroke="#9ff0d8" stroke-width="8"/>`,
+  Flask: `<path d="M108 44 h40 v14 h-40z" fill="#8a5a2e"/><path d="M112 58 h32 v26 q46 20 46 70 q0 56 -62 56 q-62 0 -62 -56 q0 -50 46 -70z" fill="#3a1820"/>
+    <path d="M78 148 q50 -22 100 0 q4 50 -50 56 q-54 -6 -50 -56z" fill="#ff4a5e"/>
+    <path d="M86 150 q42 -14 84 0" fill="none" stroke="#ffb3bd" stroke-width="5"/>
+    <path d="M100 108 q-12 16 -12 34" fill="none" stroke="#f1e3c6" stroke-width="6" stroke-opacity=".8"/>
+    <circle cx="150" cy="176" r="7" fill="#ffd0d6" stroke-width="3"/><circle cx="118" cy="186" r="4" fill="#ffd0d6" stroke-width="2"/>`,
+  Block: `<path d="M128 36 L204 64 V126 q0 64 -76 98 q-76 -34 -76 -98 V64 Z" fill="#b26cff"/>
+    <path d="M128 60 L182 80 V126 q0 46 -54 72 q-54 -26 -54 -72 V80 Z" fill="#e7c8ff" stroke-width="5"/>
+    <path d="M128 90 L150 128 L128 166 L106 128 Z" fill="#7a3fd0" stroke-width="5"/>`,
   Dash: `<path d="M70 72 L130 128 L70 184" fill="none" stroke="#d8b4ff" stroke-width="22"/><path d="M130 72 L190 128 L130 184" fill="none" stroke="#e7c8ff" stroke-width="22"/>
     <path d="M30 100 h26 M24 128 h30 M30 156 h26" stroke="#b26cff" stroke-width="8"/>`,
 };
 
 // Shard colours per skill: [top, bottom]
 const SHARD = {
-  RiftBolt: ['#c69bff', '#3b1470'], Dash: ['#6b4a8f', '#160a24'],
+  RiftBolt: ['#c69bff', '#3b1470'], Block: ['#8a5ad0', '#1d0c36'], Dash: ['#6b4a8f', '#160a24'], Flask: ['#c2203a', '#3a0812'],
   Fireball: [C.Fire, '#6a1c06'], TidalWave: [C.Water, '#0f2f66'], StoneSpike: [C.Earth, '#4a2a10'], Gust: [C.Air, '#1f5a4c'], SparkBolt: [C.Lightning, '#6a5208'],
   SteamCloud: [C.Fire, C.Water], MagmaBurst: [C.Fire, C.Earth], Firestorm: [C.Fire, C.Air], PlasmaLance: [C.Fire, C.Lightning],
   MudTrap: [C.Water, C.Earth], FrostGale: [C.Water, C.Air], ChainShock: [C.Water, C.Lightning],
@@ -204,6 +211,115 @@ function vignette() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><defs><radialGradient id="v" cx=".5" cy=".5" r=".72"><stop offset=".5" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".88"/></radialGradient></defs><rect width="512" height="512" fill="url(#v)"/></svg>`;
 }
 
+
+// Round relic frame for collectible items, tinted by rarity.
+function relic(rim, glyph) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${DEFS}
+  <defs><radialGradient id="rg" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="${rim}" stop-opacity=".35"/><stop offset=".75" stop-color="#140d17"/><stop offset="1" stop-color="#07050a"/></radialGradient></defs>
+  <g filter="url(#chip)">
+    <circle cx="128" cy="128" r="118" fill="${C.ink}"/>
+    <circle cx="128" cy="128" r="106" fill="url(#rg)"/>
+    <circle cx="128" cy="128" r="106" fill="none" stroke="url(#bronze)" stroke-width="9" filter="url(#grit)"/>
+    <circle cx="128" cy="128" r="94" fill="none" stroke="${rim}" stroke-width="3" opacity=".9"/>
+  </g>
+  <g stroke="${C.ink}" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" filter="url(#ink)" transform="translate(128 130) scale(.88) translate(-128 -128)">${glyph}</g>
+  <g fill="url(#bronze)" stroke="${C.ink}" stroke-width="2.5" filter="url(#grit)"><path d="M118 2 h20 l6 14 h-32z"/><path d="M118 254 h20 l6 -14 h-32z"/></g>
+</svg>`;
+}
+const ITEM_GLYPH = {
+  RiftShard: `<path d="M128 40 L160 110 L128 210 L96 110Z" fill="#c69bff"/><path d="M78 118 L100 100 L112 170 L84 196Z" fill="#8a52e0"/><path d="M178 118 L156 100 L144 170 L172 196Z" fill="#a874ff"/><path d="M128 64 L144 110 L128 170" fill="none" stroke="#f2e4ff" stroke-width="6"/>`,
+  HuskIchor: `<path d="M108 52 h40 v18 h-40z" fill="#5c3a17"/><path d="M112 70 h32 v20 q30 18 30 56 q0 52 -46 52 q-46 0 -46 -52 q0 -38 30 -56z" fill="#2a1630"/><path d="M90 150 q38 -16 76 0 q2 42 -38 46 q-40 -4 -38 -46z" fill="#7ad36b"/><circle cx="142" cy="168" r="7" fill="#d6ffcf" stroke-width="3"/>`,
+  EmberCore: `<circle cx="128" cy="128" r="66" fill="#ff7a2b"/><path d="M98 96 l22 26 l-8 24 l26 22 M150 86 l-10 34 l24 12" fill="none" stroke="#ffe08a" stroke-width="7"/><circle cx="128" cy="128" r="66" fill="none" stroke-width="9"/>`,
+};
+const BAG_GLYPH = `<path d="M70 104 q0 -10 10 -10 h96 q10 0 10 10 l10 92 q0 14 -14 14 h-108 q-14 0 -14 -14z" fill="#8a5a2e"/>
+  <path d="M100 94 q0 -40 28 -40 q28 0 28 40" fill="none" stroke-width="10"/><path d="M100 94 q0 -40 28 -40 q28 0 28 40" fill="none" stroke="#c8904d" stroke-width="5"/>
+  <path d="M66 120 h124 v26 h-124z" fill="#5c3a17"/><rect x="114" y="124" width="28" height="30" rx="4" fill="#e9c27a"/>`;
+
+
+const STAT_GLYPH = {
+  Vitality: `<path d="M128 206 C60 160 44 124 52 96 C60 66 100 58 128 90 C156 58 196 66 204 96 C212 124 196 160 128 206Z" fill="#e8364a"/><path d="M84 96 q8 -18 28 -12" fill="none" stroke="#ffc2c9" stroke-width="7"/>`,
+  Might: `<path d="M64 196 q-34 -46 -6 -96 q4 28 22 34 q-6 -52 34 -86 q-2 36 20 48 q10 -34 40 -48 q-8 40 16 56 q14 -14 12 -34 q34 44 4 126z" fill="#ff7a2b" stroke="none"/>
+    <path d="M78 196 q-18 -34 2 -66 q6 20 20 22 q0 -34 28 -58 q2 30 22 40 q10 -22 28 -30 q-6 30 10 44 q10 -8 10 -22 q18 36 -6 70z" fill="#ffb347" stroke="none"/>
+    <g stroke="#07050a" stroke-width="9" stroke-linejoin="round">
+      <rect x="92" y="88" width="30" height="50" rx="14" fill="#f2d2b0"/><rect x="120" y="82" width="30" height="56" rx="14" fill="#f2d2b0"/>
+      <rect x="148" y="86" width="30" height="52" rx="14" fill="#f2d2b0"/><rect x="176" y="96" width="26" height="44" rx="12" fill="#f2d2b0"/>
+      <path d="M92 124 h110 v40 q0 34 -34 34 h-48 q-28 0 -28 -30z" fill="#f2d2b0"/>
+      <path d="M76 120 q22 -10 46 8 q10 10 2 24 l-22 -6 q-20 -4 -26 -26z" fill="#e8bc96"/>
+      <path d="M110 198 h56 v30 h-56z" fill="#a8773f"/></g>
+    <path d="M100 100 v20 M128 94 v22 M156 98 v20" stroke="#fff3e6" stroke-width="5" stroke-linecap="round"/>`,
+  Swiftness: `<g stroke="#07050a" stroke-width="10" stroke-linejoin="round">
+    <path d="M70 116 q-40 -20 -54 -58 q30 6 44 24 q-14 -34 -4 -56 q26 20 36 54 q4 -26 20 -40 q6 30 -6 60z" fill="#e8fff8"/>
+    <path d="M104 58 h58 v84 q0 10 10 14 l40 14 q20 8 20 28 v8 h-150 v-24 q0 -14 8 -26 l14 -20z" fill="#2f8f78"/>
+    <path d="M90 206 h148 v12 q0 10 -10 10 h-128 q-10 0 -10 -10z" fill="#6e4520"/>
+    <path d="M104 58 h58 v20 h-58z" fill="#e9c27a"/></g>
+    <path d="M114 104 h38 M114 126 h36" stroke="#9ff0d8" stroke-width="7" stroke-linecap="round"/>
+    <path d="M24 170 h44 M14 196 h50" stroke="#9ff0d8" stroke-width="9" stroke-linecap="round"/>`,
+  Focus: `<path d="M80 50 h96 v10 q0 40 -36 68 q36 28 36 68 v10 h-96 v-10 q0 -40 36 -68 q-36 -28 -36 -68z" fill="#3b1470"/><path d="M96 66 h64 q-4 30 -32 50 q-28 -20 -32 -50z" fill="#c69bff"/><path d="M104 196 q24 -34 48 0z" fill="#c69bff"/><path d="M70 50 h116 M70 206 h116" stroke="#e9c27a" stroke-width="10"/>`,
+};
+
+// ---------------------------------------------------------------------------
+// Particle / VFX textures. White on transparent so ParticleEmitter.Color,
+// Beam.Color and Decal.Color3 can tint them per element.
+// ---------------------------------------------------------------------------
+function fxSvg(w, h, body, defs = '') {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><defs>${defs}</defs>${body}</svg>`;
+}
+const FX = {
+  // Soft round glow.
+  fx_glow: fxSvg(256, 256, `<circle cx="128" cy="128" r="124" fill="url(#g)"/>`,
+    `<radialGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset=".25" stop-color="#fff" stop-opacity=".85"/><stop offset=".6" stop-color="#fff" stop-opacity=".25"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`),
+  // Long thin streak (for sparks, wind, speed lines). Use with Orientation VelocityParallel.
+  fx_spark: fxSvg(256, 256, `<ellipse cx="128" cy="128" rx="14" ry="122" fill="url(#g)"/><ellipse cx="128" cy="128" rx="5" ry="90" fill="#fff"/>`,
+    `<radialGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`),
+  // Crescent wind blade: a thick curved slash that fades out at both tips.
+  fx_crescent: fxSvg(256, 256, `<path d="M28 168 C60 70 196 70 228 168 C190 118 66 118 28 168Z" fill="url(#g)"/>
+      <path d="M44 160 C84 96 172 96 212 160" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-opacity=".9"/>`,
+    `<linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".3" stop-color="#fff" stop-opacity=".8"/><stop offset=".5" stop-color="#fff"/><stop offset=".7" stop-color="#fff" stop-opacity=".8"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`),
+  // Shockwave ring with a hot inner edge.
+  fx_ring: fxSvg(512, 512, `<circle cx="256" cy="256" r="232" fill="none" stroke="url(#g)" stroke-width="40"/><circle cx="256" cy="256" r="246" fill="none" stroke="#fff" stroke-width="5"/>`,
+    `<radialGradient id="g" r=".5"><stop offset=".78" stop-color="#fff" stop-opacity="0"/><stop offset=".9" stop-color="#fff" stop-opacity=".7"/><stop offset=".97" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`),
+  // Telegraph circle: dashed outer ring + faint fill + rune ticks.
+  fx_telegraph: fxSvg(512, 512, `<circle cx="256" cy="256" r="236" fill="#fff" fill-opacity=".12"/>
+    <circle cx="256" cy="256" r="236" fill="none" stroke="#fff" stroke-width="10" stroke-dasharray="38 18"/>
+    <circle cx="256" cy="256" r="200" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/>
+    ${Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2; const x1 = 256 + Math.cos(a) * 205, y1 = 256 + Math.sin(a) * 205, x2 = 256 + Math.cos(a) * 225, y2 = 256 + Math.sin(a) * 225; return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#fff" stroke-width="7"/>`; }).join('')}`),
+  // Soft flame with three licking tongues (tallest in the middle), a hot
+  // core near the base and gently warped, feathered edges. Points up.
+  fx_flame: fxSvg(256, 256, `<g filter="url(#warp)">
+      <path d="M128 10 C138 60 158 78 164 110 C172 92 174 74 170 56 C196 92 210 128 204 168 C198 214 166 246 128 246 C90 246 58 214 52 168 C46 128 60 92 86 56 C82 74 84 92 92 110 C98 78 118 60 128 10Z" fill="url(#outer)"/>
+      <path d="M128 92 C136 124 160 140 160 178 C160 212 146 234 128 234 C110 234 96 212 96 178 C96 140 120 124 128 92Z" fill="url(#inner)"/>
+    </g>`,
+    `<linearGradient id="outer" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".25" stop-color="#fff" stop-opacity=".55"/><stop offset=".7" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity=".75"/></linearGradient>
+     <radialGradient id="inner" cx=".5" cy=".75" r=".55"><stop offset="0" stop-color="#fff"/><stop offset=".65" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+     <filter id="warp" x="-20%" y="-20%" width="140%" height="140%">
+       <feTurbulence type="fractalNoise" baseFrequency=".012 .03" numOctaves="2" seed="4" result="n"/>
+       <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G" result="d"/>
+       <feGaussianBlur in="d" stdDeviation="3"/>
+     </filter>`),
+  // Puffy smoke blob with soft noise.
+  fx_smoke: fxSvg(256, 256, `<g filter="url(#n)"><circle cx="128" cy="138" r="80" fill="url(#g)"/><circle cx="88" cy="120" r="56" fill="url(#g)"/><circle cx="170" cy="112" r="60" fill="url(#g)"/><circle cx="130" cy="86" r="54" fill="url(#g)"/></g>`,
+    `<radialGradient id="g"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".7" stop-color="#fff" stop-opacity=".45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+     <filter id="n"><feTurbulence type="fractalNoise" baseFrequency=".03" numOctaves="3" seed="3"/><feDisplacementMap in="SourceGraphic" scale="26"/></filter>`),
+  // Horizontal jagged lightning, tileable along X (for Beams).
+  fx_lightning: fxSvg(512, 128, `<g filter="url(#gl)"><polyline points="0,64 40,40 70,82 110,30 150,90 190,50 230,74 270,24 310,96 350,46 390,80 430,36 470,70 512,64" fill="none" stroke="#fff" stroke-width="10" stroke-linejoin="bevel"/></g>
+    <polyline points="0,64 40,40 70,82 110,30 150,90 190,50 230,74 270,24 310,96 350,46 390,80 430,36 470,70 512,64" fill="none" stroke="#fff" stroke-width="4"/>
+    <polyline points="110,30 120,8 128,20 M310,96 322,118" fill="none" stroke="#fff" stroke-width="3"/>`,
+    `<filter id="gl" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="7"/></filter>`),
+  // Curved wind swirl arc.
+  fx_swirl: fxSvg(256, 256, `<path d="M40 150 C40 70 150 40 200 92 C232 126 206 180 160 176 C124 172 118 132 146 124" fill="none" stroke="url(#g)" stroke-width="16" stroke-linecap="round"/>`,
+    `<linearGradient id="g" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset=".5" stop-color="#fff" stop-opacity=".8"/><stop offset="1" stop-color="#fff"/></linearGradient>`),
+  // Water droplet.
+  fx_drop: fxSvg(256, 256, `<path d="M128 24 C150 84 196 120 196 168 C196 210 166 236 128 236 C90 236 60 210 60 168 C60 120 106 84 128 24Z" fill="#fff" fill-opacity=".85"/><path d="M100 150 C100 126 112 112 124 104" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round"/>`),
+  // Ground cracks decal (white, tinted per element).
+  fx_crack: fxSvg(512, 512, `<g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M256 256 L210 180 L224 120 L180 40 M256 256 L340 210 L400 222 L480 170 M256 256 L300 330 L286 400 L330 480 M256 256 L170 290 L120 270 L40 320 M224 120 L270 90 M300 330 L360 350 M170 290 L160 350" stroke-width="12"/>
+    <path d="M256 256 L210 180 L224 120 L180 40 M256 256 L340 210 L400 222 L480 170 M256 256 L300 330 L286 400 L330 480 M256 256 L170 290 L120 270 L40 320" stroke-width="30" stroke-opacity=".25"/></g>
+    <circle cx="256" cy="256" r="40" fill="url(#g)"/>`,
+    `<radialGradient id="g"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>`),
+  // Crystal shard.
+  fx_shard: fxSvg(256, 256, `<polygon points="128,10 168,100 140,246 100,120" fill="#fff" fill-opacity=".9"/><polygon points="128,10 140,246 100,120" fill="#fff" fill-opacity=".55"/>`),
+};
+
 const ASSETS = {};
 for (const id of Object.keys(G)) {
   const [top, bottom] = SHARD[id];
@@ -219,6 +335,18 @@ ASSETS.coin = { w: 128, h: 128, svg: coin() };
 ASSETS.grain = { w: 256, h: 256, svg: grain() };
 ASSETS.smoke = { w: 512, h: 512, svg: smoke() };
 ASSETS.vignette = { w: 512, h: 512, svg: vignette() };
+ASSETS.item_RiftShard = { w: 256, h: 256, svg: relic('#b9a68f', ITEM_GLYPH.RiftShard) };
+ASSETS.item_HuskIchor = { w: 256, h: 256, svg: relic('#6fd38a', ITEM_GLYPH.HuskIchor) };
+ASSETS.item_EmberCore = { w: 256, h: 256, svg: relic('#5aa8ff', ITEM_GLYPH.EmberCore) };
+ASSETS.bag = { w: 256, h: 256, svg: relic('#e9c27a', BAG_GLYPH) };
+ASSETS.stat_Vitality = { w: 256, h: 256, svg: relic('#e8364a', STAT_GLYPH.Vitality) };
+ASSETS.stat_Might = { w: 256, h: 256, svg: relic('#ff8a3a', STAT_GLYPH.Might) };
+ASSETS.stat_Swiftness = { w: 256, h: 256, svg: relic('#9ff0d8', STAT_GLYPH.Swiftness) };
+ASSETS.stat_Focus = { w: 256, h: 256, svg: relic('#b26cff', STAT_GLYPH.Focus) };
+for (const [name, svg] of Object.entries(FX)) {
+  const m = svg.match(/width="(\d+)" height="(\d+)"/);
+  ASSETS[name] = { w: Number(m[1]), h: Number(m[2]), svg };
+}
 
 function render(name) {
   const a = ASSETS[name];

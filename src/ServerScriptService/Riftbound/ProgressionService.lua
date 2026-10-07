@@ -1,8 +1,6 @@
 -- Each player's level, XP and gold. Published to the client as player
 -- attributes (Level, Xp, XpToNext, Gold) and to the player list as leaderstats.
-local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Progression = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Progression"))
 
@@ -12,6 +10,12 @@ local ProgressionService = {}
 
 -- Set by Main to send toasts to the client.
 ProgressionService.OnNotify = function(_player, _text, _color) end
+-- Set by Main; called after a player gains one or more levels.
+ProgressionService.OnLevelUp = function(_player, _level, _gained) end
+-- Set by Main; extra max health from stats.
+ProgressionService.HealthBonus = function(_player)
+	return 0
+end
 
 local data = {}
 
@@ -37,35 +41,35 @@ local function applyHealth(player, heal)
 	if not d or not hum then
 		return
 	end
-	local max = Progression.MaxHealth(d.Level)
+	local max = Progression.MaxHealth(d.Level) + ProgressionService.HealthBonus(player)
+	local gained = max - hum.MaxHealth
 	hum.MaxHealth = max
 	if heal then
 		hum.Health = max
+	elseif gained > 0 and hum.Health > 0 then
+		hum.Health = math.min(max, hum.Health + gained)
+	end
+end
+
+-- Re-applies max health (e.g. after a Vitality point), granting the added health.
+function ProgressionService.RefreshHealth(player)
+	applyHealth(player, false)
+end
+
+-- Asks every client to play a player effect (rendered by SkillVFX).
+local function playerFx(kind, root)
+	local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Riftbound"):FindFirstChild("Remotes")
+	local remote = remotes and remotes:FindFirstChild("SkillFx")
+	if remote then
+		remote:FireAllClients({ Type = kind, Target = root })
 	end
 end
 
 local function levelUpEffect(player)
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not root then
-		return
+	if root then
+		playerFx("LevelUp", root)
 	end
-	local ring = Instance.new("Part")
-	ring.Shape = Enum.PartType.Cylinder
-	ring.Anchored = true
-	ring.CanCollide = false
-	ring.CanQuery = false
-	ring.CanTouch = false
-	ring.Material = Enum.Material.Neon
-	ring.Color = LEVEL_UP_COLOR
-	ring.Transparency = 0.2
-	ring.Size = Vector3.new(0.3, 2, 2)
-	ring.CFrame = CFrame.new(root.Position - Vector3.new(0, 2.7, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	ring.Parent = workspace
-	TweenService:Create(ring, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(0.3, 22, 22),
-		Transparency = 1,
-	}):Play()
-	Debris:AddItem(ring, 0.65)
 end
 
 function ProgressionService.Init(player)
@@ -105,6 +109,7 @@ function ProgressionService.AddXp(player, amount)
 		return
 	end
 	d.Xp += amount
+	local startLevel = d.Level
 	local leveled = false
 	while d.Level < Progression.MaxLevel and d.Xp >= Progression.XpToNext(d.Level) do
 		d.Xp -= Progression.XpToNext(d.Level)
@@ -119,6 +124,7 @@ function ProgressionService.AddXp(player, amount)
 		applyHealth(player, true)
 		levelUpEffect(player)
 		ProgressionService.OnNotify(player, `Level up! You are now level {d.Level}`, LEVEL_UP_COLOR)
+		ProgressionService.OnLevelUp(player, d.Level, d.Level - startLevel)
 	end
 end
 

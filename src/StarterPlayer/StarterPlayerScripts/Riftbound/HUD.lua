@@ -14,9 +14,11 @@ local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Elements = require(Shared:WaitForChild("Elements"))
+local Items = require(Shared:WaitForChild("Items"))
 local Merge = require(Shared:WaitForChild("Merge"))
 local Progression = require(Shared:WaitForChild("Progression"))
 local Skills = require(Shared:WaitForChild("Skills"))
+local Stats = require(Shared:WaitForChild("Stats"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
 
 local C = {
@@ -48,19 +50,24 @@ local F = {
 
 local NUMERALS = { "I", "II", "III", "IV", "V" }
 local KEYWORDS = {}
-for _, word in { "Burns", "Burning", "Burn", "Slows", "Slow", "Soaks", "Soaked", "Soak", "Stuns", "Stun", "Shocked", "Shock", "Pulls", "Freezing" } do
+for _, word in { "Burns", "Burning", "Burn", "Slows", "Slow", "Soaks", "Soaked", "Soak", "Stuns", "Stun", "Shocked", "Shock", "Pulls", "Freezing", "Freezes", "Freeze", "Frozen", "Ablaze" } do
 	table.insert(KEYWORDS, word)
 	table.insert(KEYWORDS, word:lower())
 end
 
+-- Fixed slots always hold the same ability (Fixed = its id).
 local SLOTS = {
 	{ Slot = "M1", Key = "LMB", Lift = 10 },
+	{ Slot = "M2", Key = "RMB", Lift = 10, Fixed = "Block" },
 	{ Slot = "Q", Key = "Q", Lift = 0 },
 	{ Slot = "E", Key = "E", Lift = 0 },
-	{ Slot = "Dash", Key = "SHIFT", Lift = 10 },
+	{ Slot = "Dash", Key = "SHIFT", Lift = 10, Fixed = "Dash" },
 }
 local ICON = 84
-local DASH_INFO = { Name = "Dash", Description = "A swift dash through danger. Use it to reposition and escape." }
+local FIXED_INFO = {
+	Dash = { Name = "Dash", Meta = "MOVEMENT  ·  SHIFT", Subtitle = "M O V E M E N T", Description = "A swift dash through danger. Use it to reposition and escape." },
+	Block = { Name = "Block", Meta = "DEFENSE  ·  HOLD RMB", Subtitle = "D E F E N S E", Description = "Hold to raise a rift shield that stops enemy attacks. You move at half speed and it breaks after 3 seconds. Block right as a hit lands to parry: the attacker is stunned and knocked back." },
+}
 
 local HUD = {}
 
@@ -70,6 +77,7 @@ local build = { Skills = {}, Slots = {} }
 local discovered = {}
 local cooldownEnds = {} -- [skillId] = { Ends, Length }
 local dash = { Ends = 0, Length = 1 }
+local block = { Ends = 0, Length = 1 }
 local slotCards = {}
 local gui, fxGui, arsenal, forge, forgeShade, toastHolder, tooltip
 
@@ -217,7 +225,7 @@ end
 -- Short headline stat for a skill at a level, e.g. ("Damage", "55").
 local function headlineStat(def, level)
 	local mult = Skills.DamageMult(level or 1)
-	if def.Kind == "Zone" then
+	if def.Kind == "Zone" or def.Kind == "Tornado" then
 		return "Damage per tick", string.format("%d  ·  %d sec", math.floor(def.TickDamage * mult + 0.5), def.Duration)
 	elseif def.Kind == "Chain" then
 		return "Damage", string.format("%d  ·  %d jumps", math.floor(def.Damage * mult + 0.5), def.Jumps)
@@ -282,16 +290,24 @@ end
 local function showTooltip(id, level)
 	local content = tooltip.Content
 	local def = id and Skills.Defs[id]
-	if id == "Dash" then
-		content.Title.Text = DASH_INFO.Name
+	if id == "Flask" then
+		local charges, max = player:GetAttribute("FlaskCharges") or 0, player:GetAttribute("FlaskMax") or 0
+		content.Title.Text = "Rift Flask"
+		content.Title.TextColor3 = Color3.fromRGB(255, 96, 114)
+		content.Meta.Text = `CONSUMABLE  ·  R  ·  {charges} / {max} CHARGES`
+		content.Body.Text = emphasize("Drink to restore 35% of your health. You are slowed while you sip. Holds 3 charges.")
+			.. `\n<font color="{hex(C.Ash)}">> Refill at the Rift Well or by levelling up</font>`
+	elseif FIXED_INFO[id] then
+		local info = FIXED_INFO[id]
+		content.Title.Text = info.Name
 		content.Title.TextColor3 = C.RiftHot
-		content.Meta.Text = "MOVEMENT  ·  SHIFT"
-		content.Body.Text = DASH_INFO.Description
+		content.Meta.Text = info.Meta
+		content.Body.Text = emphasize(info.Description)
 	elseif def then
 		content.Title.Text = def.Name .. (if level and id ~= "RiftBolt" then "  " .. NUMERALS[level] else "")
 		content.Title.TextColor3 = skillColor(id)
 		local elements = if #def.Elements > 0 then table.concat(def.Elements, " + "):upper() else "RIFT"
-		content.Meta.Text = string.format("%s  ·  %s  ·  %.1fs", elements, def.Kind:upper(), Skills.CooldownOf(id, level or 1))
+		content.Meta.Text = string.format("%s  ·  %s  ·  %.1fs", elements, def.Kind:upper(), Skills.CooldownOf(id, level or 1) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")))
 		local label, value = headlineStat(def, level)
 		content.Body.Text = emphasize(def.Description) .. `\n<font color="{hex(C.Ash)}">> {label}</font>   <font color="{hex(C.Good)}">{value}</font>`
 	else
@@ -527,34 +543,40 @@ end
 -------------------------------------------------------------------------------
 
 local function buildGold()
+	-- Compact strip tucked under the HP and essence bars (top-left).
 	local box = new("Frame", {
 		Name = "Gold",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -14, 0, 10),
-		Size = UDim2.fromOffset(190, 64),
+		Position = UDim2.fromOffset(98, 94),
+		Size = UDim2.fromOffset(124, 32),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
-	local plate = slab({ AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(160, 50), Parent = box })
+	local plate = slab({
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, 0, 0.5, 0),
+		Size = UDim2.fromOffset(106, 28),
+		SliceScale = 0.28,
+		Parent = box,
+	})
 	local coin = new("ImageLabel", {
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 0, 0.5, 0),
-		Size = UDim2.fromOffset(58, 58),
+		Size = UDim2.fromOffset(32, 32),
 		BackgroundTransparency = 1,
 		Image = UIAssets.Coin,
 		ZIndex = 5,
 		Parent = box,
 	})
 	local amount = text({
-		Position = UDim2.fromOffset(30, 0),
-		Size = UDim2.new(1, -50, 1, 0),
+		Position = UDim2.fromOffset(18, 0),
+		Size = UDim2.new(1, -28, 1, 0),
 		Text = "0",
 		FontFace = F.TitleBold,
-		TextSize = 26,
+		TextSize = 18,
 		TextColor3 = C.Gold,
 		TextStrokeColor3 = C.Ink,
 		TextStrokeTransparency = 0.3,
-		TextXAlignment = Enum.TextXAlignment.Right,
+		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 4,
 		Parent = plate,
 	})
@@ -567,19 +589,18 @@ local function buildGold()
 			coin.Rotation = -25
 			tween(coin, 0.45, { Rotation = 0 }, Enum.EasingStyle.Back)
 			local pop = text({
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -20, 0, 76),
-				Size = UDim2.fromOffset(120, 22),
+				Position = UDim2.fromOffset(228, 100),
+				Size = UDim2.fromOffset(80, 20),
 				Text = `+{gold - last}`,
 				FontFace = F.TitleBold,
-				TextSize = 22,
+				TextSize = 18,
 				TextColor3 = C.Gold,
 				TextStrokeColor3 = C.Ink,
 				TextStrokeTransparency = 0.2,
-				TextXAlignment = Enum.TextXAlignment.Right,
+				TextXAlignment = Enum.TextXAlignment.Left,
 				Parent = gui,
 			})
-			tween(pop, 0.9, { Position = UDim2.new(1, -20, 0, 100), TextTransparency = 1, TextStrokeTransparency = 1 })
+			tween(pop, 0.9, { Position = UDim2.fromOffset(228, 86), TextTransparency = 1, TextStrokeTransparency = 1 })
 			task.delay(0.9, function()
 				pop:Destroy()
 			end)
@@ -663,8 +684,8 @@ local function makeSlot(parent, entry, index)
 	})
 	slotCards[entry.Slot] = { Halo = halo, IconHolder = iconHolder, Shade = shade, Timer = timer, Name = name, Shown = false, Cooling = false }
 	hoverable(holder, function()
-		if entry.Slot == "Dash" then
-			return "Dash"
+		if entry.Fixed then
+			return entry.Fixed
 		end
 		return skillInSlot(entry.Slot)
 	end)
@@ -674,8 +695,8 @@ local function refreshSlots()
 	for _, entry in SLOTS do
 		local card = slotCards[entry.Slot]
 		local id, level = nil, nil
-		if entry.Slot == "Dash" then
-			id = "Dash"
+		if entry.Fixed then
+			id = entry.Fixed
 		else
 			id, level = skillInSlot(entry.Slot)
 		end
@@ -685,8 +706,8 @@ local function refreshSlots()
 			card.IconHolder:ClearAllChildren()
 			shard(id, ICON, card.IconHolder, 2)
 			local def = id and Skills.Defs[id]
-			if id == "Dash" then
-				card.Name.Text = "Dash"
+			if FIXED_INFO[id] then
+				card.Name.Text = FIXED_INFO[id].Name
 				card.Halo.BackgroundColor3 = C.Rift
 			else
 				card.Name.Text = if def then def.Name .. (if level and entry.Slot ~= "M1" then "  " .. NUMERALS[level] else "") else "—"
@@ -704,6 +725,8 @@ local function updateCooldowns()
 		local cd
 		if entry.Slot == "Dash" then
 			cd = dash
+		elseif entry.Slot == "M2" then
+			cd = block
 		else
 			local id = skillInSlot(entry.Slot)
 			cd = id and cooldownEnds[id]
@@ -722,6 +745,105 @@ local function updateCooldowns()
 			tween(card.Halo, 0.4, { BackgroundTransparency = 0.78, Size = UDim2.fromOffset(ICON * 0.95, ICON * 0.95) })
 		end
 	end
+end
+
+-------------------------------------------------------------------------------
+-- Flask (bottom-right corner)
+-------------------------------------------------------------------------------
+
+local FLASK_RED = Color3.fromRGB(255, 74, 94)
+
+local function buildFlask()
+	local holder = new("Frame", {
+		Name = "Flask",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -22, 1, -14),
+		Size = UDim2.fromOffset(ICON + 12, ICON + 50),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	})
+	local halo = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, ICON / 2),
+		Size = UDim2.fromOffset(ICON * 0.95, ICON * 0.95),
+		BackgroundColor3 = FLASK_RED,
+		BackgroundTransparency = 0.8,
+		BorderSizePixel = 0,
+		Parent = holder,
+	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+	local icon = shard("Flask", ICON, holder, 2)
+	icon.AnchorPoint = Vector2.new(0.5, 0)
+	icon.Position = UDim2.fromScale(0.5, 0)
+	local keyPlate = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, ICON - 8),
+		Size = UDim2.fromOffset(50, 18),
+		BackgroundColor3 = C.Ink,
+		ZIndex = 6,
+		Parent = holder,
+	}, { stroke(C.Bronze, 1.5) })
+	text({ Size = UDim2.fromScale(1, 1), Text = "R", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 7, Parent = keyPlate })
+	local pips = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, ICON + 16),
+		Size = UDim2.fromOffset(ICON, 14),
+		BackgroundTransparency = 1,
+		Parent = holder,
+	}, {
+		new("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			Padding = UDim.new(0, 7),
+		}),
+	})
+	local label = text({
+		Position = UDim2.fromOffset(-10, ICON + 31),
+		Size = UDim2.new(1, 20, 0, 16),
+		FontFace = F.BodyBold,
+		TextSize = 12,
+		TextStrokeColor3 = C.Ink,
+		TextStrokeTransparency = 0.2,
+		Parent = holder,
+	})
+
+	local last = player:GetAttribute("FlaskCharges") or 0
+	local function refresh()
+		local charges = player:GetAttribute("FlaskCharges") or 0
+		local max = player:GetAttribute("FlaskMax") or 0
+		for _, child in pips:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		for i = 1, max do
+			local full = i <= charges
+			new("Frame", {
+				Size = UDim2.fromOffset(9, 9),
+				Rotation = 45,
+				BackgroundColor3 = if full then FLASK_RED else C.Ink,
+				LayoutOrder = i,
+				Parent = pips,
+			}, { stroke(if full then Color3.fromRGB(255, 190, 196) else C.Bronze, 1.2) })
+		end
+		label.Text = `Flask  {charges}/{max}`
+		icon.ImageColor3 = if charges > 0 then Color3.new(1, 1, 1) else Color3.fromRGB(110, 100, 105)
+		halo.BackgroundTransparency = if charges > 0 then 0.8 else 0.95
+		if charges < last then
+			-- Drank: the shard pulses and the halo flares.
+			icon.Size = UDim2.fromOffset(ICON * 1.15, ICON * 1.15)
+			tween(icon, 0.35, { Size = UDim2.fromOffset(ICON, ICON) }, Enum.EasingStyle.Back)
+			halo.BackgroundTransparency = 0.2
+			tween(halo, 0.5, { BackgroundTransparency = if charges > 0 then 0.8 else 0.95 })
+		end
+		last = charges
+	end
+	player:GetAttributeChangedSignal("FlaskCharges"):Connect(refresh)
+	player:GetAttributeChangedSignal("FlaskMax"):Connect(refresh)
+	refresh()
+	hoverable(holder, function()
+		return "Flask"
+	end)
 end
 
 -------------------------------------------------------------------------------
@@ -758,7 +880,7 @@ local function buildArsenal()
 	text({
 		Position = UDim2.fromOffset(0, 50),
 		Size = UDim2.new(1, 0, 0, 14),
-		Text = "F  INTERACT    ·    SHIFT  DASH    ·    WHEEL  ZOOM",
+		Text = "F  INTERACT   ·   R  FLASK   ·   B  BAG   ·   C  STATS",
 		FontFace = F.Label,
 		TextSize = 10,
 		TextColor3 = C.Ash,
@@ -1194,8 +1316,694 @@ refreshForge = function()
 end
 
 -------------------------------------------------------------------------------
+-- Arsenal collapse tab
+-------------------------------------------------------------------------------
+
+local ARSENAL_OPEN = UDim2.new(0, 14, 0.47, 0)
+local ARSENAL_CLOSED = UDim2.new(0, -270, 0.47, 0)
+local arsenalCollapsed = false
+
+local function buildArsenalToggle()
+	local tab = new("ImageButton", {
+		Name = "Toggle",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(1, -6, 0.5, 0),
+		Size = UDim2.fromOffset(30, 74),
+		BackgroundTransparency = 1,
+		Image = UIAssets.Slab,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = UIAssets.SlabSlice,
+		SliceScale = 0.18,
+		ZIndex = 4,
+		Parent = arsenal,
+	})
+	local arrow = text({
+		Size = UDim2.fromScale(1, 1),
+		Text = "<",
+		FontFace = F.TitleBold,
+		TextSize = 24,
+		TextColor3 = C.Gold,
+		ZIndex = 5,
+		Parent = tab,
+	})
+	tab.Activated:Connect(function()
+		arsenalCollapsed = not arsenalCollapsed
+		arrow.Text = if arsenalCollapsed then ">" else "<"
+		hideTooltip()
+		tween(arsenal, 0.3, { Position = if arsenalCollapsed then ARSENAL_CLOSED else ARSENAL_OPEN }, Enum.EasingStyle.Quint)
+	end)
+	tab.MouseEnter:Connect(function()
+		arrow.TextColor3 = C.RiftHot
+	end)
+	tab.MouseLeave:Connect(function()
+		arrow.TextColor3 = C.Gold
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- Backpack: equipment, stats, collected items and powers (B)
+-------------------------------------------------------------------------------
+
+local ITEM_CELLS = 10
+local inventory = {}
+local backpack
+local refreshBackpack
+
+local function showItemTooltip(id, count)
+	local def = Items.Defs[id]
+	local content = tooltip.Content
+	content.Title.Text = def.Name
+	content.Title.TextColor3 = def.Color
+	content.Meta.Text = `{spaced(Items.Rarity[def.Rarity].Name)}   ·   x{count}`
+	content.Body.Text = def.Description
+	tooltip.Visible = true
+end
+
+local function sectionHeader(parent, title, x, y)
+	text({
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(240, 26),
+		Text = title,
+		FontFace = F.TitleBold,
+		TextSize = 22,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 22,
+		Parent = parent,
+	})
+	new("Frame", { Position = UDim2.fromOffset(x, y + 30), Size = UDim2.fromOffset(46, 2), BackgroundColor3 = C.Crimson, BorderSizePixel = 0, ZIndex = 22, Parent = parent })
+end
+
+local function buildBackpack()
+	backpack = new("Frame", {
+		Name = "Backpack",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = UDim2.fromOffset(780, 570),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 20,
+		Parent = gui,
+	})
+	new("UIScale", { Parent = backpack })
+	slab({ Name = "Body", Position = UDim2.fromOffset(10, 92), Size = UDim2.new(1, -20, 1, -92), ZIndex = 20, Parent = backpack })
+
+	local banner = new("ImageLabel", {
+		Name = "Banner",
+		Position = UDim2.fromOffset(-30, 0),
+		Size = UDim2.new(1, 60, 0, 104),
+		BackgroundTransparency = 1,
+		Image = UIAssets.Banner,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = UIAssets.BannerSlice,
+		SliceScale = 0.8,
+		ZIndex = 22,
+		Parent = backpack,
+	})
+	text({ Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Backpack"), FontFace = F.Title, TextSize = 38, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 23, Parent = banner })
+	text({ Position = UDim2.fromOffset(0, 62), Size = UDim2.new(1, 0, 0, 16), Text = "W H A T   Y O U   C A R R Y   T H R O U G H   T H E   R I F T", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 23, Parent = banner })
+
+	local close = new("TextButton", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 112),
+		Size = UDim2.fromOffset(34, 34),
+		Text = "X",
+		FontFace = F.TitleBold,
+		TextSize = 18,
+		TextColor3 = C.Gold,
+		AutoButtonColor = true,
+		BackgroundColor3 = C.Ink,
+		ZIndex = 24,
+		Parent = backpack,
+	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Bronze, 2) })
+	close.Activated:Connect(function()
+		HUD.SetBackpack(false)
+	end)
+
+	-- Left column: equipment + stats
+	sectionHeader(backpack, "Equipment", 40, 112)
+	new("Frame", {
+		Name = "Equipment",
+		Position = UDim2.fromOffset(34, 152),
+		Size = UDim2.fromOffset(310, 270),
+		BackgroundTransparency = 1,
+		ZIndex = 22,
+		Parent = backpack,
+	}, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	new("Frame", {
+		Name = "Stats",
+		Position = UDim2.fromOffset(40, 432),
+		Size = UDim2.fromOffset(300, 110),
+		BackgroundTransparency = 1,
+		ZIndex = 22,
+		Parent = backpack,
+	}, {
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(148, 34), CellPadding = UDim2.fromOffset(4, 2), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+
+	-- Divider between the columns.
+	new("Frame", {
+		Position = UDim2.fromOffset(362, 120),
+		Size = UDim2.fromOffset(2, 420),
+		BackgroundColor3 = C.Bronze,
+		BorderSizePixel = 0,
+		ZIndex = 22,
+		Parent = backpack,
+	}, { new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.3), NumberSequenceKeypoint.new(1, 1) }) }) })
+
+	-- Right column: inventory + powers
+	sectionHeader(backpack, "Inventory", 390, 112)
+	text({
+		Name = "ItemCount",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -50, 0, 120),
+		Size = UDim2.fromOffset(240, 16),
+		FontFace = F.Label,
+		TextSize = 11,
+		TextColor3 = C.Ash,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		ZIndex = 22,
+		Parent = backpack,
+	})
+	new("Frame", {
+		Name = "Items",
+		Position = UDim2.fromOffset(386, 154),
+		Size = UDim2.fromOffset(360, 150),
+		BackgroundTransparency = 1,
+		ZIndex = 22,
+		Parent = backpack,
+	}, {
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(64, 64), CellPadding = UDim2.fromOffset(9, 9), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+	sectionHeader(backpack, "Powers", 390, 318)
+	new("Frame", {
+		Name = "Powers",
+		Position = UDim2.fromOffset(386, 358),
+		Size = UDim2.fromOffset(360, 180),
+		BackgroundTransparency = 1,
+		ZIndex = 22,
+		Parent = backpack,
+	}, {
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(56, 70), CellPadding = UDim2.fromOffset(4, 4), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+end
+
+local function clearGui(parent)
+	for _, child in parent:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+local function equipmentRow(parent, order, iconId, key, title, subtitle, color, hover)
+	local row = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 48),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		LayoutOrder = order,
+		ZIndex = 22,
+		Parent = parent,
+	}, {
+		new("UIGradient", {
+			Color = ColorSequence.new(color, C.Ink),
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.68), NumberSequenceKeypoint.new(0.6, 0.6), NumberSequenceKeypoint.new(1, 0.45) }),
+		}),
+		stroke(C.Bronze, 1, 0.55),
+	})
+	local icon = shard(iconId, 46, row, 23)
+	icon.Position = UDim2.fromOffset(2, 1)
+	local plate = new("Frame", {
+		Position = UDim2.fromOffset(54, 15),
+		Size = UDim2.fromOffset(44, 18),
+		BackgroundColor3 = C.Ink,
+		ZIndex = 23,
+		Parent = row,
+	}, { stroke(C.Bronze, 1.2) })
+	text({ Size = UDim2.fromScale(1, 1), Text = key, FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 24, Parent = plate })
+	text({
+		Position = UDim2.fromOffset(108, 5),
+		Size = UDim2.new(1, -116, 0, 20),
+		Text = title,
+		FontFace = F.TitleBold,
+		TextSize = 17,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 23,
+		Parent = row,
+	})
+	text({
+		Position = UDim2.fromOffset(108, 26),
+		Size = UDim2.new(1, -116, 0, 14),
+		Text = subtitle,
+		RichText = true,
+		FontFace = F.Label,
+		TextSize = 10,
+		TextColor3 = C.Ash,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 23,
+		Parent = row,
+	})
+	hoverable(row, hover)
+end
+
+local function stat(parent, order, label, value)
+	local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 22, Parent = parent })
+	text({ Size = UDim2.new(1, 0, 0, 13), Text = spaced(label), FontFace = F.Label, TextSize = 10, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = cell })
+	text({ Position = UDim2.fromOffset(0, 13), Size = UDim2.new(1, 0, 0, 20), Text = value, FontFace = F.TitleBold, TextSize = 18, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = cell })
+end
+
+refreshBackpack = function()
+	if not backpack or not backpack.Visible then
+		return
+	end
+
+	-- Equipment
+	local equipment = backpack.Equipment
+	clearGui(equipment)
+	for i, entry in SLOTS do
+		if entry.Fixed then
+			local info = FIXED_INFO[entry.Fixed]
+			equipmentRow(equipment, i, entry.Fixed, entry.Key, info.Name, info.Subtitle, C.Rift, function()
+				return entry.Fixed
+			end)
+		else
+			local id, level = skillInSlot(entry.Slot)
+			local def = id and Skills.Defs[id]
+			local subtitle
+			if not def then
+				subtitle = "E M P T Y"
+			elseif entry.Slot == "M1" then
+				subtitle = "B A S I C   A T T A C K"
+			else
+				subtitle = `<font color="{hex(C.Gold)}">{NUMERALS[level]}</font>   {if #def.Elements == 2 then "F U S I O N" else spaced(def.Elements[1])}`
+			end
+			equipmentRow(equipment, i, id, entry.Key, if def then def.Name else "Nothing equipped", subtitle, skillColor(id), function()
+				return skillInSlot(entry.Slot)
+			end)
+		end
+	end
+	local charges, max = player:GetAttribute("FlaskCharges") or 0, player:GetAttribute("FlaskMax") or 0
+	equipmentRow(equipment, #SLOTS + 1, "Flask", "R", "Rift Flask", `{charges} / {max}   C H A R G E S`, Color3.fromRGB(255, 74, 94), function()
+		return "Flask"
+	end)
+
+	-- Stats
+	local stats = backpack.Stats
+	clearGui(stats)
+	local level = player:GetAttribute("Level") or 1
+	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+	local known, total = 0, 0
+	for _, id in Merge.All() do
+		total += 1
+		if discovered[id] then
+			known += 1
+		end
+	end
+	stat(stats, 1, "Level", tostring(level))
+	stat(stats, 2, "Max Health", tostring(if hum then math.floor(hum.MaxHealth) else Progression.MaxHealth(level)))
+	local damage = Progression.DamageMult(level) * Stats.DamageMult(player:GetAttribute("Stat_Might"))
+	stat(stats, 3, "Skill Damage", `+{math.floor((damage - 1) * 100 + 0.5)}%`)
+	stat(stats, 4, "Gold", tostring(player:GetAttribute("Gold") or 0))
+	stat(stats, 5, "Fusions", `{known} / {total}`)
+	stat(stats, 6, "Powers", tostring(#sortedOwned()))
+
+	-- Inventory
+	local grid = backpack.Items
+	clearGui(grid)
+	local kinds, pieces = 0, 0
+	for _, id in Items.Order do
+		local count = inventory[id]
+		if count and count > 0 then
+			kinds += 1
+			pieces += count
+			local def = Items.Defs[id]
+			local rarity = Items.Rarity[def.Rarity]
+			local cell = new("Frame", {
+				BackgroundColor3 = C.Ink,
+				BackgroundTransparency = 0.25,
+				LayoutOrder = kinds,
+				ZIndex = 22,
+				Parent = grid,
+			}, { corner(4), stroke(rarity.Color, 1.5, 0.2) })
+			new("ImageLabel", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(58, 58),
+				BackgroundTransparency = 1,
+				Image = UIAssets.Items[id],
+				ZIndex = 23,
+				Parent = cell,
+			})
+			text({
+				AnchorPoint = Vector2.new(1, 1),
+				Position = UDim2.new(1, -3, 1, -1),
+				Size = UDim2.fromOffset(40, 18),
+				Text = `x{count}`,
+				FontFace = F.TitleBold,
+				TextSize = 15,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				TextStrokeColor3 = C.Ink,
+				TextStrokeTransparency = 0,
+				ZIndex = 24,
+				Parent = cell,
+			})
+			cell.MouseEnter:Connect(function()
+				showItemTooltip(id, count)
+			end)
+			cell.MouseLeave:Connect(hideTooltip)
+		end
+	end
+	for i = kinds + 1, ITEM_CELLS do
+		new("Frame", {
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.55,
+			LayoutOrder = i,
+			ZIndex = 22,
+			Parent = grid,
+		}, { corner(4), stroke(C.Bronze, 1, 0.65) })
+	end
+	backpack.ItemCount.Text = if pieces > 0 then `{pieces}   I T E M S` else "D E F E A T   H U S K S   T O   C O L L E C T"
+
+	-- Powers (owned skills)
+	local powers = backpack.Powers
+	clearGui(powers)
+	local owned = sortedOwned()
+	for i, id in owned do
+		local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i, ZIndex = 22, Parent = powers })
+		local s = shard(id, 54, cell, 23)
+		s.Position = UDim2.fromOffset(1, 0)
+		text({
+			Position = UDim2.fromOffset(0, 52),
+			Size = UDim2.new(1, 0, 0, 16),
+			Text = NUMERALS[build.Skills[id]],
+			FontFace = F.TitleBold,
+			TextSize = 14,
+			TextColor3 = C.Gold,
+			ZIndex = 23,
+			Parent = cell,
+		})
+		hoverable(cell, function()
+			return id, build.Skills[id]
+		end)
+	end
+	if #owned == 0 then
+		text({
+			Size = UDim2.fromOffset(360, 60),
+			Text = "No powers yet. Seek the elemental shrines.",
+			FontFace = F.Italic,
+			TextSize = 17,
+			TextColor3 = C.Ash,
+			ZIndex = 22,
+			Parent = powers,
+		})
+	end
+end
+
+-- Bag button under the gold strip.
+local function buildBagButton()
+	local button = new("ImageButton", {
+		Name = "BagButton",
+		Position = UDim2.fromOffset(20, 132),
+		Size = UDim2.fromOffset(52, 52),
+		BackgroundTransparency = 1,
+		Image = UIAssets.Bag,
+		Parent = gui,
+	})
+	local plate = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 1, -8),
+		Size = UDim2.fromOffset(26, 16),
+		BackgroundColor3 = C.Ink,
+		ZIndex = 3,
+		Parent = button,
+	}, { stroke(C.Bronze, 1.2) })
+	text({ Size = UDim2.fromScale(1, 1), Text = "B", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 4, Parent = plate })
+	button.Activated:Connect(function()
+		HUD.ToggleBackpack()
+	end)
+	button.MouseEnter:Connect(function()
+		tween(button, 0.12, { Size = UDim2.fromOffset(58, 58), Position = UDim2.fromOffset(17, 129) })
+	end)
+	button.MouseLeave:Connect(function()
+		tween(button, 0.12, { Size = UDim2.fromOffset(52, 52), Position = UDim2.fromOffset(20, 132) })
+	end)
+end
+
+-------------------------------------------------------------------------------
+-- Attributes: spend stat points (C, or click the level medallion)
+-------------------------------------------------------------------------------
+
+local attributes
+local refreshAttributes
+
+local function buildAttributes()
+	attributes = new("Frame", {
+		Name = "Attributes",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.52),
+		Size = UDim2.fromOffset(680, 560),
+		BackgroundTransparency = 1,
+		Visible = false,
+		ZIndex = 20,
+		Parent = gui,
+	})
+	new("UIScale", { Parent = attributes })
+	slab({ Name = "Body", Position = UDim2.fromOffset(10, 92), Size = UDim2.new(1, -20, 1, -92), ZIndex = 20, Parent = attributes })
+
+	local banner = new("ImageLabel", {
+		Name = "Banner",
+		Position = UDim2.fromOffset(-30, 0),
+		Size = UDim2.new(1, 60, 0, 104),
+		BackgroundTransparency = 1,
+		Image = UIAssets.Banner,
+		ScaleType = Enum.ScaleType.Slice,
+		SliceCenter = UIAssets.BannerSlice,
+		SliceScale = 0.8,
+		ZIndex = 22,
+		Parent = attributes,
+	})
+	text({ Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Attributes"), FontFace = F.Title, TextSize = 36, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 23, Parent = banner })
+	text({ Position = UDim2.fromOffset(0, 62), Size = UDim2.new(1, 0, 0, 16), Text = "E A C H   L E V E L   G R A N T S   O N E   P O I N T", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 23, Parent = banner })
+
+	local close = new("TextButton", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 112),
+		Size = UDim2.fromOffset(34, 34),
+		Text = "X",
+		FontFace = F.TitleBold,
+		TextSize = 18,
+		TextColor3 = C.Gold,
+		AutoButtonColor = true,
+		BackgroundColor3 = C.Ink,
+		ZIndex = 24,
+		Parent = attributes,
+	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Bronze, 2) })
+	close.Activated:Connect(function()
+		HUD.SetStats(false)
+	end)
+
+	text({ Position = UDim2.fromOffset(40, 114), Size = UDim2.fromOffset(360, 28), Text = "Shape your power", FontFace = F.TitleBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = attributes })
+	new("Frame", { Position = UDim2.fromOffset(40, 146), Size = UDim2.fromOffset(52, 2), BackgroundColor3 = C.Crimson, BorderSizePixel = 0, ZIndex = 22, Parent = attributes })
+	text({ Name = "PointsLabel", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -96, 0, 122), Size = UDim2.fromOffset(160, 16), Text = "U N S P E N T", FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 22, Parent = attributes })
+	text({ Name = "Points", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -50, 0, 110), Size = UDim2.fromOffset(44, 40), Text = "0", FontFace = F.TitleBold, TextSize = 34, TextColor3 = C.Gold, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.3, ZIndex = 22, Parent = attributes })
+
+	local list = new("Frame", {
+		Name = "Rows",
+		Position = UDim2.fromOffset(28, 160),
+		Size = UDim2.new(1, -56, 0, 380),
+		BackgroundTransparency = 1,
+		ZIndex = 22,
+		Parent = attributes,
+	}, { new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }) })
+
+	for order, id in Stats.Order do
+		local def = Stats.Defs[id]
+		local row = new("ImageLabel", {
+			Name = id,
+			Size = UDim2.new(1, 0, 0, 88),
+			BackgroundTransparency = 1,
+			Image = UIAssets.Row,
+			ScaleType = Enum.ScaleType.Slice,
+			SliceCenter = UIAssets.RowSlice,
+			SliceScale = 0.5,
+			LayoutOrder = order,
+			ZIndex = 22,
+			Parent = list,
+		})
+		new("Frame", {
+			Position = UDim2.fromOffset(8, 8),
+			Size = UDim2.new(1, -16, 1, -16),
+			BackgroundColor3 = def.Color,
+			BorderSizePixel = 0,
+			ZIndex = 22,
+			Parent = row,
+		}, { new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.75), NumberSequenceKeypoint.new(0.5, 0.96), NumberSequenceKeypoint.new(1, 1) }) }) })
+		new("ImageLabel", {
+			Name = "Icon",
+			Position = UDim2.fromOffset(12, 8),
+			Size = UDim2.fromOffset(72, 72),
+			BackgroundTransparency = 1,
+			Image = UIAssets.Stats[id],
+			ZIndex = 23,
+			Parent = row,
+		})
+		text({ Position = UDim2.fromOffset(96, 10), Size = UDim2.fromOffset(200, 24), Text = def.Name, FontFace = F.TitleBold, TextSize = 22, TextColor3 = def.Color, TextXAlignment = Enum.TextXAlignment.Left, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.4, ZIndex = 23, Parent = row })
+		text({ Position = UDim2.fromOffset(96, 34), Size = UDim2.fromOffset(330, 18), Text = def.Description, FontFace = F.Body, TextSize = 12, TextColor3 = Color3.fromRGB(217, 201, 173), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = row })
+		new("Frame", {
+			Name = "Pips",
+			Position = UDim2.fromOffset(98, 60),
+			Size = UDim2.fromOffset(200, 14),
+			BackgroundTransparency = 1,
+			ZIndex = 23,
+			Parent = row,
+		}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 8) }) })
+		text({ Name = "Bonus", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -80, 0, 14), Size = UDim2.fromOffset(170, 20), FontFace = F.Label, TextSize = 13, TextColor3 = C.Good, TextXAlignment = Enum.TextXAlignment.Right, RichText = true, ZIndex = 23, Parent = row })
+		text({ Name = "Rank", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -80, 0, 56), Size = UDim2.fromOffset(120, 18), FontFace = F.Label, TextSize = 12, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 23, Parent = row })
+		local plus = new("TextButton", {
+			Name = "Plus",
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -18, 0.5, 0),
+			Size = UDim2.fromOffset(48, 48),
+			Text = "+",
+			FontFace = F.TitleBold,
+			TextSize = 30,
+			AutoButtonColor = true,
+			ZIndex = 24,
+			Parent = row,
+		}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Gold, 2) })
+		plus.Activated:Connect(function()
+			if (player:GetAttribute("StatPoints") or 0) <= 0 then
+				return
+			end
+			if remotes.SpendStat:InvokeServer(id) then
+				local icon = row.Icon
+				icon.Size = UDim2.fromOffset(84, 84)
+				icon.Position = UDim2.fromOffset(6, 2)
+				tween(icon, 0.35, { Size = UDim2.fromOffset(72, 72), Position = UDim2.fromOffset(12, 8) }, Enum.EasingStyle.Back)
+			end
+		end)
+	end
+end
+
+refreshAttributes = function()
+	if not attributes then
+		return
+	end
+	local points = player:GetAttribute("StatPoints") or 0
+	attributes.Points.Text = tostring(points)
+	attributes.Points.TextColor3 = if points > 0 then C.Gold else C.Ash
+	for _, id in Stats.Order do
+		local def = Stats.Defs[id]
+		local row = attributes.Rows[id]
+		local rank = player:GetAttribute("Stat_" .. id) or 0
+		for _, child in row.Pips:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		for i = 1, Stats.MaxRank do
+			local full = i <= rank
+			new("Frame", {
+				Size = UDim2.fromOffset(9, 9),
+				Rotation = 45,
+				BackgroundColor3 = if full then def.Color else C.Ink,
+				LayoutOrder = i,
+				ZIndex = 23,
+				Parent = row.Pips,
+			}, { stroke(if full then C.Parchment else C.Bronze, 1, if full then 0.4 else 0.2) })
+		end
+		local maxed = rank >= Stats.MaxRank
+		row.Rank.Text = `R A N K   {rank} / {Stats.MaxRank}`
+		if maxed then
+			row.Bonus.Text = def.Format(rank) .. "   ·   MAX"
+		elseif rank == 0 then
+			row.Bonus.Text = `<font color="{hex(C.Ash)}">none</font>   >   {def.Format(1)}`
+		else
+			row.Bonus.Text = `<font color="{hex(C.Ash)}">{def.Format(rank)}</font>   >   {def.Format(rank + 1)}`
+		end
+		local canBuy = points > 0 and not maxed
+		row.Plus.Text = if maxed then "" else "+"
+		row.Plus.BackgroundColor3 = if canBuy then C.Gold else C.Ink
+		row.Plus.TextColor3 = if canBuy then C.Ink else C.Ash
+		row.Plus.UIStroke.Color = if canBuy then C.Gold else C.Bronze
+		row.Plus.AutoButtonColor = canBuy
+	end
+end
+
+-- "+N" badge on the level medallion while points are unspent; clicking the
+-- medallion opens the Attributes page.
+local function buildPointsBadge()
+	local medal = gui.Vitals.Medallion
+	local hit = new("TextButton", {
+		Name = "OpenStats",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Text = "",
+		ZIndex = 7,
+		Parent = medal,
+	})
+	hit.Activated:Connect(function()
+		HUD.ToggleStats()
+	end)
+	local badge = new("Frame", {
+		Name = "PointsBadge",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -8, 0, 14),
+		Size = UDim2.fromOffset(30, 30),
+		BackgroundColor3 = C.Gold,
+		Visible = false,
+		ZIndex = 8,
+		Parent = medal,
+	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Ink, 2) })
+	local label = text({ Size = UDim2.fromScale(1, 1), FontFace = F.TitleBold, TextSize = 15, TextColor3 = C.Ink, ZIndex = 9, Parent = badge })
+	local pulse
+	local function refresh()
+		local points = player:GetAttribute("StatPoints") or 0
+		badge.Visible = points > 0
+		label.Text = "+" .. points
+		if points > 0 and not pulse then
+			pulse = TweenService:Create(badge, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Size = UDim2.fromOffset(36, 36) })
+			pulse:Play()
+		elseif points == 0 and pulse then
+			pulse:Cancel()
+			pulse = nil
+			badge.Size = UDim2.fromOffset(30, 30)
+		end
+	end
+	player:GetAttributeChangedSignal("StatPoints"):Connect(refresh)
+	refresh()
+end
+
+-------------------------------------------------------------------------------
 -- Public API
 -------------------------------------------------------------------------------
+
+local function menuShade(show)
+	if show then
+		forgeShade.Visible = true
+		forgeShade.BackgroundTransparency = 1
+		forgeShade.Vignette.ImageTransparency = 1
+		tween(forgeShade, 0.25, { BackgroundTransparency = 0.5 })
+		tween(forgeShade.Vignette, 0.25, { ImageTransparency = 0 })
+	else
+		forgeShade.Visible = false
+	end
+	arsenal.Visible = not show
+end
+
+local function popIn(frame)
+	frame.UIScale.Scale = 0.92
+	tween(frame.UIScale, 0.28, { Scale = 1 }, Enum.EasingStyle.Back)
+end
+
+-- True while any full-screen menu (Forge, Backpack) is open; Controls uses it to block casting.
+function HUD.MenuOpen()
+	return (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible)
+end
+
+-- The skill id equipped in a slot ("M1", "Q", "E"), or nil.
+function HUD.SkillInSlot(slot)
+	return (skillInSlot(slot))
+end
 
 function HUD.ForgeOpen()
 	return forge ~= nil and forge.Visible
@@ -1207,25 +2015,64 @@ function HUD.SetForge(open)
 	end
 	hideTooltip()
 	if open then
+		backpack.Visible = false
+		attributes.Visible = false
 		refreshForge()
 		forge.Visible = true
-		forgeShade.Visible = true
-		arsenal.Visible = false
-		forge.UIScale.Scale = 0.92
-		tween(forge.UIScale, 0.28, { Scale = 1 }, Enum.EasingStyle.Back)
-		forgeShade.BackgroundTransparency = 1
-		forgeShade.Vignette.ImageTransparency = 1
-		tween(forgeShade, 0.25, { BackgroundTransparency = 0.5 })
-		tween(forgeShade.Vignette, 0.25, { ImageTransparency = 0 })
+		menuShade(true)
+		popIn(forge)
 	else
 		forge.Visible = false
-		forgeShade.Visible = false
-		arsenal.Visible = true
+		menuShade(false)
 	end
 end
 
 function HUD.ToggleForge()
 	HUD.SetForge(not forge.Visible)
+end
+
+function HUD.SetBackpack(open)
+	if open == backpack.Visible then
+		return
+	end
+	hideTooltip()
+	if open then
+		forge.Visible = false
+		attributes.Visible = false
+		backpack.Visible = true
+		refreshBackpack()
+		menuShade(true)
+		popIn(backpack)
+	else
+		backpack.Visible = false
+		menuShade(false)
+	end
+end
+
+function HUD.ToggleBackpack()
+	HUD.SetBackpack(not backpack.Visible)
+end
+
+function HUD.SetStats(open)
+	if open == attributes.Visible then
+		return
+	end
+	hideTooltip()
+	if open then
+		forge.Visible = false
+		backpack.Visible = false
+		attributes.Visible = true
+		refreshAttributes()
+		menuShade(true)
+		popIn(attributes)
+	else
+		attributes.Visible = false
+		menuShade(false)
+	end
+end
+
+function HUD.ToggleStats()
+	HUD.SetStats(not attributes.Visible)
 end
 
 -- Starts the local cooldown for a slot. Returns false if it is still cooling down.
@@ -1239,13 +2086,18 @@ function HUD.TryStartCooldown(slot)
 	if cd and now < cd.Ends then
 		return false
 	end
-	local length = Skills.CooldownOf(id, level)
+	local length = Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus"))
 	cooldownEnds[id] = { Ends = now + length, Length = length }
 	return true
 end
 
 function HUD.StartDashCooldown(length)
 	dash = { Ends = os.clock() + length, Length = length }
+end
+
+-- True when the shield is off cooldown.
+function HUD.BlockReady()
+	return os.clock() >= block.Ends
 end
 
 local function applyBuild(snapshot)
@@ -1256,6 +2108,7 @@ local function applyBuild(snapshot)
 	refreshSlots()
 	refreshArsenal()
 	refreshForge()
+	refreshBackpack()
 end
 
 function HUD.Init(remoteFolder)
@@ -1285,15 +2138,25 @@ function HUD.Init(remoteFolder)
 		Name = "SkillBar",
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 18, 1, -10),
-		Size = UDim2.fromOffset(4 * 96, ICON + 60),
+		Size = UDim2.fromOffset(#SLOTS * 96, ICON + 60),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
 	for i, entry in SLOTS do
 		makeSlot(bar, entry, i)
 	end
+	-- The server publishes when the shield can be raised again.
+	player:GetAttributeChangedSignal("BlockReadyAt"):Connect(function()
+		local length = (player:GetAttribute("BlockReadyAt") or 0) - workspace:GetServerTimeNow()
+		if length > 0 then
+			block = { Ends = os.clock() + length, Length = length }
+		end
+	end)
+	buildFlask()
 
 	buildArsenal()
+	buildArsenalToggle()
+	buildBagButton()
 
 	toastHolder = new("Frame", {
 		Name = "Toasts",
@@ -1307,6 +2170,9 @@ function HUD.Init(remoteFolder)
 	})
 
 	buildForge()
+	buildBackpack()
+	buildAttributes()
+	buildPointsBadge()
 	buildTooltip()
 
 	remotes.BuildChanged.OnClientEvent:Connect(applyBuild)
@@ -1315,6 +2181,18 @@ function HUD.Init(remoteFolder)
 		HUD.SetForge(true)
 	end)
 	applyBuild(remotes.GetBuild:InvokeServer())
+
+	remotes.InventoryChanged.OnClientEvent:Connect(function(snapshot)
+		inventory = snapshot
+		refreshBackpack()
+	end)
+	inventory = remotes.GetInventory:InvokeServer() or {}
+	for _, name in { "Gold", "Level", "FlaskCharges", "FlaskMax", "StatPoints", "Stat_Vitality", "Stat_Might", "Stat_Swiftness", "Stat_Focus" } do
+		player:GetAttributeChangedSignal(name):Connect(function()
+			refreshBackpack()
+			refreshAttributes()
+		end)
+	end
 
 	RunService.RenderStepped:Connect(updateCooldowns)
 end

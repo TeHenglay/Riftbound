@@ -193,6 +193,55 @@ forgePrompt:SetAttribute("Forge", true)
 forgePrompt.Parent = forgeBase
 forge.Parent = arena
 
+-- The Rift Well: refills flasks (F) ---------------------------------------------
+local WELL_POS = Vector3.new(30, FLOOR_TOP, 44)
+local WELL_RED = Color3.fromRGB(255, 74, 94)
+local well = Instance.new("Model")
+well.Name = "RiftWell"
+local wellBase = part(well, {
+	Name = "Base",
+	Shape = Enum.PartType.Cylinder,
+	Size = Vector3.new(3, 10, 10),
+	CFrame = CFrame.new(WELL_POS + Vector3.new(0, 1.5, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+	Material = Enum.Material.Basalt,
+	Color = Color3.fromRGB(58, 48, 70),
+})
+part(well, {
+	Name = "Rim",
+	Shape = Enum.PartType.Cylinder,
+	Size = Vector3.new(0.6, 10.6, 10.6),
+	CFrame = CFrame.new(WELL_POS + Vector3.new(0, 3.1, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+	Material = Enum.Material.Metal,
+	Color = Color3.fromRGB(168, 119, 63),
+})
+local liquid = part(well, {
+	Name = "Liquid",
+	Shape = Enum.PartType.Cylinder,
+	Size = Vector3.new(0.3, 8, 8),
+	CFrame = CFrame.new(WELL_POS + Vector3.new(0, 3.05, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+	Material = Enum.Material.Neon,
+	Color = WELL_RED,
+	CanCollide = false,
+})
+local wellLight = Instance.new("PointLight")
+wellLight.Color = WELL_RED
+wellLight.Range = 18
+wellLight.Brightness = 2.5
+wellLight.Parent = liquid
+billboard(liquid, "RIFT WELL", "Press F to refill your flasks", Color3.fromRGB(255, 120, 135))
+
+local refillPrompt = Instance.new("ProximityPrompt")
+refillPrompt.ActionText = "Refill Flasks"
+refillPrompt.ObjectText = "Rift Well"
+refillPrompt.KeyboardKeyCode = Enum.KeyCode.F
+refillPrompt.HoldDuration = 0
+refillPrompt.MaxActivationDistance = 11
+refillPrompt.RequiresLineOfSight = false
+refillPrompt:SetAttribute("FlaskRefill", true)
+refillPrompt.Parent = wellBase
+
+well.Parent = arena
+
 -- Dummy spawn points -----------------------------------------------------------
 local spawns = Instance.new("Folder")
 spawns.Name = "DummySpawns"

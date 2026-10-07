@@ -1,85 +1,33 @@
--- Server-side skill execution: hit detection, damage, statuses and visuals.
--- One function per skill Kind (see ReplicatedStorage.Riftbound.Skills).
-local Debris = game:GetService("Debris")
+-- Server-side skill execution: hit detection, damage and statuses. One function
+-- per skill Kind (see ReplicatedStorage.Riftbound.Skills).
+-- Visuals are not built here: the server fires the SkillFx remote with what
+-- happened (cast, projectile flight, strike, zone, bolt, impact) and every
+-- client renders it with StarterPlayerScripts.Riftbound.SkillVFX.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Elements = require(Shared:WaitForChild("Elements"))
 local Skills = require(Shared:WaitForChild("Skills"))
 local Enemies = require(script.Parent.Enemies)
 local ProgressionService = require(script.Parent.ProgressionService)
+local StatService = require(script.Parent.StatService)
 
 local DEFAULT_RANGE = 60
 local GROUND_OFFSET = 2.9 -- HumanoidRootPart height above the floor for a standard avatar
-
-local fx = workspace:FindFirstChild("RiftFX") or Instance.new("Folder")
-fx.Name = "RiftFX"
-fx.Parent = workspace
+local PROJECTILE_START = 2.5 -- studs in front of the caster
 
 local SkillEffects = {}
 local Kinds = {}
 
-local function part(props)
-	local p = Instance.new("Part")
-	p.Anchored = true
-	p.CanCollide = false
-	p.CanQuery = false
-	p.CanTouch = false
-	p.CastShadow = false
-	p.Material = Enum.Material.Neon
-	p.TopSurface = Enum.SurfaceType.Smooth
-	p.BottomSurface = Enum.SurfaceType.Smooth
-	for k, v in props do
-		p[k] = v
-	end
-	p.Parent = fx
-	return p
-end
+local nextFxId = 0
 
-local function tween(inst, t, goal, style)
-	local tw = TweenService:Create(inst, TweenInfo.new(t, style or Enum.EasingStyle.Quad, Enum.EasingDirection.Out), goal)
-	tw:Play()
-	return tw
-end
-
-local function fadeOut(p, t, goal)
-	goal = goal or {}
-	goal.Transparency = 1
-	tween(p, t, goal)
-	Debris:AddItem(p, t + 0.05)
-end
-
--- A flat disc lying on the ground (cylinders point along X, so roll 90 degrees).
-local function disc(pos, radius, color, transparency)
-	return part({
-		Shape = Enum.PartType.Cylinder,
-		Size = Vector3.new(0.3, radius * 2, radius * 2),
-		CFrame = CFrame.new(pos) * CFrame.Angles(0, 0, math.rad(90)),
-		Color = color,
-		Transparency = transparency or 0.5,
-	})
-end
-
-local function bolt(from, to, color, width)
-	local points = { from }
-	local segments = 4
-	for i = 1, segments - 1 do
-		local p = from:Lerp(to, i / segments)
-		local jitter = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2.5
-		table.insert(points, p + jitter)
-	end
-	table.insert(points, to)
-	for i = 1, #points - 1 do
-		local a, b = points[i], points[i + 1]
-		local len = (b - a).Magnitude
-		local seg = part({
-			Size = Vector3.new(width or 0.4, width or 0.4, len),
-			CFrame = CFrame.lookAt((a + b) / 2, b),
-			Color = color,
-		})
-		fadeOut(seg, 0.25)
+-- Sends a visual event to every client (Main creates the SkillFx remote).
+local function fx(payload)
+	local remotes = Shared:FindFirstChild("Remotes")
+	local remote = remotes and remotes:FindFirstChild("SkillFx")
+	if remote then
+		remote:FireAllClients(payload)
 	end
 end
 
@@ -89,6 +37,9 @@ local function hit(ctx, model, mult)
 		for name, params in ctx.Def.Status do
 			Enemies.ApplyStatus(model, name, params)
 		end
+	end
+	if model.PrimaryPart then
+		fx({ Type = "Impact", Skill = ctx.Def.Id, At = model.PrimaryPart.Position })
 	end
 end
 
@@ -103,50 +54,48 @@ end
 
 function Kinds.Projectile(ctx)
 	local def = ctx.Def
+	if def.Windup and not ctx.Released then
+		-- Let the throw animation reach its release point, from wherever the
+		-- caster is standing by then.
+		ctx.Released = true
+		task.delay(def.Windup, function()
+			local char = ctx.Player.Character
+			local root = char and char:FindFirstChild("HumanoidRootPart")
+			if root then
+				ctx.Origin = root.Position
+				Kinds.Projectile(ctx)
+			end
+		end)
+		return
+	end
 	local size = if def.Radius >= 6 then 2 else 1
-	local ball = part({
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.one * size,
-		CFrame = CFrame.new(ctx.Origin + ctx.Dir * 2.5),
-		Color = ctx.Color,
-	})
-	local light = Instance.new("PointLight")
-	light.Color = ctx.Color
-	light.Range = 10
-	light.Parent = ball
+	nextFxId += 1
+	local id = nextFxId
+	local pos = ctx.Origin + ctx.Dir * PROJECTILE_START
+	fx({ Type = "ProjectileStart", Id = id, Skill = def.Id, From = pos, Dir = ctx.Dir, Speed = def.Speed, Range = def.Range, Floor = ctx.Floor, Caster = ctx.Player })
 
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { fx, Enemies.Folder, ctx.Player.Character }
+	params.FilterDescendantsInstances = { workspace:FindFirstChild("RiftFX"), Enemies.Folder, ctx.Player.Character }
 
 	local travelled = 0
 	local conn
-	local function explode(pos)
+	local function explode(at)
 		conn:Disconnect()
-		ball:Destroy()
-		for _, model in Enemies.InRadius(pos, def.Radius) do
+		for _, model in Enemies.InRadius(at, def.Radius) do
 			hit(ctx, model)
 		end
-		local burst = part({
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.one,
-			CFrame = CFrame.new(pos),
-			Color = ctx.Color,
-			Transparency = 0.2,
-		})
-		fadeOut(burst, 0.3, { Size = Vector3.one * def.Radius * 2 })
+		fx({ Type = "ProjectileEnd", Id = id, Skill = def.Id, At = at, Radius = def.Radius, Floor = ctx.Floor })
 	end
 
 	conn = RunService.Heartbeat:Connect(function(dt)
-		local from = ball.Position
 		local step = ctx.Dir * def.Speed * dt
-		local wall = workspace:Raycast(from, step, params)
+		local wall = workspace:Raycast(pos, step, params)
 		if wall then
 			explode(wall.Position)
 			return
 		end
-		local pos = from + step
-		ball.Position = pos
+		pos += step
 		travelled += step.Magnitude
 		for _, model in Enemies.GetAll() do
 			if (model.PrimaryPart.Position - pos).Magnitude < 2.5 + size then
@@ -164,6 +113,7 @@ function Kinds.Line(ctx)
 	local def = ctx.Def
 	local o, dir = ctx.Origin, ctx.Dir
 	local sweep = 0.3
+	fx({ Type = "Line", Skill = def.Id, From = o, Dir = dir, Length = def.Length, Width = def.Width, Sweep = sweep, Floor = ctx.Floor })
 	for _, model in Enemies.GetAll() do
 		local rel = model.PrimaryPart.Position - o
 		local along = rel:Dot(dir)
@@ -180,49 +130,147 @@ function Kinds.Line(ctx)
 			end)
 		end
 	end
-	local base = CFrame.lookAt(o, o + dir) * CFrame.new(0, -1.5, 0)
-	local slab = part({
-		Size = Vector3.new(def.Width, 3, 1),
-		CFrame = base * CFrame.new(0, 0, -0.5),
-		Color = ctx.Color,
-		Transparency = 0.3,
-	})
-	tween(slab, sweep, { Size = Vector3.new(def.Width, 3, def.Length), CFrame = base * CFrame.new(0, 0, -def.Length / 2) })
-	task.delay(sweep, function()
-		fadeOut(slab, 0.35)
+end
+
+function Kinds.Cone(ctx)
+	local def = ctx.Def
+	local o, dir = ctx.Origin, ctx.Dir
+	local halfAngle = math.rad(def.Angle / 2)
+	fx({ Type = "Cone", Skill = def.Id, From = o, Dir = dir, Length = def.Length, Angle = def.Angle, Sweep = def.Sweep, Windup = def.Windup, Floor = ctx.Floor })
+	task.delay(def.Windup or 0, function()
+		for _, model in Enemies.GetAll() do
+			local rel = model.PrimaryPart.Position - o
+			local flat = Vector3.new(rel.X, 0, rel.Z)
+			local dist = flat.Magnitude
+			-- Inside the angle, with a little slack for the enemy's own width.
+			local inCone = dist < 2.5 or math.acos(math.clamp(flat.Unit:Dot(dir), -1, 1)) <= halfAngle + math.atan2(1.5, dist)
+			if dist <= def.Length + 1.5 and inCone and math.abs(rel.Y) < 14 then
+				task.delay(dist / def.Length * def.Sweep, function()
+					if Enemies.IsAlive(model) then
+						hit(ctx, model)
+					end
+				end)
+			end
+		end
+	end)
+end
+
+function Kinds.Roller(ctx)
+	local def = ctx.Def
+	local dir = ctx.Dir
+	local side = dir:Cross(Vector3.yAxis)
+	fx({ Type = "Roller", Skill = def.Id, From = ctx.Origin, Dir = dir, Speed = def.Speed, Length = def.Length, Radius = def.Radius, Windup = def.Windup, Floor = ctx.Floor })
+	task.delay(def.Windup or 0, function()
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { workspace:FindFirstChild("RiftFX"), Enemies.Folder, ctx.Player.Character }
+		local pos = ctx.Origin + dir * 3
+		local travelled = 0
+		local struck = {}
+		local conn
+		conn = RunService.Heartbeat:Connect(function(dt)
+			local step = dir * def.Speed * dt
+			local wall = workspace:Raycast(pos, step, params)
+			travelled += step.Magnitude
+			pos += step
+			for _, model in Enemies.InRadius(pos, def.Radius) do
+				if not struck[model] then
+					struck[model] = true
+					hit(ctx, model)
+					-- Flattened and flung off to the side of the boulder's path.
+					local rel = model.PrimaryPart.Position - pos
+					local away = if rel:Dot(side) >= 0 then side else -side
+					Enemies.Push(model, (dir * 0.7 + away).Unit * (def.Knockback or 0), 0.3)
+				end
+			end
+			if wall or travelled >= def.Length then
+				conn:Disconnect()
+				fx({ Type = "RollerEnd", Skill = def.Id, At = pos, Floor = ctx.Floor })
+			end
+		end)
+	end)
+end
+
+function Kinds.Meteor(ctx)
+	local def = ctx.Def
+	local center = ctx.Target
+	local tickDamage = (def.TickDamage or 0) * Skills.DamageMult(ctx.Level) * ctx.PowerMult
+	fx({ Type = "Meteor", Skill = def.Id, At = center, Dir = ctx.Dir, Radius = def.Radius, Delay = def.Delay, Duration = def.Duration, PoolRadius = def.PoolRadius })
+	task.delay(def.Delay, function()
+		for _, model in Enemies.InRadius(center, def.Radius) do
+			hit(ctx, model)
+			pushAway(model, center, 25)
+		end
+		-- The lava pool left behind.
+		local elapsed = 0
+		while elapsed < def.Duration do
+			task.wait(def.TickRate)
+			elapsed += def.TickRate
+			for _, model in Enemies.InRadius(center, def.PoolRadius) do
+				Enemies.Damage(model, tickDamage, def.Elements, ctx.Color)
+				for name, params in def.Status or {} do
+					Enemies.ApplyStatus(model, name, params)
+				end
+			end
+		end
+	end)
+end
+
+function Kinds.Leap(ctx)
+	local def = ctx.Def
+	local char = ctx.Player.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	if not root or not hum then
+		return
+	end
+	-- The caster's client launches the jump (it owns the character's physics).
+	fx({ Type = "Leap", Skill = def.Id, Root = root, Caster = ctx.Player, JumpVelocity = def.JumpVelocity })
+	task.spawn(function()
+		local start = os.clock()
+		task.wait(0.25)
+		while os.clock() - start < 2.5 and hum.FloorMaterial == Enum.Material.Air and root.Parent do
+			task.wait()
+		end
+		local at = root.Position - Vector3.new(0, GROUND_OFFSET, 0)
+		fx({ Type = "LeapSlam", Skill = def.Id, At = at, Inner = def.InnerRadius, Radius = def.Radius })
+		local struck = {}
+		for _, model in Enemies.InRadius(at, def.InnerRadius) do
+			struck[model] = true
+			hit(ctx, model)
+		end
+		task.wait(0.15)
+		for _, model in Enemies.InRadius(at, def.Radius) do
+			if not struck[model] then
+				hit(ctx, model)
+				pushAway(model, at, 30)
+			end
+		end
 	end)
 end
 
 function Kinds.Nova(ctx)
 	local def = ctx.Def
 	local center = ctx.Origin
-	for _, model in Enemies.InRadius(center, def.Radius) do
-		hit(ctx, model)
-		if def.Knockback then
-			pushAway(model, center, def.Knockback)
+	local windup = def.Windup or 0
+	fx({ Type = "Nova", Skill = def.Id, At = center, Radius = def.Radius, Floor = ctx.Floor, Windup = windup })
+	-- The hit lands on the visual release (and the cast animation's fling).
+	task.delay(windup, function()
+		for _, model in Enemies.InRadius(center, def.Radius) do
+			hit(ctx, model)
+			if def.Knockback then
+				pushAway(model, center, def.Knockback)
+			end
 		end
-	end
-	local ring = disc(center - Vector3.new(0, GROUND_OFFSET - 0.2, 0), 2, ctx.Color, 0.2)
-	fadeOut(ring, 0.4, { Size = Vector3.new(0.3, def.Radius * 2, def.Radius * 2) })
-	local dome = part({
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.one * 3,
-		CFrame = CFrame.new(center),
-		Color = ctx.Color,
-		Transparency = 0.5,
-	})
-	fadeOut(dome, 0.35, { Size = Vector3.one * def.Radius * 1.6 })
+	end)
 end
 
 function Kinds.Strike(ctx)
 	local def = ctx.Def
 	local center = ctx.Target
-	local warn = disc(center + Vector3.new(0, 0.2, 0), def.Radius, ctx.Color, 0.75)
-	tween(warn, def.Delay, { Transparency = 0.45 }, Enum.EasingStyle.Linear)
+	fx({ Type = "Strike", Skill = def.Id, At = center, Radius = def.Radius, Delay = def.Delay, Pull = def.Pull ~= nil })
 	task.delay(def.Delay, function()
-		warn:Destroy()
-		local targets = Enemies.InRadius(center, def.Radius)
-		for _, model in targets do
+		for _, model in Enemies.InRadius(center, def.Radius) do
 			if def.Pull then
 				local p = model.PrimaryPart.Position
 				local toCenter = Vector3.new(center.X - p.X, 0, center.Z - p.Z)
@@ -233,31 +281,6 @@ function Kinds.Strike(ctx)
 			end
 			hit(ctx, model)
 		end
-		local column = part({
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(1, def.Radius * 1.2, def.Radius * 1.2),
-			CFrame = CFrame.new(center) * CFrame.Angles(0, 0, math.rad(90)),
-			Color = ctx.Color,
-			Transparency = 0.15,
-		})
-		fadeOut(column, 0.45, {
-			Size = Vector3.new(14, def.Radius * 2, def.Radius * 2),
-			CFrame = CFrame.new(center + Vector3.new(0, 7, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-		})
-		for i = 1, 6 do
-			local angle = i / 6 * math.pi * 2
-			local offset = Vector3.new(math.cos(angle), 0, math.sin(angle)) * def.Radius * 0.55
-			local spike = part({
-				Size = Vector3.new(1.4, 0.5, 1.4),
-				CFrame = CFrame.new(center + offset) * CFrame.Angles(math.random() * 0.5, angle, math.random() * 0.5),
-				Color = ctx.Color,
-				Material = Enum.Material.Slate,
-			})
-			tween(spike, 0.15, { Size = Vector3.new(1.4, 6, 1.4) })
-			task.delay(0.5, function()
-				fadeOut(spike, 0.3)
-			end)
-		end
 	end)
 end
 
@@ -266,17 +289,7 @@ function Kinds.Zone(ctx)
 	local center = ctx.Target
 	local tickDamage = (def.TickDamage or 0) * Skills.DamageMult(ctx.Level) * ctx.PowerMult
 	local isStorm = table.find(def.Elements, "Lightning") ~= nil
-
-	local zone = disc(center + Vector3.new(0, 0.2, 0), 1, ctx.Color, 0.55)
-	tween(zone, 0.25, { Size = Vector3.new(0.3, def.Radius * 2, def.Radius * 2) })
-	local cloud = part({
-		Shape = Enum.PartType.Ball,
-		Size = Vector3.new(def.Radius * 2, 4, def.Radius * 2),
-		CFrame = CFrame.new(center + Vector3.new(0, if isStorm then 14 else 3, 0)),
-		Color = ctx.Color,
-		Material = Enum.Material.ForceField,
-		Transparency = 0.1,
-	})
+	fx({ Type = "Zone", Skill = def.Id, At = center, Radius = def.Radius, Duration = def.Duration, TickRate = def.TickRate })
 
 	for _, model in Enemies.InRadius(center, def.Radius) do
 		if ctx.Damage > 0 then
@@ -299,11 +312,9 @@ function Kinds.Zone(ctx)
 			if isStorm and #inside > 0 then
 				local victim = inside[math.random(1, #inside)]
 				local p = victim.PrimaryPart.Position
-				bolt(p + Vector3.new(0, 14, 0), p, ctx.Color, 0.6)
+				fx({ Type = "Bolt", Skill = def.Id, From = p + Vector3.new(0, 16, 0), To = p, Strike = true })
 			end
 		end
-		fadeOut(zone, 0.4)
-		fadeOut(cloud, 0.4)
 	end)
 end
 
@@ -325,7 +336,7 @@ function Kinds.Chain(ctx)
 
 	local first = nearest(ctx.Target, 16)
 	if not first or (first.PrimaryPart.Position - ctx.Origin).Magnitude > (def.Range or DEFAULT_RANGE) + 5 then
-		bolt(ctx.Origin, ctx.Target + Vector3.new(0, 1, 0), ctx.Color, 0.3)
+		fx({ Type = "Bolt", Skill = def.Id, From = ctx.Origin, To = ctx.Target + Vector3.new(0, 1, 0), Fizzle = true })
 		return
 	end
 
@@ -333,18 +344,79 @@ function Kinds.Chain(ctx)
 		local from = ctx.Origin
 		local current = first
 		local mult = 1
-		for _ = 0, def.Jumps do
+		for jump = 0, def.Jumps do
 			if not current then
 				break
 			end
 			hitSet[current] = true
 			local to = current.PrimaryPart.Position
-			bolt(from, to, ctx.Color, 0.45)
+			fx({ Type = "Bolt", Skill = def.Id, From = from, To = to, First = jump == 0 })
 			hit(ctx, current, mult)
 			mult *= 0.85
 			from = to
 			task.wait(0.08)
 			current = nearest(from, def.JumpRange)
+		end
+	end)
+end
+
+-- Pulls every enemy within `reach` of `center` toward it. `speed` caps the pull.
+local function pullIn(center, reach, speed, duration)
+	for _, model in Enemies.InRadius(center, reach) do
+		local p = model.PrimaryPart.Position
+		local toCenter = Vector3.new(center.X - p.X, 0, center.Z - p.Z)
+		local dist = toCenter.Magnitude
+		if dist > 1 then
+			Enemies.Push(model, toCenter.Unit * math.min(dist / math.max(duration, 0.05), speed), duration)
+		end
+	end
+end
+
+function Kinds.Tornado(ctx)
+	local def = ctx.Def
+	local center = ctx.Target
+	local tickDamage = (def.TickDamage or 0) * Skills.DamageMult(ctx.Level) * ctx.PowerMult
+	fx({ Type = "Tornado", Skill = def.Id, At = center, Radius = def.Radius, Duration = def.Duration })
+	for _, model in Enemies.InRadius(center, def.Radius) do
+		hit(ctx, model)
+	end
+	task.spawn(function()
+		local elapsed, nextTick = 0, def.TickRate
+		while elapsed < def.Duration do
+			task.wait(0.15)
+			elapsed += 0.15
+			-- Constant inward drag, stronger the further out an enemy is.
+			pullIn(center, def.Radius * 1.4, def.Pull, 0.2)
+			if elapsed >= nextTick then
+				nextTick += def.TickRate
+				for _, model in Enemies.InRadius(center, def.Radius) do
+					Enemies.Damage(model, tickDamage, def.Elements, ctx.Color)
+					for name, params in def.Status or {} do
+						Enemies.ApplyStatus(model, name, params)
+					end
+				end
+			end
+		end
+	end)
+end
+
+function Kinds.Magnet(ctx)
+	local def = ctx.Def
+	local center = ctx.Target
+	fx({ Type = "Magnet", Skill = def.Id, At = center, Radius = def.Radius, PullTime = def.PullTime })
+	task.spawn(function()
+		-- Yank phase: fast pulls toward the core.
+		local elapsed = 0
+		while elapsed < def.PullTime do
+			pullIn(center, def.Radius, 95, 0.12)
+			task.wait(0.1)
+			elapsed += 0.1
+		end
+		-- Detonation: everything gathered at the core is held in place and hit.
+		fx({ Type = "MagnetBlast", Skill = def.Id, At = center, Radius = def.Radius })
+		for _, model in Enemies.InRadius(center, def.Radius * 0.55) do
+			Enemies.Push(model, Vector3.zero, 0.2)
+			hit(ctx, model)
 		end
 	end)
 end
@@ -372,7 +444,9 @@ function SkillEffects.Cast(player, id, level, targetPos)
 		target = Vector3.new(origin.X, target.Y, origin.Z) + dir * range
 	end
 
-	local powerMult = ProgressionService.DamageMult(player)
+	fx({ Type = "Cast", Skill = id, At = origin, Dir = dir, Caster = player })
+
+	local powerMult = ProgressionService.DamageMult(player) * StatService.DamageMult(player)
 	Kinds[def.Kind]({
 		Player = player,
 		Def = def,
@@ -383,6 +457,7 @@ function SkillEffects.Cast(player, id, level, targetPos)
 		Origin = origin,
 		Target = target,
 		Dir = dir,
+		Floor = groundY,
 	})
 end
 

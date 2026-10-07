@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Elements = require(Shared:WaitForChild("Elements"))
 local Merge = require(Shared:WaitForChild("Merge"))
 local Skills = require(Shared:WaitForChild("Skills"))
+local StatService = require(script.Parent.StatService)
 
 local SLOTS = { "Q", "E" }
 local BASIC_ATTACK = "RiftBolt"
@@ -153,7 +154,7 @@ function BuildService.TryCast(player, slot)
 	if now < (b.Cooldowns[id] or 0) then
 		return nil
 	end
-	b.Cooldowns[id] = now + Skills.CooldownOf(id, level) - COOLDOWN_TOLERANCE
+	b.Cooldowns[id] = now + Skills.CooldownOf(id, level) * StatService.CooldownMult(player) - COOLDOWN_TOLERANCE
 	return id, level
 end
 

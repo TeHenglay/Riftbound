@@ -21,6 +21,7 @@ Elements.Reactions = {
 	{ Name = "Evaporate", Needs = "Soak", Hit = "Fire", Mult = 1.25, Consume = true },
 	{ Name = "Fan the Flames", Needs = "Burn", Hit = "Air", Mult = 1.3, Consume = false },
 	{ Name = "Shatter", Needs = "Stun", Hit = "Earth", Mult = 1.4, Consume = true },
+	{ Name = "Shatter", Needs = "Freeze", Hit = "Earth", Mult = 1.6, Consume = true },
 }
 
 function Elements.ColorOf(elements)

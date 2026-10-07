@@ -1,5 +1,7 @@
--- Input: hold left mouse for the basic attack, Q/E for equipped skills,
--- Shift to dash. Skills aim at the mouse cursor. (F is the interact key.)
+-- Input: hold left mouse for the basic attack, hold right mouse to block,
+-- Q/E for equipped skills,
+-- Shift to dash, R to drink the flask, B for the backpack, C for stats. Skills aim at the cursor.
+-- (F is the interact key.)
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,11 +11,14 @@ local DASH_SPEED = 85
 local DASH_TIME = 0.18
 local DASH_COOLDOWN = 0.9
 
+local CastAnimator = require(script.Parent:WaitForChild("CastAnimator"))
+
 local Controls = {}
 
 function Controls.Init(Remotes, HUD)
 	local player = Players.LocalPlayer
 	local attackHeld = false
+	local blockHeld = false
 	local lastDash = -math.huge
 
 	local function getRoot()
@@ -43,7 +48,7 @@ function Controls.Init(Remotes, HUD)
 
 	local function cast(slot)
 		local root = getRoot()
-		if not root or HUD.ForgeOpen() then
+		if not root or HUD.MenuOpen() then
 			return
 		end
 		if not HUD.TryStartCooldown(slot) then
@@ -55,6 +60,7 @@ function Controls.Init(Remotes, HUD)
 			root.CFrame = CFrame.lookAt(root.Position, flat)
 		end
 		Remotes.Cast:FireServer(slot, target)
+		CastAnimator.Play(player.Character, HUD.SkillInSlot(slot))
 	end
 
 	local function dash()
@@ -77,12 +83,23 @@ function Controls.Init(Remotes, HUD)
 		lv.Parent = root
 		Debris:AddItem(lv, DASH_TIME)
 		HUD.StartDashCooldown(DASH_COOLDOWN)
+		CastAnimator.Play(player.Character, "Dash")
 	end
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			if not processed then
 				attackHeld = true
+			end
+			return
+		end
+		if input.UserInputType == Enum.UserInputType.MouseButton2 then
+			if not processed and not HUD.MenuOpen() and getRoot() then
+				blockHeld = true
+				Remotes.Block:FireServer(true)
+				if HUD.BlockReady() then
+					CastAnimator.PredictGuard()
+				end
 			end
 			return
 		end
@@ -96,12 +113,21 @@ function Controls.Init(Remotes, HUD)
 			cast("E")
 		elseif key == Enum.KeyCode.LeftShift then
 			dash()
+		elseif key == Enum.KeyCode.R then
+			Remotes.UseFlask:FireServer()
+		elseif key == Enum.KeyCode.B then
+			HUD.ToggleBackpack()
+		elseif key == Enum.KeyCode.C then
+			HUD.ToggleStats()
 		end
 	end)
 
 	UserInputService.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
 			attackHeld = false
+		elseif input.UserInputType == Enum.UserInputType.MouseButton2 and blockHeld then
+			blockHeld = false
+			Remotes.Block:FireServer(false)
 		end
 	end)
 

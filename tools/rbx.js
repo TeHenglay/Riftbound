@@ -69,5 +69,5 @@ if (require.main === module) {
     console.log((r.isError ? 'ERROR: ' : '') + r.text);
     s.close(); process.exit(r.isError ? 1 : 0);
   })().catch(e => { console.error(e.message); process.exit(2); });
-  setTimeout(() => { console.error('TIMEOUT'); process.exit(3); }, 240000);
+  setTimeout(() => { console.error('TIMEOUT'); process.exit(3); }, Number(process.env.RBX_TIMEOUT || 240000));
 }

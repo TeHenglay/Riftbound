@@ -2,14 +2,28 @@
 -- To add a new fusion, add a skill with two elements: Merge picks it up automatically.
 --
 -- Kinds (implemented in ServerScriptService.Riftbound.SkillEffects):
---   Projectile  flies toward the aim point and explodes in Radius
+--   Projectile  flies toward the aim point and explodes in Radius (launched
+--               after Windup, if set)
 --   Line        hits everything in a Length x Width strip in front of you
---   Nova        hits everything within Radius around you
+--   Cone        after Windup, sweeps outward over Sweep seconds and hits
+--               everything within Length and Angle degrees of your aim
+--   Nova        hits everything within Radius around you (after Windup, if set)
 --   Strike      telegraphs at the aim point, then hits Radius after Delay
 --   Zone        lingers at the aim point for Duration, hitting every TickRate
 --   Chain       hits the enemy nearest the aim point, then jumps Jumps times
+--   Tornado     a vortex at the aim point that pulls enemies in (Pull) and
+--               ticks TickDamage every TickRate for Duration
+--   Magnet      yanks enemies in Radius to the aim point for PullTime, then
+--               hits everything gathered there
+--   Roller      after Windup, a boulder rolls Length studs forward at Speed,
+--               hitting each enemy within Radius of it once
+--   Meteor      a rock lands on the aim point after Delay (hits Radius), then
+--               leaves a pool (PoolRadius) ticking TickDamage for Duration
+--   Leap        the caster jumps (JumpVelocity); on landing, spikes hit
+--               InnerRadius, then a second ring hits out to Radius
 --
--- Status keys: Burn {Dps}, Soak, Slow {Amount 0-1}, Stun, Shock (+20% damage taken).
+-- Status keys: Burn {Dps}, Soak, Slow {Amount 0-1}, Stun, Shock (+20% damage taken),
+-- Freeze (frozen solid: cannot move or attack).
 local Skills = {}
 
 Skills.MaxLevel = 5
@@ -42,8 +56,8 @@ Skills.Defs = {
 	},
 	Gust = {
 		Name = "Gust", Elements = { "Air" }, Kind = "Nova",
-		Damage = 10, Cooldown = 2.2, Radius = 16, Knockback = 70,
-		Description = "Blasts every nearby enemy away from you.",
+		Damage = 10, Cooldown = 2.2, Radius = 16, Knockback = 70, Windup = 0.15,
+		Description = "Draws the wind in, then blasts every nearby enemy away from you.",
 	},
 	SparkBolt = {
 		Name = "Spark Bolt", Elements = { "Lightning" }, Kind = "Chain",
@@ -60,34 +74,35 @@ Skills.Defs = {
 		Description = "A scalding cloud that burns and slows everything inside.",
 	},
 	MagmaBurst = {
-		Name = "Magma Burst", Elements = { "Fire", "Earth" }, Kind = "Strike",
-		Damage = 55, Cooldown = 4.5, Range = 50, Radius = 12, Delay = 0.6,
-		Status = { Burn = { Duration = 4, Dps = 8 } },
-		Description = "The ground erupts in molten rock.",
+		Name = "Magma Meteor", Elements = { "Fire", "Earth" }, Kind = "Meteor",
+		Damage = 60, Cooldown = 6, Range = 50, Radius = 10, Delay = 0.75,
+		Duration = 3, PoolRadius = 9, TickDamage = 9, TickRate = 0.5,
+		Status = { Burn = { Duration = 3, Dps = 8 } },
+		Description = "Calls a molten rock down from the sky. It leaves a pool of lava that burns for 3 seconds.",
 	},
 	Firestorm = {
-		Name = "Firestorm", Elements = { "Fire", "Air" }, Kind = "Nova",
-		Damage = 28, Cooldown = 4, Radius = 24, Knockback = 60,
-		Status = { Burn = { Duration = 4, Dps = 7 } },
-		Description = "A ring of fire explodes outward from you.",
+		Name = "Firestorm", Elements = { "Fire", "Air" }, Kind = "Tornado",
+		Damage = 14, TickDamage = 8, TickRate = 0.4, Duration = 2.6, Cooldown = 6, Range = 45, Radius = 15, Pull = 26,
+		Status = { Burn = { Duration = 3, Dps = 7 } },
+		Description = "Summons a fire tornado that drags enemies into its heart and burns them.",
 	},
 	PlasmaLance = {
-		Name = "Plasma Lance", Elements = { "Fire", "Lightning" }, Kind = "Line",
-		Damage = 48, Cooldown = 3.5, Length = 60, Width = 5,
-		Status = { Burn = { Duration = 2, Dps = 6 }, Shock = { Duration = 3 } },
-		Description = "A beam that burns through everything in a long line.",
+		Name = "Plasma Lance", Elements = { "Fire", "Lightning" }, Kind = "Projectile",
+		Damage = 52, Cooldown = 3.5, Speed = 140, Range = 70, Radius = 10, Windup = 0.22,
+		Status = { Burn = { Duration = 4, Dps = 9 }, Shock = { Duration = 3 } },
+		Description = "Hurls a spear of plasma that flies straight and explodes on impact, setting enemies ablaze.",
 	},
 	MudTrap = {
-		Name = "Mud Trap", Elements = { "Water", "Earth" }, Kind = "Zone",
-		Damage = 10, TickDamage = 4, TickRate = 0.5, Duration = 6, Cooldown = 7, Range = 55, Radius = 16,
-		Status = { Slow = { Duration = 1, Amount = 0.7 }, Soak = { Duration = 3 } },
-		Description = "A sticky swamp that nearly stops enemies and soaks them.",
+		Name = "Mudslide", Elements = { "Water", "Earth" }, Kind = "Roller",
+		Damage = 38, Cooldown = 5, Speed = 34, Length = 45, Radius = 4.5, Windup = 0.3, Knockback = 45,
+		Status = { Soak = { Duration = 3 }, Slow = { Duration = 3, Amount = 0.45 } },
+		Description = "Heaves a giant mud boulder that rolls forward, flattening enemies and leaving them soaked and slowed.",
 	},
 	FrostGale = {
-		Name = "Frost Gale", Elements = { "Water", "Air" }, Kind = "Line",
-		Damage = 24, Cooldown = 4, Length = 40, Width = 16, Knockback = 30,
-		Status = { Stun = { Duration = 1.6 } },
-		Description = "A freezing wind that locks enemies in place.",
+		Name = "Frost Gale", Elements = { "Water", "Air" }, Kind = "Cone",
+		Damage = 30, Cooldown = 5, Length = 28, Angle = 70, Sweep = 0.45, Windup = 0.18,
+		Status = { Freeze = { Duration = 2 }, Slow = { Duration = 4, Amount = 0.4 } },
+		Description = "Breathes a blizzard in a wide cone, freezing enemies solid in blocks of ice.",
 	},
 	ChainShock = {
 		Name = "Chain Shock", Elements = { "Water", "Lightning" }, Kind = "Chain",
@@ -96,16 +111,16 @@ Skills.Defs = {
 		Description = "Lightning that leaps through a whole crowd and soaks it.",
 	},
 	Sandstorm = {
-		Name = "Sandstorm", Elements = { "Earth", "Air" }, Kind = "Zone",
-		Damage = 0, TickDamage = 7, TickRate = 0.4, Duration = 5, Cooldown = 6.5, Range = 55, Radius = 18,
-		Status = { Slow = { Duration = 1, Amount = 0.35 } },
-		Description = "A whirling storm of sand that shreds enemies inside.",
+		Name = "Quake Leap", Elements = { "Earth", "Air" }, Kind = "Leap",
+		Damage = 42, Cooldown = 6.5, JumpVelocity = 80, InnerRadius = 7, Radius = 13,
+		Status = { Stun = { Duration = 0.8 }, Slow = { Duration = 2, Amount = 0.35 } },
+		Description = "Leap high on a gust of wind, then slam down and raise two rings of stone spikes around you.",
 	},
 	MagnetQuake = {
-		Name = "Magnet Quake", Elements = { "Earth", "Lightning" }, Kind = "Strike",
-		Damage = 40, Cooldown = 5, Range = 50, Radius = 20, Delay = 0.5, Pull = 60,
-		Status = { Shock = { Duration = 4 }, Stun = { Duration = 0.6 } },
-		Description = "Pulls enemies to the centre, then stuns them.",
+		Name = "Magnet Quake", Elements = { "Earth", "Lightning" }, Kind = "Magnet",
+		Damage = 48, Cooldown = 5.5, Range = 50, Radius = 22, PullTime = 0.6,
+		Status = { Shock = { Duration = 4 }, Stun = { Duration = 1 } },
+		Description = "A magnetic core yanks every nearby enemy into one spot, then detonates in a shock blast.",
 	},
 	Thunderstorm = {
 		Name = "Thunderstorm", Elements = { "Air", "Lightning" }, Kind = "Zone",

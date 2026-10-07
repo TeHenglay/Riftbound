@@ -1,10 +1,12 @@
--- XP orbs and gold coins dropped by enemies. They pop out, then fly to any
+-- XP orbs, gold coins and item crystals dropped by enemies. They pop out, then fly to any
 -- player who walks close enough and are collected on touch.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local InventoryService = require(script.Parent.InventoryService)
 local ProgressionService = require(script.Parent.ProgressionService)
+local Items = require(game:GetService("ReplicatedStorage"):WaitForChild("Riftbound"):WaitForChild("Items"))
 
 local MAGNET_RADIUS = 18
 local PICKUP_RADIUS = 3
@@ -35,7 +37,7 @@ local function split(total, pieces)
 	return out
 end
 
-local function spawnPiece(origin, groundY, kind, amount)
+local function spawnPiece(origin, groundY, kind, amount, itemId)
 	local p = Instance.new("Part")
 	p.Name = kind
 	p.Anchored = true
@@ -48,6 +50,10 @@ local function spawnPiece(origin, groundY, kind, amount)
 		p.Shape = Enum.PartType.Ball
 		p.Size = Vector3.one * 0.9
 		p.Color = XP_COLOR
+	elseif kind == "Item" then
+		-- Items are chunky spinning crystals in their own colour.
+		p.Size = Vector3.new(0.9, 1.4, 0.9)
+		p.Color = Items.Defs[itemId].Color
 	else
 		p.Shape = Enum.PartType.Cylinder
 		p.Size = Vector3.new(0.3, 1.3, 1.3)
@@ -68,11 +74,12 @@ local function spawnPiece(origin, groundY, kind, amount)
 		CFrame = CFrame.new(landing),
 	}):Play()
 
-	active[p] = { Kind = kind, Amount = amount, Born = os.clock() }
+	active[p] = { Kind = kind, Amount = amount, ItemId = itemId, Born = os.clock() }
 end
 
--- Drops `xp` and `gold` around `position` (an enemy's root position).
-function Drops.Spawn(position, xp, gold, groundY)
+-- Drops `xp`, `gold` and `items` ({ [itemId] = count }) around `position`
+-- (an enemy's root position).
+function Drops.Spawn(position, xp, gold, groundY, items)
 	groundY = groundY or position.Y - 2
 	if xp and xp > 0 then
 		for _, amount in split(xp, math.ceil(xp / 5)) do
@@ -82,6 +89,13 @@ function Drops.Spawn(position, xp, gold, groundY)
 	if gold and gold > 0 then
 		for _, amount in split(gold, math.min(gold, 5)) do
 			spawnPiece(position, groundY, "Gold", amount)
+		end
+	end
+	for id, count in items or {} do
+		if Items.Defs[id] then
+			for _ = 1, count do
+				spawnPiece(position, groundY, "Item", 1, id)
+			end
 		end
 	end
 end
@@ -107,6 +121,8 @@ local function collect(part, info, player)
 	part:Destroy()
 	if info.Kind == "Xp" then
 		ProgressionService.AddXp(player, info.Amount)
+	elseif info.Kind == "Item" then
+		InventoryService.Add(player, info.ItemId, info.Amount)
 	else
 		ProgressionService.AddGold(player, info.Amount)
 	end
@@ -122,6 +138,8 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 		if info.Kind == "Gold" then
 			part.CFrame *= CFrame.Angles(dt * 3, 0, 0)
+		elseif info.Kind == "Item" then
+			part.CFrame *= CFrame.Angles(0, dt * 2.5, 0)
 		end
 		if now - info.Born < ARM_TIME then
 			continue
