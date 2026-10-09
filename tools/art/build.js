@@ -10,7 +10,7 @@ const BROWSERS = [
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
 ];
-const BROWSER = BROWSERS.find(b => fs.existsSync(b));
+const BROWSER = process.env.BROWSER || BROWSERS.find(b => fs.existsSync(b));
 
 const C = {
   ink: '#07050a', slab: '#140d17', slab2: '#22162a', bronze: '#a8773f', gold: '#e9c27a',
@@ -258,6 +258,71 @@ const STAT_GLYPH = {
 };
 
 // ---------------------------------------------------------------------------
+// Lobby menu tiles: square obsidian plaque, bronze corner clamps, a coloured
+// rift glow behind the glyph. The button label is drawn in-engine.
+// ---------------------------------------------------------------------------
+function menuTile(tint, glyph) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">${DEFS}
+  <defs><radialGradient id="mg" cx=".5" cy=".42" r=".62"><stop offset="0" stop-color="${tint}" stop-opacity=".55"/><stop offset=".6" stop-color="${tint}" stop-opacity=".12"/><stop offset="1" stop-color="${C.ink}" stop-opacity="0"/></radialGradient></defs>
+  <g filter="url(#chip)">
+    <path d="M28 8 H228 L248 28 V228 L228 248 H28 L8 228 V28Z" fill="${C.ink}"/>
+    <path d="M32 16 H224 L240 32 V224 L224 240 H32 L16 224 V32Z" fill="url(#slabFill)" filter="url(#stone)"/>
+    <path d="M32 16 H224 L240 32 V224 L224 240 H32 L16 224 V32Z" fill="url(#mg)"/>
+    <path d="M32 16 H224 L240 32 V224 L224 240 H32 L16 224 V32Z" fill="none" stroke="${C.bronze}" stroke-width="4"/>
+    <path d="M38 26 H218 L230 38 V218 L218 230 H38 L26 218 V38Z" fill="none" stroke="${tint}" stroke-width="2" opacity=".7"/>
+  </g>
+  <g stroke="${C.ink}" stroke-width="9" stroke-linejoin="round" stroke-linecap="round" filter="url(#ink)" transform="translate(128 112) scale(.66) translate(-128 -128)">${glyph}</g>
+  <polyline points="230,60 212,72 218,88" fill="none" stroke="${C.riftHot}" stroke-width="2.4" filter="url(#glow)"/>
+  <g filter="url(#grit)" fill="url(#bronze)" stroke="${C.ink}" stroke-width="2.5">
+    <path d="M4 40 V4 H40 V16 H16 V40Z"/><path d="M252 40 V4 H216 V16 H240 V40Z"/>
+    <path d="M4 216 V252 H40 V240 H16 V216Z"/><path d="M252 216 V252 H216 V240 H240 V216Z"/>
+  </g>
+  <g fill="#2a1a08"><circle cx="10" cy="10" r="2.8"/><circle cx="246" cy="10" r="2.8"/><circle cx="10" cy="246" r="2.8"/><circle cx="246" cy="246" r="2.8"/></g>
+</svg>`;
+}
+
+const MENU = {
+  // Rift chest spilling a crystal.
+  Store: ['#e9c27a', `<path d="M52 120 h152 v80 q0 10 -10 10 h-132 q-10 0 -10 -10z" fill="#7a4a22"/>
+    <path d="M52 120 q0 -54 76 -54 q76 0 76 54z" fill="#9a6a33"/>
+    <path d="M52 120 h152 M92 72 v138 M164 72 v138" fill="none" stroke-width="8"/>
+    <path d="M84 120 h88 v22 h-88z" fill="#e9c27a"/><rect x="114" y="132" width="28" height="30" rx="4" fill="#3b1470"/>
+    <path d="M128 18 L146 52 L128 92 L110 52Z" fill="#c69bff"/><path d="M128 30 L136 52 L128 76" fill="none" stroke="#f2e4ff" stroke-width="5"/>`],
+  // Satchel (same as the HUD bag).
+  Items: ['#c08446', BAG_GLYPH],
+  // Sealed scroll.
+  Quests: ['#ff6a2b', `<path d="M76 54 h112 q16 0 16 16 v120 q0 18 -18 18 h-112 q-18 0 -18 -18 v-8 h104 v-112 q0 -16 -16 -16z" fill="#f1e3c6"/>
+    <path d="M60 54 q-20 0 -20 18 q0 18 20 18 h16 v-20 q0 -16 -16 -16z" fill="#d8c29a"/>
+    <path d="M100 96 h70 M100 120 h70 M100 144 h44" fill="none" stroke="#8a5a2e" stroke-width="7"/>
+    <circle cx="170" cy="176" r="24" fill="#c2203a"/><path d="M160 176 l8 8 l14 -16" fill="none" stroke="#ffd0d6" stroke-width="6"/>`],
+  // Compass rose over a rift crack.
+  Areas: ['#9ff0d8', `<circle cx="128" cy="128" r="86" fill="#1f5a4c"/>
+    <circle cx="128" cy="128" r="66" fill="none" stroke="#9ff0d8" stroke-width="5"/>
+    <path d="M128 30 L146 128 L128 226 L110 128Z" fill="#e8fff8"/><path d="M30 128 L128 110 L226 128 L128 146Z" fill="#9ff0d8"/>
+    <path d="M128 30 L146 128 L128 128Z" fill="#c2203a"/><circle cx="128" cy="128" r="12" fill="#e9c27a"/>`],
+  // Rift portal with a blade through it.
+  Play: ['#b26cff', `<ellipse cx="128" cy="134" rx="74" ry="92" fill="#3b1470"/>
+    <ellipse cx="128" cy="134" rx="52" ry="70" fill="#8a52e0"/><ellipse cx="128" cy="134" rx="28" ry="42" fill="#e7c8ff"/>
+    <path d="M62 202 L176 58 l16 -4 l-4 16 L74 214z" fill="#d9d2ea"/>
+    <path d="M58 182 l38 38 M48 226 l22 -22" fill="none" stroke-width="12"/><path d="M58 182 l38 38" fill="none" stroke="#a8773f" stroke-width="5"/>`],
+  // Heraldic shield with a crystal.
+  Guild: ['#8fe36b', `<path d="M128 30 L204 58 V122 Q204 188 128 226 Q52 188 52 122 V58Z" fill="#2f6a26"/>
+    <path d="M128 30 V226 Q52 188 52 122 V58Z" fill="#3f8a32"/>
+    <path d="M128 70 L152 124 L128 186 L104 124Z" fill="#e9c27a"/><path d="M128 84 L140 124 L128 164" fill="none" stroke="#fff3d0" stroke-width="5"/>`],
+  // Hooded figure bust.
+  Profile: ['#3c9cff', `<path d="M128 34 q62 0 70 76 q4 40 -18 58 h-104 q-22 -18 -18 -58 q8 -76 70 -76z" fill="#0f2f66"/>
+    <ellipse cx="128" cy="116" rx="36" ry="42" fill="#07050a"/>
+    <circle cx="114" cy="114" r="7" fill="#8fe3ff" stroke="none"/><circle cx="142" cy="114" r="7" fill="#8fe3ff" stroke="none"/>
+    <path d="M44 222 q8 -60 84 -60 q76 0 84 60z" fill="#2a74d0"/><path d="M128 168 L140 190 L128 214 L116 190Z" fill="#e9c27a"/>`],
+  // Stone tablet with a day grid and a marked rune.
+  Calendar: ['#fae13c', `<path d="M48 64 h160 v140 q0 12 -12 12 h-136 q-12 0 -12 -12z" fill="#3a2a3e"/>
+    <path d="M48 64 h160 v34 h-160z" fill="#c2203a"/>
+    <path d="M86 44 v36 M170 44 v36" fill="none" stroke="#a8773f" stroke-width="12"/>
+    <path d="M70 124 h116 M70 152 h116 M70 180 h116 M98 110 v88 M128 110 v88 M158 110 v88" fill="none" stroke="#8f86a8" stroke-width="4"/>
+    <rect x="132" y="128" width="22" height="20" fill="#fae13c" stroke-width="4"/>`],
+};
+
+// ---------------------------------------------------------------------------
 // Particle / VFX textures. White on transparent so ParticleEmitter.Color,
 // Beam.Color and Decal.Color3 can tint them per element.
 // ---------------------------------------------------------------------------
@@ -343,6 +408,9 @@ ASSETS.stat_Vitality = { w: 256, h: 256, svg: relic('#e8364a', STAT_GLYPH.Vitali
 ASSETS.stat_Might = { w: 256, h: 256, svg: relic('#ff8a3a', STAT_GLYPH.Might) };
 ASSETS.stat_Swiftness = { w: 256, h: 256, svg: relic('#9ff0d8', STAT_GLYPH.Swiftness) };
 ASSETS.stat_Focus = { w: 256, h: 256, svg: relic('#b26cff', STAT_GLYPH.Focus) };
+for (const [id, [tint, glyph]] of Object.entries(MENU)) {
+  ASSETS['menu_' + id] = { w: 256, h: 256, svg: menuTile(tint, glyph) };
+}
 for (const [name, svg] of Object.entries(FX)) {
   const m = svg.match(/width="(\d+)" height="(\d+)"/);
   ASSETS[name] = { w: Number(m[1]), h: Number(m[2]), svg };

@@ -1977,6 +1977,10 @@ end
 -- Public API
 -------------------------------------------------------------------------------
 
+local inLobby = false
+local lobbyMenuOpen = false
+local closeLobbyPanel
+
 local function menuShade(show)
 	if show then
 		forgeShade.Visible = true
@@ -1987,7 +1991,7 @@ local function menuShade(show)
 	else
 		forgeShade.Visible = false
 	end
-	arsenal.Visible = not show
+	arsenal.Visible = not show and not inLobby
 end
 
 local function popIn(frame)
@@ -1997,7 +2001,50 @@ end
 
 -- True while any full-screen menu (Forge, Backpack) is open; Controls uses it to block casting.
 function HUD.MenuOpen()
-	return (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible)
+	return lobbyMenuOpen or (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible)
+end
+
+-- Shared look for other screens (the lobby menu) so they match the HUD.
+HUD.Style = {
+	C = C,
+	F = F,
+	new = new,
+	stroke = stroke,
+	text = text,
+	tween = tween,
+	spaced = spaced,
+	slab = slab,
+	popIn = popIn,
+}
+
+-- In the lobby the Arsenal steps aside for the lobby menu buttons.
+function HUD.SetLobby(on)
+	inLobby = on
+	arsenal.Visible = not on and not HUD.MenuOpen()
+end
+
+-- The lobby menu sets this to hide its panel when a HUD menu (Forge, Backpack, Attributes) opens.
+HUD.OnHudMenuOpened = nil
+
+closeLobbyPanel = function()
+	if lobbyMenuOpen then
+		lobbyMenuOpen = false
+		if HUD.OnHudMenuOpened then
+			HUD.OnHudMenuOpened()
+		end
+	end
+end
+
+-- A lobby menu panel is open: dim the world and block casting like the HUD's own menus.
+function HUD.SetLobbyPanel(open)
+	if open then
+		hideTooltip()
+		forge.Visible = false
+		backpack.Visible = false
+		attributes.Visible = false
+	end
+	lobbyMenuOpen = open
+	menuShade(open)
 end
 
 -- The skill id equipped in a slot ("M1", "Q", "E"), or nil.
@@ -2015,6 +2062,7 @@ function HUD.SetForge(open)
 	end
 	hideTooltip()
 	if open then
+		closeLobbyPanel()
 		backpack.Visible = false
 		attributes.Visible = false
 		refreshForge()
@@ -2037,6 +2085,7 @@ function HUD.SetBackpack(open)
 	end
 	hideTooltip()
 	if open then
+		closeLobbyPanel()
 		forge.Visible = false
 		attributes.Visible = false
 		backpack.Visible = true
@@ -2059,6 +2108,7 @@ function HUD.SetStats(open)
 	end
 	hideTooltip()
 	if open then
+		closeLobbyPanel()
 		forge.Visible = false
 		backpack.Visible = false
 		attributes.Visible = true

@@ -42,6 +42,10 @@ UIAssets.Items = {
 }
 UIAssets.Bag = "rbxassetid://137592377080750"
 
+-- Lobby menu tiles (menu_* in tools/art/build.js). Filled in once uploaded;
+-- until then LobbyMenu falls back to plain slabs.
+UIAssets.Menu = {}
+
 UIAssets.Stats = {
 	Focus = "rbxassetid://89505312058081",
 	Might = "rbxassetid://130407449315919",
