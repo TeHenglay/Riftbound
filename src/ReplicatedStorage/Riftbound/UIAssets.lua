@@ -42,9 +42,18 @@ UIAssets.Items = {
 }
 UIAssets.Bag = "rbxassetid://137592377080750"
 
--- Lobby menu tiles (menu_* in tools/art/build.js). Filled in once uploaded;
--- until then LobbyMenu falls back to plain slabs.
-UIAssets.Menu = {}
+-- Lobby menu tiles (menu_* in tools/art/build.js). LobbyMenu falls back to
+-- plain slabs for any id missing here.
+UIAssets.Menu = {
+	Store = "rbxassetid://106487022967164",
+	Items = "rbxassetid://117717009732639",
+	Quests = "rbxassetid://97028418841931",
+	Areas = "rbxassetid://123844829656953",
+	Play = "rbxassetid://129909717567315",
+	Guild = "rbxassetid://100527571727565",
+	Profile = "rbxassetid://109307206721183",
+	Calendar = "rbxassetid://132954542926671",
+}
 
 UIAssets.Stats = {
 	Focus = "rbxassetid://89505312058081",
