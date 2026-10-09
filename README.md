@@ -41,8 +41,9 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   **Store**, **Items**, **Quests**, **Areas**, **Play** on the left and
   **Profile** and **Calendar** on the right. They slide away when you
   enter the Rift (`InRift`) and stay hidden on the nation select screen.
-- Items opens the Backpack (B). Play fires the `EnterRift` remote when the
-  server provides one. Profile shows your avatar, nation, level, gold and
+- Items opens the Backpack (B). Play opens **Choose your match**: Training
+  (the current arena, via `EnterRift("Training")` and the nation portal) is
+  open; Rift Run and Boss Trial are listed as coming soon. Profile shows your avatar, nation, level, gold and
   attributes. Store, Quests, Areas and Calendar open "coming soon"
   panels for now.
 - Code: `src/StarterPlayer/StarterPlayerScripts/Riftbound/LobbyMenu.lua`. Tile art
