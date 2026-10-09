@@ -19,6 +19,7 @@ local Merge = require(Shared:WaitForChild("Merge"))
 local Progression = require(Shared:WaitForChild("Progression"))
 local Skills = require(Shared:WaitForChild("Skills"))
 local Stats = require(Shared:WaitForChild("Stats"))
+local Nations = require(Shared:WaitForChild("Nations"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
 
 local C = {
@@ -307,7 +308,7 @@ local function showTooltip(id, level)
 		content.Title.Text = def.Name .. (if level and id ~= "RiftBolt" then "  " .. NUMERALS[level] else "")
 		content.Title.TextColor3 = skillColor(id)
 		local elements = if #def.Elements > 0 then table.concat(def.Elements, " + "):upper() else "RIFT"
-		content.Meta.Text = string.format("%s  ·  %s  ·  %.1fs", elements, def.Kind:upper(), Skills.CooldownOf(id, level or 1) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")))
+		content.Meta.Text = string.format("%s  ·  %s  ·  %.1fs", elements, def.Kind:upper(), Skills.CooldownOf(id, level or 1) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")) * Nations.CooldownMult(player))
 		local label, value = headlineStat(def, level)
 		content.Body.Text = emphasize(def.Description) .. `\n<font color="{hex(C.Ash)}">> {label}</font>   <font color="{hex(C.Good)}">{value}</font>`
 	else
@@ -1620,7 +1621,7 @@ refreshBackpack = function()
 	end
 	stat(stats, 1, "Level", tostring(level))
 	stat(stats, 2, "Max Health", tostring(if hum then math.floor(hum.MaxHealth) else Progression.MaxHealth(level)))
-	local damage = Progression.DamageMult(level) * Stats.DamageMult(player:GetAttribute("Stat_Might"))
+	local damage = Progression.DamageMult(level) * Stats.DamageMult(player:GetAttribute("Stat_Might")) * Nations.DamageMult(player)
 	stat(stats, 3, "Skill Damage", `+{math.floor((damage - 1) * 100 + 0.5)}%`)
 	stat(stats, 4, "Gold", tostring(player:GetAttribute("Gold") or 0))
 	stat(stats, 5, "Fusions", `{known} / {total}`)
@@ -1716,36 +1717,6 @@ refreshBackpack = function()
 			Parent = powers,
 		})
 	end
-end
-
--- Bag button under the gold strip.
-local function buildBagButton()
-	local button = new("ImageButton", {
-		Name = "BagButton",
-		Position = UDim2.fromOffset(20, 132),
-		Size = UDim2.fromOffset(52, 52),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Bag,
-		Parent = gui,
-	})
-	local plate = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 1, -8),
-		Size = UDim2.fromOffset(26, 16),
-		BackgroundColor3 = C.Ink,
-		ZIndex = 3,
-		Parent = button,
-	}, { stroke(C.Bronze, 1.2) })
-	text({ Size = UDim2.fromScale(1, 1), Text = "B", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 4, Parent = plate })
-	button.Activated:Connect(function()
-		HUD.ToggleBackpack()
-	end)
-	button.MouseEnter:Connect(function()
-		tween(button, 0.12, { Size = UDim2.fromOffset(58, 58), Position = UDim2.fromOffset(17, 129) })
-	end)
-	button.MouseLeave:Connect(function()
-		tween(button, 0.12, { Size = UDim2.fromOffset(52, 52), Position = UDim2.fromOffset(20, 132) })
-	end)
 end
 
 -------------------------------------------------------------------------------
@@ -1977,6 +1948,10 @@ end
 -- Public API
 -------------------------------------------------------------------------------
 
+local inLobby = false
+local lobbyMenuOpen = false
+local closeLobbyPanel
+
 local function menuShade(show)
 	if show then
 		forgeShade.Visible = true
@@ -1987,7 +1962,7 @@ local function menuShade(show)
 	else
 		forgeShade.Visible = false
 	end
-	arsenal.Visible = not show
+	arsenal.Visible = not show and not inLobby
 end
 
 local function popIn(frame)
@@ -1997,7 +1972,50 @@ end
 
 -- True while any full-screen menu (Forge, Backpack) is open; Controls uses it to block casting.
 function HUD.MenuOpen()
-	return (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible)
+	return lobbyMenuOpen or (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible)
+end
+
+-- Shared look for other screens (the lobby menu) so they match the HUD.
+HUD.Style = {
+	C = C,
+	F = F,
+	new = new,
+	stroke = stroke,
+	text = text,
+	tween = tween,
+	spaced = spaced,
+	slab = slab,
+	popIn = popIn,
+}
+
+-- In the lobby the Arsenal steps aside for the lobby menu buttons.
+function HUD.SetLobby(on)
+	inLobby = on
+	arsenal.Visible = not on and not HUD.MenuOpen()
+end
+
+-- The lobby menu sets this to hide its panel when a HUD menu (Forge, Backpack, Attributes) opens.
+HUD.OnHudMenuOpened = nil
+
+closeLobbyPanel = function()
+	if lobbyMenuOpen then
+		lobbyMenuOpen = false
+		if HUD.OnHudMenuOpened then
+			HUD.OnHudMenuOpened()
+		end
+	end
+end
+
+-- A lobby menu panel is open: dim the world and block casting like the HUD's own menus.
+function HUD.SetLobbyPanel(open)
+	if open then
+		hideTooltip()
+		forge.Visible = false
+		backpack.Visible = false
+		attributes.Visible = false
+	end
+	lobbyMenuOpen = open
+	menuShade(open)
 end
 
 -- The skill id equipped in a slot ("M1", "Q", "E"), or nil.
@@ -2015,6 +2033,7 @@ function HUD.SetForge(open)
 	end
 	hideTooltip()
 	if open then
+		closeLobbyPanel()
 		backpack.Visible = false
 		attributes.Visible = false
 		refreshForge()
@@ -2037,6 +2056,7 @@ function HUD.SetBackpack(open)
 	end
 	hideTooltip()
 	if open then
+		closeLobbyPanel()
 		forge.Visible = false
 		attributes.Visible = false
 		backpack.Visible = true
@@ -2059,6 +2079,7 @@ function HUD.SetStats(open)
 	end
 	hideTooltip()
 	if open then
+		closeLobbyPanel()
 		forge.Visible = false
 		backpack.Visible = false
 		attributes.Visible = true
@@ -2086,7 +2107,7 @@ function HUD.TryStartCooldown(slot)
 	if cd and now < cd.Ends then
 		return false
 	end
-	local length = Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus"))
+	local length = Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")) * Nations.CooldownMult(player)
 	cooldownEnds[id] = { Ends = now + length, Length = length }
 	return true
 end
@@ -2156,7 +2177,6 @@ function HUD.Init(remoteFolder)
 
 	buildArsenal()
 	buildArsenalToggle()
-	buildBagButton()
 
 	toastHolder = new("Frame", {
 		Name = "Toasts",

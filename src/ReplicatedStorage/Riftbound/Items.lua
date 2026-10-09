@@ -28,8 +28,24 @@ Items.Defs = {
 	},
 }
 
+-- Essences: earned by clearing story acts, one per nation's story.
+for _, e in {
+	{ "Fire", "Fire Essence", Color3.fromRGB(255, 106, 43) },
+	{ "Earth", "Earth Essence", Color3.fromRGB(176, 122, 64) },
+	{ "Water", "Water Essence", Color3.fromRGB(52, 152, 255) },
+	{ "Wind", "Wind Essence", Color3.fromRGB(159, 240, 216) },
+	{ "Lightning", "Lightning Essence", Color3.fromRGB(250, 225, 60) },
+} do
+	Items.Defs[e[1] .. "Essence"] = {
+		Name = e[2],
+		Rarity = "Rare",
+		Color = e[3],
+		Description = "Distilled from a nation's story. Used to evolve skills.",
+	}
+end
+
 -- Display order in the backpack.
-Items.Order = { "RiftShard", "HuskIchor", "EmberCore" }
+Items.Order = { "RiftShard", "HuskIchor", "EmberCore", "FireEssence", "EarthEssence", "WaterEssence", "WindEssence", "LightningEssence" }
 
 for id, def in Items.Defs do
 	def.Id = id

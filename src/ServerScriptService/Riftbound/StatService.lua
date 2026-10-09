@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Stats = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Stats"))
+local Nations = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Nations"))
 
 local BASE_WALK_SPEED = 16
 
@@ -29,7 +30,7 @@ local function applySpeed(player)
 	local d = data[player]
 	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if d and hum then
-		hum.WalkSpeed = BASE_WALK_SPEED * Stats.SpeedMult(d.Ranks.Swiftness)
+		hum.WalkSpeed = BASE_WALK_SPEED * Stats.SpeedMult(d.Ranks.Swiftness) * Nations.SpeedMult(player)
 	end
 end
 
@@ -47,6 +48,11 @@ function StatService.Init(player)
 	if player.Character then
 		applySpeed(player)
 	end
+	-- Nation perks change speed and max health.
+	player:GetAttributeChangedSignal("Nation"):Connect(function()
+		applySpeed(player)
+		StatService.OnHealthChanged(player)
+	end)
 end
 
 function StatService.Remove(player)
@@ -86,15 +92,15 @@ function StatService.Rank(player, id)
 end
 
 function StatService.HealthBonus(player)
-	return Stats.HealthBonus(StatService.Rank(player, "Vitality"))
+	return Stats.HealthBonus(StatService.Rank(player, "Vitality")) + Nations.HealthBonus(player)
 end
 
 function StatService.DamageMult(player)
-	return Stats.DamageMult(StatService.Rank(player, "Might"))
+	return Stats.DamageMult(StatService.Rank(player, "Might")) * Nations.DamageMult(player)
 end
 
 function StatService.CooldownMult(player)
-	return Stats.CooldownMult(StatService.Rank(player, "Focus"))
+	return Stats.CooldownMult(StatService.Rank(player, "Focus")) * Nations.CooldownMult(player)
 end
 
 return StatService

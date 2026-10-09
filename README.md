@@ -35,6 +35,22 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 - Tuning: curve and bonuses are in `src/ReplicatedStorage/Riftbound/Progression.lua`;
   drop amounts per enemy are in `TestArena.server.lua` (`Xp`, `Gold`).
 
+## Lobby menu
+
+- In your nation's lobby, Shattered Obsidian buttons line the screen edges:
+  **Store**, **Items**, **Quests**, **Areas**, **Play** on the left and
+  **Profile** and **Calendar** on the right. They slide away when you
+  enter the Rift (`InRift`) and stay hidden on the nation select screen.
+- Items opens the Backpack (B). Play opens a full-screen mode select
+  (`PlayScreen.lua`): your Riftwalker with level and name on the left, and
+  **Story**, **Raid** (locked below level 25), **Training** and **Daily Challenge**
+  cards on the right. Training (the current arena) fires `EnterRift("Training")`
+  and the server sets `MatchMode`; the other cards are coming in a future update. Profile shows your avatar, nation, level, gold and
+  attributes. Store, Quests, Areas and Calendar open "coming soon"
+  panels for now.
+- Code: `src/StarterPlayer/StarterPlayerScripts/Riftbound/LobbyMenu.lua`. Tile art
+  is `menu_*` in `tools/art/build.js`; its uploaded ids go in `UIAssets.Menu`.
+
 ## Rift Flask
 
 - Press **R** to drink: after a short sip (you move at half speed) it restores
@@ -154,3 +170,55 @@ node tools/rbx.js luau @tools/tests/SkillSmokeTest.luau Server
 ```
 
 During Play, casts every skill at the dummies and checks fusion.
+
+## Nations and lobbies
+
+- On their first join a player picks one of five nations on the select screen
+  (`Nation.client.lua`). The choice is saved in the `RiftboundNation_v1`
+  DataStore and published as the player attribute `Nation`.
+- Each nation gives +10% damage to skills containing its element (fusions
+  included) plus one perk:
+
+  | Nation | Element | Extra perk |
+  | --- | --- | --- |
+  | Ember Dominion | Fire | +5% damage on every skill |
+  | Stonehold Clans | Earth | +25 max health |
+  | Tidewater Court | Water | Rift Flask heals 45% instead of 35% |
+  | Skyreach Nomads | Wind (Air) | +8% movement speed |
+  | Stormcall Order | Lightning | Skills recharge 8% faster |
+
+  Tuning lives in `src/ReplicatedStorage/Riftbound/Nations.lua`.
+- Players spawn on their nation's floating lobby island (`workspace.NationLobbies`,
+  far from the arena at Z = 2600). Walking through the Rift portal moves them to
+  the gameplay spawn (attribute `InRift = true`); dying in the Rift respawns them
+  in their lobby. `Lobby.server.lua` turns off `CharacterAutoLoads` and
+  `NationService` does all spawning through `Player.RespawnLocation`.
+- Themes: Fire has a smoking volcano, lava pools and falling ash; Earth is ringed
+  by mountains; Water is a lagoon with a waterfall; Wind has windmills and
+  floating rocks; Lightning is a cloud temple with a Zeus statue and lightning
+  strikes. Each lobby also tints the sky while you stand in it (client only).
+- `LobbyBuilder.lua` builds any lobby the place is missing at server start. The
+  props it places (AI-generated monuments, volcano, mountains, waterfall cliff,
+  windmills, coral, lava rocks and a Creator Store oak) live only in the place
+  at `ServerStorage.LobbyAssets`; without them it falls back to plain parts.
+- Saving needs **Game Settings > Security > Enable Studio Access to API Services**
+  in Studio; without it the choice lasts for the session only.
+- Studio testing: `game.ServerStorage.NationDebug:Invoke("reset", player)` forgets
+  a player's nation; `"rift"` / `"lobby"` move them between the two.
+
+## The Crossroads (main lobby)
+
+- A shared floating plaza (`workspace.NationLobbies.Crossroads`) where players of
+  every nation meet. The rift gate in each nation lobby leads here; the
+  Crossroads has a **Your Nation** gate (north) back home. Training in the
+  arena starts from the lobby menu's Play button (`NationService.EnterRift`).
+- Player attribute `Area` is `"Nation"`, `"Crossroads"` or `"Rift"`.
+  `NationService.GoTo(player, area)` travels; clients can ask with
+  `NationRemotes.TravelTo:FireServer("Crossroads" | "Nation")`.
+- **The Rift Shop** sells Flask Refills (25 g), Tomes of Insight (+1 stat point,
+  150 g) and materials. **The Goods Merchant** buys Rift Shards (6 g), Husk Ichor
+  (16 g) and Ember Cores (45 g). Walk up to a stall and press F. Prices are in
+  `src/ReplicatedStorage/Riftbound/Market.lua`; `MarketService.lua` checks you
+  stand at the stall before trading.
+- Other client UI can open the screens with
+  `NationRemotes.OpenMarketLocal:Fire("Shop" | "Merchant")`.

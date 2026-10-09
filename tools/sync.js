@@ -3,7 +3,8 @@
 //   Name.server.lua -> Script, Name.client.lua -> LocalScript, Name.lua -> ModuleScript
 // src/<Service>/<Folder...>/<file> maps to game.<Service>.<Folder...>.<Name>.
 //
-// Usage: node tools/sync.js   (needs Studio open with the MCP server enabled)
+// Usage: node tools/sync.js [files...]   (needs Studio open with the MCP server enabled)
+//   With file paths, only those files are pushed.
 const fs = require('fs');
 const path = require('path');
 const { session } = require('./rbx');
@@ -57,7 +58,7 @@ function toLuau(files) {
 }
 
 (async () => {
-  const files = walk(SRC);
+  const files = process.argv.length > 2 ? process.argv.slice(2).map(f => path.resolve(f)) : walk(SRC);
   const s = await session();
   const r = await s.call('execute_luau', { code: toLuau(files), datamodel_type: 'Edit' });
   console.log((r.isError ? 'ERROR: ' : '') + r.text);

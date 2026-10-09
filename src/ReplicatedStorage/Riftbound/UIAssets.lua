@@ -40,7 +40,25 @@ UIAssets.Items = {
 	HuskIchor = "rbxassetid://81774452746485",
 	RiftShard = "rbxassetid://136347395990865",
 }
+-- Essences reuse the element skill shards for now.
+UIAssets.Items.FireEssence = UIAssets.Icons.Fireball
+UIAssets.Items.EarthEssence = UIAssets.Icons.StoneSpike
+UIAssets.Items.WaterEssence = UIAssets.Icons.TidalWave
+UIAssets.Items.WindEssence = UIAssets.Icons.Gust
+UIAssets.Items.LightningEssence = UIAssets.Icons.ChainShock
 UIAssets.Bag = "rbxassetid://137592377080750"
+
+-- Lobby menu tiles (menu_* in tools/art/build.js). LobbyMenu falls back to
+-- plain slabs for any id missing here.
+UIAssets.Menu = {
+	Store = "rbxassetid://106487022967164",
+	Items = "rbxassetid://117717009732639",
+	Quests = "rbxassetid://131754583105442",
+	Areas = "rbxassetid://123844829656953",
+	Play = "rbxassetid://129909717567315",
+	Profile = "rbxassetid://109307206721183",
+	Calendar = "rbxassetid://132954542926671",
+}
 
 UIAssets.Stats = {
 	Focus = "rbxassetid://89505312058081",

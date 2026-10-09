@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Elements = require(Shared:WaitForChild("Elements"))
+local Nations = require(Shared:WaitForChild("Nations"))
 local Skills = require(Shared:WaitForChild("Skills"))
 local Enemies = require(script.Parent.Enemies)
 local ProgressionService = require(script.Parent.ProgressionService)
@@ -446,7 +447,7 @@ function SkillEffects.Cast(player, id, level, targetPos)
 
 	fx({ Type = "Cast", Skill = id, At = origin, Dir = dir, Caster = player })
 
-	local powerMult = ProgressionService.DamageMult(player) * StatService.DamageMult(player)
+	local powerMult = ProgressionService.DamageMult(player) * StatService.DamageMult(player) * Nations.ElementMult(player, def.Elements)
 	Kinds[def.Kind]({
 		Player = player,
 		Def = def,
