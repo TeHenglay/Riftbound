@@ -7,6 +7,9 @@
 local Players = game:GetService("Players")
 
 local BODY_PARTS = { "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg" }
+-- Avatar heads are sized for the newer bodies; this shrinks them to sit like
+-- a classic head on the blocky torso.
+local HEAD_SCALE = 0.85
 
 local function classic(description)
 	for _, part in BODY_PARTS do
@@ -17,6 +20,7 @@ local function classic(description)
 	description.HeightScale = 1
 	description.WidthScale = 1
 	description.DepthScale = 1
+	description.HeadScale = HEAD_SCALE
 	-- Classic 2D clothing only: drop layered (3D) clothing, keep rigid accessories.
 	local kept = {}
 	for _, accessory in description:GetAccessories(true) do
