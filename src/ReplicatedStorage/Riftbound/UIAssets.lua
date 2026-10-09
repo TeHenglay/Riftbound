@@ -50,7 +50,6 @@ UIAssets.Menu = {
 	Quests = "rbxassetid://97028418841931",
 	Areas = "rbxassetid://123844829656953",
 	Play = "rbxassetid://129909717567315",
-	Guild = "rbxassetid://100527571727565",
 	Profile = "rbxassetid://109307206721183",
 	Calendar = "rbxassetid://132954542926671",
 }

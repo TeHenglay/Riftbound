@@ -1718,36 +1718,6 @@ refreshBackpack = function()
 	end
 end
 
--- Bag button under the gold strip.
-local function buildBagButton()
-	local button = new("ImageButton", {
-		Name = "BagButton",
-		Position = UDim2.fromOffset(20, 132),
-		Size = UDim2.fromOffset(52, 52),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Bag,
-		Parent = gui,
-	})
-	local plate = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 1, -8),
-		Size = UDim2.fromOffset(26, 16),
-		BackgroundColor3 = C.Ink,
-		ZIndex = 3,
-		Parent = button,
-	}, { stroke(C.Bronze, 1.2) })
-	text({ Size = UDim2.fromScale(1, 1), Text = "B", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 4, Parent = plate })
-	button.Activated:Connect(function()
-		HUD.ToggleBackpack()
-	end)
-	button.MouseEnter:Connect(function()
-		tween(button, 0.12, { Size = UDim2.fromOffset(58, 58), Position = UDim2.fromOffset(17, 129) })
-	end)
-	button.MouseLeave:Connect(function()
-		tween(button, 0.12, { Size = UDim2.fromOffset(52, 52), Position = UDim2.fromOffset(20, 132) })
-	end)
-end
-
 -------------------------------------------------------------------------------
 -- Attributes: spend stat points (C, or click the level medallion)
 -------------------------------------------------------------------------------
@@ -2206,7 +2176,6 @@ function HUD.Init(remoteFolder)
 
 	buildArsenal()
 	buildArsenalToggle()
-	buildBagButton()
 
 	toastHolder = new("Frame", {
 		Name = "Toasts",

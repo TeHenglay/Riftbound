@@ -39,11 +39,11 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 
 - In your nation's lobby, Shattered Obsidian buttons line the screen edges:
   **Store**, **Items**, **Quests**, **Areas**, **Play** on the left and
-  **Guild**, **Profile**, **Calendar** on the right. They slide away when you
+  **Profile** and **Calendar** on the right. They slide away when you
   enter the Rift (`InRift`) and stay hidden on the nation select screen.
 - Items opens the Backpack (B). Play fires the `EnterRift` remote when the
   server provides one. Profile shows your avatar, nation, level, gold and
-  attributes. Store, Quests, Areas, Guild and Calendar open "coming soon"
+  attributes. Store, Quests, Areas and Calendar open "coming soon"
   panels for now.
 - Code: `src/StarterPlayer/StarterPlayerScripts/Riftbound/LobbyMenu.lua`. Tile art
   is `menu_*` in `tools/art/build.js`; its uploaded ids go in `UIAssets.Menu`.

@@ -1,8 +1,8 @@
 -- Lobby menu: Shattered Obsidian tiles down the left (Store, Items, Quests,
--- Areas, Play) and right (Guild, Profile, Calendar) edges of the screen.
+-- Areas, Play) and right (Profile, Calendar) edges of the screen.
 -- Shown only while the player is in their nation's lobby; slides away in the Rift.
 -- Items opens the Backpack, Play sends you into the arena, Profile shows your
--- level and attributes. Store, Quests, Areas, Guild and Calendar open
+-- level and attributes. Store, Quests, Areas and Calendar open
 -- placeholder panels until those features exist.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +32,6 @@ local BUTTONS = {
 	Quests = { Title = "Quests", Tint = Color3.fromRGB(255, 106, 43), Subtitle = "BOUNTIES OF THE RIFT" },
 	Areas = { Title = "Areas", Tint = Color3.fromRGB(159, 240, 216), Subtitle = "TRAVEL THE SHATTERED LANDS" },
 	Play = { Title = "Play", Tint = Color3.fromRGB(178, 108, 255) },
-	Guild = { Title = "Guild", Tint = Color3.fromRGB(143, 227, 107), Subtitle = "BANDS OF RIFTWALKERS" },
 	Profile = { Title = "Profile", Tint = Color3.fromRGB(60, 156, 255), Subtitle = "YOUR RIFTWALKER" },
 	Calendar = { Title = "Calendar", Tint = Color3.fromRGB(250, 225, 60), Subtitle = "DAILY REWARDS" },
 }
@@ -41,7 +40,6 @@ local PLACEHOLDER = {
 	Store = "The Rift Merchant is still unpacking. Soon you'll spend your gold here on cosmetics, flasks and boosts.",
 	Quests = "No bounties are posted yet. Daily and weekly quests with gold and XP rewards are coming.",
 	Areas = "Only the first arena has been charted. New areas unlock here as you push deeper into the Rift.",
-	Guild = "Guilds aren't open yet. Soon you'll be able to found or join one and run the Rift together.",
 }
 
 -------------------------------------------------------------------------------
@@ -603,7 +601,7 @@ end
 
 local LEFT_W = TILE * 2 + GAP
 local LEFT_H = 76 + GAP + TILE * 2 + GAP
-local RIGHT_H = TILE * 3 + GAP * 2
+local RIGHT_H = TILE * 2 + GAP
 local LEFT_IN, LEFT_OUT = UDim2.new(0, EDGE, 0.56, 0), UDim2.new(0, -LEFT_W - 40, 0.56, 0)
 local RIGHT_IN, RIGHT_OUT = UDim2.new(1, -EDGE, 0.56, 0), UDim2.new(1, TILE + 40, 0.56, 0)
 
@@ -633,7 +631,7 @@ local function buildColumns()
 		Visible = false,
 		Parent = holder,
 	})
-	for i, id in { "Guild", "Profile", "Calendar" } do
+	for i, id in { "Profile", "Calendar" } do
 		tile(right, id, 0, (i - 1) * (TILE + GAP))
 	end
 end

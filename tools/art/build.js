@@ -290,11 +290,13 @@ const MENU = {
     <path d="M128 18 L146 52 L128 92 L110 52Z" fill="#c69bff"/><path d="M128 30 L136 52 L128 76" fill="none" stroke="#f2e4ff" stroke-width="5"/>`],
   // Satchel (same as the HUD bag).
   Items: ['#c08446', BAG_GLYPH],
-  // Sealed scroll.
-  Quests: ['#ff6a2b', `<path d="M76 54 h112 q16 0 16 16 v120 q0 18 -18 18 h-112 q-18 0 -18 -18 v-8 h104 v-112 q0 -16 -16 -16z" fill="#f1e3c6"/>
-    <path d="M60 54 q-20 0 -20 18 q0 18 20 18 h16 v-20 q0 -16 -16 -16z" fill="#d8c29a"/>
-    <path d="M100 96 h70 M100 120 h70 M100 144 h44" fill="none" stroke="#8a5a2e" stroke-width="7"/>
-    <circle cx="170" cy="176" r="24" fill="#c2203a"/><path d="M160 176 l8 8 l14 -16" fill="none" stroke="#ffd0d6" stroke-width="6"/>`],
+  // Bounty scroll: parchment between two wooden rods, marked with a big "!".
+  Quests: ['#ff6a2b', `<path d="M58 52 h140 v152 h-140z" fill="#f1e3c6"/>
+    <path d="M58 52 h140 v24 h-140z M58 180 h140 v24 h-140z" fill="#d8c29a" stroke="none"/>
+    <path d="M58 52 h140 v152 h-140z" fill="none"/>
+    <path d="M42 38 h172 v22 h-172z M42 196 h172 v22 h-172z" fill="#8a5a2e"/>
+    <path d="M114 74 h28 l-6 76 h-16z" fill="#ff6a2b"/><circle cx="128" cy="172" r="14" fill="#ff6a2b"/>
+    <path d="M122 84 l2 44" fill="none" stroke="#ffd36b" stroke-width="5"/>`],
   // Compass rose over a rift crack.
   Areas: ['#9ff0d8', `<circle cx="128" cy="128" r="86" fill="#1f5a4c"/>
     <circle cx="128" cy="128" r="66" fill="none" stroke="#9ff0d8" stroke-width="5"/>
@@ -305,10 +307,6 @@ const MENU = {
     <ellipse cx="128" cy="134" rx="52" ry="70" fill="#8a52e0"/><ellipse cx="128" cy="134" rx="28" ry="42" fill="#e7c8ff"/>
     <path d="M62 202 L176 58 l16 -4 l-4 16 L74 214z" fill="#d9d2ea"/>
     <path d="M58 182 l38 38 M48 226 l22 -22" fill="none" stroke-width="12"/><path d="M58 182 l38 38" fill="none" stroke="#a8773f" stroke-width="5"/>`],
-  // Heraldic shield with a crystal.
-  Guild: ['#8fe36b', `<path d="M128 30 L204 58 V122 Q204 188 128 226 Q52 188 52 122 V58Z" fill="#2f6a26"/>
-    <path d="M128 30 V226 Q52 188 52 122 V58Z" fill="#3f8a32"/>
-    <path d="M128 70 L152 124 L128 186 L104 124Z" fill="#e9c27a"/><path d="M128 84 L140 124 L128 164" fill="none" stroke="#fff3d0" stroke-width="5"/>`],
   // Hooded figure bust.
   Profile: ['#3c9cff', `<path d="M128 34 q62 0 70 76 q4 40 -18 58 h-104 q-22 -18 -18 -58 q8 -76 70 -76z" fill="#0f2f66"/>
     <ellipse cx="128" cy="116" rx="36" ry="42" fill="#07050a"/>
