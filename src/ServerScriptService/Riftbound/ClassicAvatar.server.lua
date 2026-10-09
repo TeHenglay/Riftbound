@@ -1,11 +1,11 @@
--- Every player wears the classic blocky R15 body: avatar body parts, dynamic
--- heads and Rthro proportions are swapped for the standard Roblox ones, while
--- clothing, face, hair, accessories and skin colours are kept. Works with any
+-- Every player wears the classic blocky R15 body: avatar body parts and Rthro
+-- proportions are swapped for the standard Roblox ones, while the player's own
+-- head (dynamic heads included), clothing, accessories and skin colours stay. Works with any
 -- spawn path (NationService loads characters itself), since it runs on
 -- CharacterAdded.
 local Players = game:GetService("Players")
 
-local BODY_PARTS = { "Head", "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg" }
+local BODY_PARTS = { "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg" }
 
 local function classic(description)
 	for _, part in BODY_PARTS do
@@ -16,7 +16,6 @@ local function classic(description)
 	description.HeightScale = 1
 	description.WidthScale = 1
 	description.DepthScale = 1
-	description.HeadScale = 1
 	return description
 end
 
