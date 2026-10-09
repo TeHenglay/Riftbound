@@ -1,9 +1,10 @@
 -- Lobby menu: Shattered Obsidian tiles down the left (Store, Items, Quests,
 -- Areas, Play) and right (Profile, Calendar) edges of the screen.
 -- Shown only while the player is in their nation's lobby; slides away in the Rift.
--- Items opens the Backpack, Play opens the match picker (Training is the
--- current arena), Profile shows your level and attributes. Store, Quests,
--- Areas and Calendar open placeholder panels until those features exist.
+-- Items opens the Backpack, Play opens the full-screen mode select
+-- (PlayScreen; Training is the current arena), Profile shows your level and
+-- attributes. Store opens the market and Areas offers travel when the server
+-- provides them; otherwise they, Quests and Calendar open placeholder panels.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -12,6 +13,7 @@ local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Progression = require(Shared:WaitForChild("Progression"))
 local Stats = require(Shared:WaitForChild("Stats"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
+local PlayScreen = require(script.Parent:WaitForChild("PlayScreen"))
 
 local LobbyMenu = {}
 
@@ -31,12 +33,7 @@ local BUTTONS = {
 	Items = { Title = "Items", Tint = Color3.fromRGB(192, 132, 70), Key = "B" },
 	Quests = { Title = "Quests", Tint = Color3.fromRGB(255, 106, 43), Subtitle = "BOUNTIES OF THE RIFT" },
 	Areas = { Title = "Areas", Tint = Color3.fromRGB(159, 240, 216), Subtitle = "TRAVEL THE SHATTERED LANDS" },
-	Play = {
-		Title = "Play",
-		PanelTitle = "Choose your match",
-		Tint = Color3.fromRGB(178, 108, 255),
-		Subtitle = "WHERE WILL THE RIFT TAKE YOU",
-	},
+	Play = { Title = "Play", Tint = Color3.fromRGB(178, 108, 255) },
 	Profile = { Title = "Profile", Tint = Color3.fromRGB(60, 156, 255), Subtitle = "YOUR RIFTWALKER" },
 	Calendar = { Title = "Calendar", Tint = Color3.fromRGB(250, 225, 60), Subtitle = "DAILY REWARDS" },
 }
@@ -51,12 +48,23 @@ local PLACEHOLDER = {
 -- Lobby detection
 -------------------------------------------------------------------------------
 
--- NationService marks the player: they're in their nation's lobby once a
--- nation is chosen, until they step through the portal into the Rift.
+-- NationService marks where the player is: Area is "Nation", "Crossroads" or
+-- "Rift". Older servers only set Nation and InRift.
 local function inLobby()
-	return player:GetAttribute("Nation") ~= nil
-		and not player:GetAttribute("InRift")
-		and not player:GetAttribute("NeedsNation")
+	if player:GetAttribute("NeedsNation") then
+		return false
+	end
+	local area = player:GetAttribute("Area")
+	if area ~= nil then
+		return area == "Nation" or area == "Crossroads"
+	end
+	return player:GetAttribute("Nation") ~= nil and not player:GetAttribute("InRift")
+end
+
+-- Hub remotes from NationService; nil until the server provides them.
+local function nationRemote(name)
+	local folder = Shared:FindFirstChild("NationRemotes")
+	return folder and folder:FindFirstChild(name)
 end
 
 -------------------------------------------------------------------------------
@@ -406,141 +414,78 @@ local function fillProfile(content)
 	end
 end
 
--- Match modes on the Play screen. Training is the current test arena; the
--- others are listed so players can see what's coming.
-local MATCHES = {
-	{
-		Mode = "Training",
-		Title = "Training Grounds",
-		Icon = function()
-			return UIAssets.Stats.Might
-		end,
-		Tint = Color3.fromRGB(143, 227, 107),
-		Body = "Elemental shrines, the Forge and endless Rift Husks. Practise your build with nothing at stake.",
-	},
-	{
-		Mode = "RiftRun",
-		Title = "Rift Run",
-		Icon = function()
-			return UIAssets.Menu.Play
-		end,
-		Tint = Color3.fromRGB(178, 108, 255),
-		Body = "Descend room by room, choose a reward after each fight and survive to the end of the Rift.",
-		Locked = true,
-	},
-	{
-		Mode = "BossTrial",
-		Title = "Boss Trial",
-		Icon = function()
-			return UIAssets.Icons.MagmaBurst
-		end,
-		Tint = Color3.fromRGB(255, 106, 43),
-		Body = "Face a Rift lord alone with the build you bring. Big rewards for those who win.",
-		Locked = true,
-	},
+-- Two destinations: the shared Crossroads hub and the player's nation lobby.
+local AREAS = {
+	{ Id = "Crossroads", Title = "Crossroads", Body = "The shared main lobby where every nation meets." },
+	{ Id = "Nation", Title = "Your nation lobby", Body = "Home ground, with your nation's portal into the Rift." },
 }
 
-local function enterMatch(mode)
-	local enter = remotes:FindFirstChild("EnterRift")
-	if not enter then
-		HUD.Toast("The way into the Rift isn't open yet.", C.Ash)
+local function fillAreas(content, id)
+	local travel = nationRemote("TravelTo")
+	if not travel then
+		fillPlaceholder(content, id)
 		return
 	end
-	closePanel()
-	enter:FireServer(mode)
-end
-
-local function matchCard(parent, match, order)
-	local card = slab({
-		Name = match.Mode,
-		Size = UDim2.fromOffset(164, 300),
-		LayoutOrder = order,
-		SliceScale = 0.35,
-		ZIndex = 22,
-		Parent = parent,
-	})
-	new("ImageLabel", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 18),
-		Size = UDim2.fromOffset(84, 84),
-		BackgroundTransparency = 1,
-		Image = match.Icon() or UIAssets.Medallion,
-		ImageTransparency = if match.Locked then 0.45 else 0,
-		ZIndex = 23,
-		Parent = card,
-	})
-	text({
-		Position = UDim2.fromOffset(0, 108),
-		Size = UDim2.new(1, 0, 0, 26),
-		Text = match.Title,
-		FontFace = F.TitleBold,
-		TextSize = 20,
-		TextColor3 = if match.Locked then C.Ash else C.Parchment,
-		ZIndex = 23,
-		Parent = card,
-	})
-	new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 138),
-		Size = UDim2.fromOffset(60, 2),
-		BackgroundColor3 = match.Tint,
-		BorderSizePixel = 0,
-		ZIndex = 23,
-		Parent = card,
-	})
-	text({
-		Position = UDim2.fromOffset(16, 148),
-		Size = UDim2.new(1, -32, 0, 90),
-		Text = match.Body,
-		FontFace = F.Body,
-		TextSize = 13,
-		TextWrapped = true,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		TextColor3 = C.Ash,
-		ZIndex = 23,
-		Parent = card,
-	})
-	local button = new("TextButton", {
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -18),
-		Size = UDim2.fromOffset(124, 34),
-		Text = spaced(if match.Locked then "Soon" else "Enter"),
-		FontFace = F.Label,
-		TextSize = 13,
-		TextColor3 = if match.Locked then C.Ash else C.Ink,
-		BackgroundColor3 = if match.Locked then C.Ink else match.Tint,
-		AutoButtonColor = not match.Locked,
-		ZIndex = 24,
-		Parent = card,
-	}, { stroke(if match.Locked then C.Bronze else C.Gold, 1.5) })
-	if not match.Locked then
-		button.Activated:Connect(function()
-			enterMatch(match.Mode)
-		end)
-	end
-end
-
-local function fillMatches(content)
-	local row = new("Frame", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		ZIndex = 22,
-		Parent = content,
-	}, {
-		new("UIListLayout", {
-			FillDirection = Enum.FillDirection.Horizontal,
-			HorizontalAlignment = Enum.HorizontalAlignment.Center,
-			Padding = UDim.new(0, 18),
-			SortOrder = Enum.SortOrder.LayoutOrder,
-		}),
-	})
-	for i, match in MATCHES do
-		matchCard(row, match, i)
+	local here = player:GetAttribute("Area")
+	for i, area in AREAS do
+		local current = here == area.Id
+		local row = new("TextButton", {
+			Name = area.Id,
+			Position = UDim2.fromOffset(0, (i - 1) * 104),
+			Size = UDim2.new(1, 0, 0, 92),
+			Text = "",
+			AutoButtonColor = not current,
+			BackgroundColor3 = if current then C.RiftDeep else C.Ink,
+			BackgroundTransparency = 0.1,
+			ZIndex = 22,
+			Parent = content,
+		}, { stroke(if current then C.Rift else C.Bronze, if current then 2 else 1.2) })
+		text({
+			Position = UDim2.fromOffset(20, 12),
+			Size = UDim2.new(1, -180, 0, 30),
+			Text = area.Title,
+			FontFace = F.TitleBold,
+			TextSize = 24,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 23,
+			Parent = row,
+		})
+		text({
+			Position = UDim2.fromOffset(20, 46),
+			Size = UDim2.new(1, -180, 0, 36),
+			Text = area.Body,
+			FontFace = F.Italic,
+			TextSize = 16,
+			TextWrapped = true,
+			TextColor3 = C.Ash,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			ZIndex = 23,
+			Parent = row,
+		})
+		text({
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -20, 0.5, 0),
+			Size = UDim2.fromOffset(150, 24),
+			Text = spaced(if current then "You are here" else "Travel"),
+			FontFace = F.Label,
+			TextSize = 13,
+			TextColor3 = if current then C.RiftHot else C.Gold,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = 23,
+			Parent = row,
+		})
+		if not current then
+			row.Activated:Connect(function()
+				closePanel()
+				travel:FireServer(area.Id)
+			end)
+		end
 	end
 end
 
 local FILL = {
-	Play = fillMatches,
+	Areas = fillAreas,
 	Profile = fillProfile,
 	Calendar = fillCalendar,
 }
@@ -553,7 +498,7 @@ local function openPanel(id)
 	local info = BUTTONS[id]
 	local content = panel.Content
 	content:ClearAllChildren()
-	panel.Banner.Title.Text = spaced(info.PanelTitle or info.Title)
+	panel.Banner.Title.Text = spaced(info.Title)
 	panel.Banner.Subtitle.Text = spaced(info.Subtitle or "");
 	(FILL[id] or fillPlaceholder)(content, id)
 	openId = id
@@ -570,6 +515,19 @@ local ACTIONS = {
 	Items = function()
 		closePanel()
 		HUD.ToggleBackpack()
+	end,
+	Play = function()
+		closePanel()
+		PlayScreen.Open()
+	end,
+	Store = function()
+		local market = nationRemote("OpenMarketLocal")
+		if market then
+			closePanel()
+			market:Fire("Shop")
+		else
+			openPanel("Store")
+		end
 	end,
 }
 
@@ -778,6 +736,7 @@ local function setShown(on)
 		tween(right, 0.35, { Position = RIGHT_IN }, Enum.EasingStyle.Quint)
 	else
 		closePanel()
+		PlayScreen.Close()
 		tween(left, 0.25, { Position = LEFT_OUT }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 		local tw =
 			tween(right, 0.25, { Position = RIGHT_OUT }, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
@@ -835,13 +794,27 @@ function LobbyMenu.Init(remoteFolder, hud)
 
 	buildColumns()
 	buildPanel()
+	PlayScreen.Init(holder, HUD, remotes)
+	-- The lobby columns step aside while the full-screen Play page is up.
+	PlayScreen.OnToggle = function(open)
+		if shown then
+			left.Visible = not open
+			right.Visible = not open
+		end
+	end
 	HUD.OnHudMenuOpened = function()
 		openId = nil
 		panel.Visible = false
+		PlayScreen.Hide()
 	end
 
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if not processed and input.KeyCode == Enum.KeyCode.Escape and openId then
+		if processed or input.KeyCode ~= Enum.KeyCode.Escape then
+			return
+		end
+		if PlayScreen.IsOpen() then
+			PlayScreen.Close()
+		elseif openId then
 			closePanel()
 		end
 	end)
@@ -849,7 +822,7 @@ function LobbyMenu.Init(remoteFolder, hud)
 	local function refresh()
 		setShown(inLobby())
 	end
-	for _, name in { "Nation", "InRift", "NeedsNation" } do
+	for _, name in { "Nation", "InRift", "NeedsNation", "Area" } do
 		player:GetAttributeChangedSignal(name):Connect(refresh)
 	end
 	refresh()
