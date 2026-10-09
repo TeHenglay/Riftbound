@@ -35,6 +35,21 @@ EnterRift.OnServerEvent:Connect(function(player, mode)
 	end
 end)
 
-game:GetService("Players").PlayerRemoving:Connect(function(player)
+local Players = game:GetService("Players")
+
+-- Back in the lobby: no match running.
+local function watch(player)
+	player:GetAttributeChangedSignal("InRift"):Connect(function()
+		if not player:GetAttribute("InRift") then
+			player:SetAttribute("MatchMode", nil)
+		end
+	end)
+end
+Players.PlayerAdded:Connect(watch)
+for _, player in Players:GetPlayers() do
+	watch(player)
+end
+
+Players.PlayerRemoving:Connect(function(player)
 	lastFire[player] = nil
 end)
