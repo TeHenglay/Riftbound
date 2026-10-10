@@ -18,7 +18,7 @@ PlayScreen.OnToggle = nil
 local player = Players.LocalPlayer
 local HUD, remotes
 local C, F, new, stroke, text, tween, spaced, slab
-local screen, viewport, levelLabel, nameLabel, nationLabel, resetLabels
+local screen, viewport, levelLabel, nameLabel, nationLabel, resetLabels, storyLabels
 local isOpen = false
 local spin, ticker
 
@@ -33,11 +33,11 @@ local MODES = {
 		Kind = "Progressive Gamemode",
 		Tint = Color3.fromRGB(60, 156, 255),
 		InfoLabel = "Current Map",
-		InfoValue = "The Shattered Coast",
-		InfoNote = "0/5 Acts Cleared",
+		InfoValue = "The Five Nations",
+		InfoNote = "0/15 Acts Cleared",
 		Icons = { "TidalWave", "StoneSpike", "Fireball" },
 		Footer = "Total Progress: 0%",
-		Soon = true,
+		Story = true,
 	},
 	{
 		Id = "Raid",
@@ -155,8 +155,22 @@ local function enter(mode)
 	remote:FireServer(mode)
 end
 
+-- The lobby thread's story screen; nil until its server provides it.
+local function storyHook()
+	local folder = Shared:FindFirstChild("NationRemotes")
+	return folder and folder:FindFirstChild("OpenStoryLocal")
+end
+
 local function activate(info)
-	if info.Level and level() < info.Level then
+	if info.Story then
+		local hook = storyHook()
+		if hook then
+			PlayScreen.Close()
+			hook:Fire()
+		else
+			HUD.Toast("Story is coming in a future update.", info.Tint)
+		end
+	elseif info.Level and level() < info.Level then
 		HUD.Toast(`Reach level {info.Level} to unlock the {info.Title}.`, C.Ash)
 	elseif info.Mode then
 		enter(info.Mode)
@@ -245,7 +259,7 @@ local function modeCard(parent, info, order)
 		ZIndex = 24,
 		Parent = card,
 	})
-	text({
+	local note = text({
 		Position = UDim2.fromOffset(26, 128),
 		Size = UDim2.fromOffset(230, 34),
 		Text = info.InfoNote,
@@ -311,7 +325,7 @@ local function modeCard(parent, info, order)
 			resetLabels[weekly] = chip
 		end
 	else
-		text({
+		local footerText = text({
 			Position = UDim2.fromOffset(12, 0),
 			Size = UDim2.new(0.6, 0, 1, 0),
 			Text = info.Footer,
@@ -322,15 +336,18 @@ local function modeCard(parent, info, order)
 			ZIndex = 25,
 			Parent = footer,
 		})
+		if info.Story then
+			storyLabels = { Note = note, Footer = footerText }
+		end
 	end
 	text({
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -12, 0, 0),
 		Size = UDim2.new(0.4, 0, 1, 0),
-		Text = if info.Mode then "Click to enter  >" elseif info.Soon then "Coming soon" else "",
+		Text = if info.Mode or info.Story then "Click to enter  >" elseif info.Soon then "Coming soon" else "",
 		FontFace = F.Label,
 		TextSize = 15,
-		TextColor3 = if info.Mode then C.Good else C.RiftHot,
+		TextColor3 = if info.Mode or info.Story then C.Good else C.RiftHot,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		ZIndex = 25,
 		Parent = footer,
@@ -462,6 +479,17 @@ end
 -------------------------------------------------------------------------------
 -- Build / open / close
 -------------------------------------------------------------------------------
+
+-- Story progress from the StoryCleared attribute (0-15 acts).
+local STORY_ACTS = 15
+local function refreshStory()
+	if not storyLabels then
+		return
+	end
+	local cleared = math.clamp(player:GetAttribute("StoryCleared") or 0, 0, STORY_ACTS)
+	storyLabels.Note.Text = `{cleared}/{STORY_ACTS} Acts Cleared`
+	storyLabels.Footer.Text = `Total Progress: {math.floor(cleared / STORY_ACTS * 100)}%`
+end
 
 local function refreshHeader()
 	levelLabel.Text = `Level {level()}`
@@ -703,6 +731,7 @@ function PlayScreen.Open()
 	isOpen = true
 	refreshHeader()
 	refreshResets()
+	refreshStory()
 	showCharacter()
 	HUD.SetLobbyPanel(true)
 	if PlayScreen.OnToggle then

@@ -18,10 +18,11 @@ Story.Order = { "Fire", "Earth", "Water", "Wind", "Lightning" }
 
 Story.Defs = {
 	Fire = {
+		Image = "rbxassetid://114310667299338", -- Act 1 arena screenshot
 		Title = "The Ashen Uprising",
 		Blurb = "The Rift has cracked open beneath the Ember Dominion. Its volcano wakes, and the forges burn with something that is not fire.",
-		Grunt = "Cinder Husk",
-		Elite = "Ember Brute",
+		Grunt = "Ashen Ronin",
+		Elite = "Kiln Oni Captain",
 		Color = Color3.fromRGB(255, 106, 43),
 		Acts = {
 			{
@@ -43,10 +44,11 @@ Story.Defs = {
 		},
 	},
 	Earth = {
+		Image = "rbxassetid://132404872798119", -- Act 1 arena screenshot
 		Title = "The Breaking Mountain",
 		Blurb = "The Stonehold's sacred mountain is splitting apart. Something huge is pushing up through the rock.",
-		Grunt = "Stone Husk",
-		Elite = "Granite Brute",
+		Grunt = "Shalecrag Monk",
+		Elite = "Gravemaw Warden",
 		Color = Color3.fromRGB(176, 122, 64),
 		Acts = {
 			{
@@ -68,10 +70,11 @@ Story.Defs = {
 		},
 	},
 	Water = {
+		Image = "rbxassetid://99020583212934", -- Act 1 arena screenshot
 		Title = "The Drowned Court",
 		Blurb = "The Tidewater Court's sea has turned black. The tides no longer return; they rise.",
-		Grunt = "Tide Husk",
-		Elite = "Abyssal Brute",
+		Grunt = "Drowned Lancer",
+		Elite = "Abyssal Court Knight",
 		Color = Color3.fromRGB(52, 152, 255),
 		Acts = {
 			{
@@ -93,10 +96,11 @@ Story.Defs = {
 		},
 	},
 	Wind = {
+		Image = "rbxassetid://124292358043159", -- Act 1 arena screenshot
 		Title = "The Shattered Sky",
 		Blurb = "The Skyreach islands are falling. The winds that held them up are being drained into the Rift.",
-		Grunt = "Gale Husk",
-		Elite = "Cyclone Brute",
+		Grunt = "Gale Shinobi",
+		Elite = "Cyclone Kunoichi",
 		Color = Color3.fromRGB(159, 240, 216),
 		Acts = {
 			{
@@ -118,10 +122,11 @@ Story.Defs = {
 		},
 	},
 	Lightning = {
+		Image = "rbxassetid://138471750074863", -- Act 1 arena screenshot
 		Title = "The Thunder Rebellion",
 		Blurb = "Storms strike the Stormcall temples without end. One of the Order's own heralds has turned the lightning against them.",
-		Grunt = "Storm Husk",
-		Elite = "Volt Brute",
+		Grunt = "Thunderfallen Herald",
+		Elite = "Stormbreaker Paladin",
 		Color = Color3.fromRGB(250, 225, 60),
 		Acts = {
 			{
@@ -144,6 +149,22 @@ Story.Defs = {
 	},
 }
 
+-- Difficulty tiers: enemy health/damage and reward multipliers. Easy and
+-- Medium are open; Hard needs the act cleared on Medium, Nightmare on Hard.
+Story.DifficultyOrder = { "Easy", "Medium", "Hard", "Nightmare" }
+Story.Difficulties = {
+	Easy = { Health = 1, Damage = 1, Reward = 1, Color = Color3.fromRGB(143, 227, 107) },
+	Medium = { Health = 1.6, Damage = 1.4, Reward = 1.5, Color = Color3.fromRGB(250, 214, 80) },
+	Hard = { Health = 2.4, Damage = 1.9, Reward = 2.2, Color = Color3.fromRGB(255, 138, 58), Needs = "Medium" },
+	Nightmare = { Health = 3.6, Damage = 2.6, Reward = 3.5, Color = Color3.fromRGB(232, 54, 74), Needs = "Hard" },
+}
+
+-- Drop chances shown on the rewards row (per enemy).
+Story.ShownDrops = {
+	{ Id = "HuskIchor", Chance = 0.25 },
+	{ Id = "EmberCore", Chance = 0.04 },
+}
+
 -- Essence earned per act (by act number), before the home bonus.
 Story.EssenceReward = { 3, 5, 10 }
 -- Gold paid for clearing an act, on top of what enemies drop.
@@ -153,9 +174,10 @@ function Story.EssenceId(nationId)
 	return nationId .. "Essence"
 end
 
--- "Fire:2" style keys for the cleared-acts set.
-function Story.Key(nationId, act)
-	return nationId .. ":" .. act
+-- "Fire:2" style keys for the cleared-acts set; "Fire:2:Hard" records the
+-- difficulty it was cleared on.
+function Story.Key(nationId, act, difficulty)
+	return nationId .. ":" .. act .. (if difficulty then ":" .. difficulty else "")
 end
 
 return Story

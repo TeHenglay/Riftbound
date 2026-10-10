@@ -222,3 +222,20 @@ During Play, casts every skill at the dummies and checks fusion.
   stand at the stall before trading.
 - Other client UI can open the screens with
   `NationRemotes.OpenMarketLocal:Fire("Shop" | "Merchant")`.
+
+## Story mode
+
+- One story per nation, three acts each (`src/ReplicatedStorage/Riftbound/Story.lua`).
+  Act 1 of all five stories is built so far (`workspace.StoryArenas`, made by
+  `StoryBuilder.lua`); Acts 2 and 3 show as coming soon.
+- Open the story screen from the Play page's Story card
+  (`NationRemotes.OpenStoryLocal:Fire()`): pick a map (story), an act and a
+  difficulty, then Start. Easy and Medium are open; Hard needs the act cleared
+  on Medium, Nightmare on Hard. Players who start the same act join the same run.
+- A run is waves of husks and brutes (plus a boss in Act 3). Clearing pays gold
+  (double on a first clear per difficulty) and that nation's Essence (×1.5 in your
+  own nation's story), unlocks the next act and opens a gate back to the
+  Crossroads. Cleared acts save to the `RiftboundStory_v1` DataStore and show as
+  the player attributes `StoryProgress` and `StoryCleared`.
+- Map pictures are screenshots of each Act 1 arena (`art/ui/story_*.png`,
+  uploaded; ids in `Story.lua`).

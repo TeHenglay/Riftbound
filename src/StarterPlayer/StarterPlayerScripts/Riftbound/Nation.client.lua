@@ -475,10 +475,13 @@ local function currentLobby()
 		return nil
 	end
 	local pos = workspace.CurrentCamera.Focus.Position
-	for _, lobby in lobbies:GetChildren() do
-		local center = lobby:GetAttribute("Center")
-		if center and (Vector3.new(pos.X, center.Y, pos.Z) - center).Magnitude < 260 and math.abs(pos.Y - center.Y) < 200 then
-			return lobby
+	-- Story arenas share their nation's look, so they count too.
+	for _, folder in { lobbies, workspace:FindFirstChild("StoryArenas") } do
+		for _, lobby in folder and folder:GetChildren() or {} do
+			local center = lobby:GetAttribute("Center")
+			if center and (Vector3.new(pos.X, center.Y, pos.Z) - center).Magnitude < 260 and math.abs(pos.Y - center.Y) < 200 then
+				return lobby
+			end
 		end
 	end
 	return nil
@@ -528,13 +531,14 @@ local function bolt(lobby)
 	Debris:AddItem(glow, 0.5)
 end
 
-local strike, moodCheck, here = 0, 0, nil
+local strike, moodCheck, here, hereId = 0, 0, nil, nil
 RunService.Heartbeat:Connect(function(dt)
 	moodCheck -= dt
 	if moodCheck <= 0 then
 		moodCheck = 0.5
-		here = if player:GetAttribute("InRift") then nil else currentLobby()
-		setMood(here and here.Name)
+		here = if player:GetAttribute("InRift") and player:GetAttribute("Area") ~= "Story" then nil else currentLobby()
+		hereId = here and (here:GetAttribute("Nation") or here.Name)
+		setMood(hereId)
 	end
 	if not here then
 		return
@@ -554,7 +558,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local flash = strike <= 0 and math.random() < 0.012
 	if flash then
 		strike = 1.5
-		if here.Name == "Lightning" then
+		if hereId == "Lightning" then
 			bolt(here)
 		end
 	end

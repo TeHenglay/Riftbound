@@ -36,7 +36,7 @@ async function session() {
   for (let t = 0; t < 30 && !studio; t++) {
     const r = await c.send('tools/call', { name: 'list_roblox_studios', arguments: {} });
     const s = JSON.parse(r.result.content[0].text).studios;
-    if (s.length) studio = s[0].id; else await new Promise(r => setTimeout(r, 1500));
+    if (s.length) studio = (s.find(x => x.name && x.name.includes("Riftbound")) || s[0]).id; else await new Promise(r => setTimeout(r, 1500));
   }
   if (!studio) throw new Error('No Roblox Studio instance connected');
   const call = async (name, args) => {
