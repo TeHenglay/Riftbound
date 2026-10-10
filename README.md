@@ -102,6 +102,21 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   flinch and flash, a stun shake, a spawn rise and a death slump into a burst of
   rift crystal shards.
 
+## Nation foe models
+
+- Each nation's story foe (Grunt and Elite) is an AI-generated mesh split into
+  Body, ArmL, ArmR, LegL and LegR, rigged by `Foes/FoeRig.lua` like the Husk. The
+  templates live in the place at `ServerStorage.RiftboundAssets.Foes.<Id>` and the
+  raw generated meshes in `ServerStorage.RiftboundAssets.FoeSources`; they are
+  **not** in this repo, so save the place file. Without them each foe falls back
+  to its part-built stand-in.
+- The foes are bare-handed: they punch and cast their nation skills. The
+  Stormbreaker Paladin's wings are a separate part welded to its body.
+- `tools/BuildFoeTemplates.luau` rebuilds the templates from `FoeSources` (it can
+  also attach the generated weapon meshes with `WITH_WEAPONS`). `tools/meshview.js`
+  renders any mesh model from the open place to a PNG, e.g.
+  `tools/screens/foes-all.png`.
+
 ## Attributes (stat points)
 
 - Every level gained gives **1 stat point**. Press **C** (or click the level
