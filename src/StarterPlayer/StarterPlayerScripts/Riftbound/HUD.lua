@@ -1,6 +1,6 @@
 -- Riftbound HUD in the "Shattered Obsidian" style: textured obsidian slabs held
 -- by bronze clamps, glowing rift cracks, crystal-shard skill icons with inked
--- glyphs, crimson vitals and classical serif type. The art is drawn by
+-- glyphs and crimson vitals, lettered in Titillium Web. The art is drawn by
 -- tools/art/build.js and referenced through ReplicatedStorage.Riftbound.UIAssets.
 -- Contains the vitals (level/HP/XP), gold, ability shards, the Arsenal list,
 -- tooltips, toasts and the Forge ("choose one fusion").
@@ -39,13 +39,15 @@ local function face(enum, weight, style)
 	return Font.new(Font.fromEnum(enum).Family, weight or Enum.FontWeight.Regular, style or Enum.FontStyle.Normal)
 end
 
+-- One typeface for the whole UI (Titillium Web); change TYPEFACE to restyle every label.
+local TYPEFACE = Enum.Font.TitilliumWeb
 local F = {
-	Title = face(Enum.Font.Bodoni),
-	TitleBold = face(Enum.Font.Bodoni, Enum.FontWeight.Bold),
-	Body = face(Enum.Font.Merriweather),
-	BodyBold = face(Enum.Font.Merriweather, Enum.FontWeight.Bold),
-	Label = face(Enum.Font.Oswald, Enum.FontWeight.Bold),
-	Italic = face(Enum.Font.Garamond, Enum.FontWeight.Regular, Enum.FontStyle.Italic),
+	Title = face(TYPEFACE, Enum.FontWeight.Bold),
+	TitleBold = face(TYPEFACE, Enum.FontWeight.Heavy),
+	Body = face(TYPEFACE, Enum.FontWeight.SemiBold),
+	BodyBold = face(TYPEFACE, Enum.FontWeight.Bold),
+	Label = face(TYPEFACE, Enum.FontWeight.Bold),
+	Italic = face(TYPEFACE, Enum.FontWeight.Regular, Enum.FontStyle.Italic),
 }
 
 local NUMERALS = { "I", "II", "III", "IV", "V" }
