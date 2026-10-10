@@ -37,7 +37,7 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 
 ## Lobby menu
 
-- In your nation's lobby, Shattered Obsidian buttons line the screen edges:
+- In your nation's lobby, bold framed buttons line the screen edges:
   **Store**, **Items**, **Quests**, **Areas**, **Play** on the left and
   **Profile** and **Calendar** on the right. They slide away when you
   enter the Rift (`InRift`) and stay hidden on the nation select screen.
