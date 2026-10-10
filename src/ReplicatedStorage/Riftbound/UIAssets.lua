@@ -48,16 +48,16 @@ UIAssets.Items.WindEssence = UIAssets.Icons.Gust
 UIAssets.Items.LightningEssence = UIAssets.Icons.ChainShock
 UIAssets.Bag = "rbxassetid://137592377080750"
 
--- Lobby menu tiles (menu_* in tools/art/build.js). LobbyMenu falls back to
+-- Lobby menu icons (menu_* in tools/art/build.js). LobbyMenu falls back to
 -- plain slabs for any id missing here.
 UIAssets.Menu = {
-	Store = "rbxassetid://106487022967164",
-	Items = "rbxassetid://117717009732639",
-	Quests = "rbxassetid://131754583105442",
-	Areas = "rbxassetid://123844829656953",
-	Play = "rbxassetid://129909717567315",
-	Profile = "rbxassetid://109307206721183",
-	Calendar = "rbxassetid://132954542926671",
+	Store = "rbxassetid://109862871603514",
+	Items = "rbxassetid://113922193839381",
+	Quests = "rbxassetid://87661355214283",
+	Areas = "rbxassetid://114145055602454",
+	Play = "rbxassetid://91032559478927",
+	Profile = "rbxassetid://97608809981971",
+	Calendar = "rbxassetid://114534085755805",
 }
 
 UIAssets.Stats = {
