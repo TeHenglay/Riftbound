@@ -7,9 +7,9 @@
 local Players = game:GetService("Players")
 
 local BODY_PARTS = { "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg" }
--- Avatar heads are sized for the newer bodies; this shrinks them to sit like
--- a classic head on the blocky torso.
-local HEAD_SCALE = 0.85
+-- Avatar heads are sized for the newer bodies. A head wider than this (the
+-- blocky torso is 2 studs) is shrunk to fit; normal heads are left alone.
+local MAX_HEAD_WIDTH = 1.7
 
 local function classic(description)
 	for _, part in BODY_PARTS do
@@ -20,7 +20,6 @@ local function classic(description)
 	description.HeightScale = 1
 	description.WidthScale = 1
 	description.DepthScale = 1
-	description.HeadScale = HEAD_SCALE
 	-- Classic 2D clothing only: drop layered (3D) clothing, keep rigid accessories.
 	local kept = {}
 	for _, accessory in description:GetAccessories(true) do
@@ -54,7 +53,13 @@ local function onCharacter(player, character)
 		return
 	end
 	local ok, err = pcall(function()
-		humanoid:ApplyDescription(classic(humanoid:GetAppliedDescription()))
+		local description = classic(humanoid:GetAppliedDescription())
+		humanoid:ApplyDescription(description)
+		local head = character:FindFirstChild("Head")
+		if head and head.Size.X > MAX_HEAD_WIDTH then
+			description.HeadScale *= MAX_HEAD_WIDTH / head.Size.X
+			humanoid:ApplyDescription(description)
+		end
 	end)
 	if not ok then
 		warn("ClassicAvatar: " .. tostring(err))
