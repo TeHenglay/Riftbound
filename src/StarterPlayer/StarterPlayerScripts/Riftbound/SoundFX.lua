@@ -280,10 +280,19 @@ local PLAYER_EVENTS = {
 	end,
 }
 
+-- Awakened skills sound like their skill: "SteamCloudAwakened" -> "SteamCloud".
+local function soundId(skillId)
+	if type(skillId) == "string" and skillId:sub(-8) == "Awakened" then
+		return skillId:sub(1, -9)
+	end
+	return skillId
+end
+
 local function onSkillFx(e)
 	if typeof(e) ~= "table" or type(e.Type) ~= "string" then
 		return
 	end
+	e.Skill = soundId(e.Skill)
 	local position = eventPosition(e)
 	local special = PLAYER_EVENTS[e.Type]
 	if special then
@@ -544,10 +553,10 @@ local function hookLocalCasts()
 	local play = CastAnimator.Play
 	CastAnimator.Play = function(character, skillId, ...)
 		if character ~= nil and character == player.Character and type(skillId) == "string" then
-			local skill = Library.Skills[skillId]
+			local skill = Library.Skills[soundId(skillId)]
 			local root = character:FindFirstChild("HumanoidRootPart")
 			if skill and skill.Cast and root then
-				predicted[skillId] = os.clock()
+				predicted[soundId(skillId)] = os.clock()
 				pcall(runEntry, skill.Cast, {}, root.Position)
 			end
 		end

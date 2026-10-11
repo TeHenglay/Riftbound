@@ -361,7 +361,7 @@ local tabAll = new("TextButton", {
 	Position = UDim2.new(0, 0, 0, 0),
 	Size = UDim2.new(0.25, -4, 1, 0),
 	BackgroundColor3 = Color3.fromRGB(26, 24, 28),
-	Text = "ALL SKILLS (20)",
+	Text = `ALL SKILLS ({5 + #Crafting.ForgeOrder + #Crafting.AwakenOrder})`,
 	TextColor3 = Color3.fromRGB(255, 195, 110),
 	TextSize = 12,
 	FontFace = F.Bold,
@@ -406,7 +406,7 @@ local tabAwaken = new("TextButton", {
 	Position = UDim2.new(0.75, 6, 0, 0),
 	Size = UDim2.new(0.25, -6, 1, 0),
 	BackgroundColor3 = Color3.fromRGB(18, 18, 22),
-	Text = "AWAKENED (5)",
+	Text = `AWAKENED ({#Crafting.AwakenOrder})`,
 	TextColor3 = Color3.fromRGB(140, 145, 160),
 	TextSize = 12,
 	FontFace = F.Bold,
@@ -1282,7 +1282,7 @@ local function renderDetails()
 		local baseElem = getSkillElement(recipe.BaseSkill)
 		local baseColor = getSkillColor(recipe.BaseSkill)
 		s1Icon.Image = UIAssets.Icons[recipe.BaseSkill] or UIAssets.Icons.Empty
-		s1Name.Text = recipe.BaseSkill
+		s1Name.Text = if baseDef then baseDef.Name else recipe.BaseSkill
 		s1Element.Text = baseElem
 		s1Element.TextColor3 = baseColor
 		s1Glow.ImageColor3 = baseColor
@@ -1297,7 +1297,7 @@ local function renderDetails()
 		-- Skill 2 is Awakened Skill (Fireball >> Fireball Awakened)
 		local isAwakened = (cachedBuild.Skills[recipe.AwakenedSkill] ~= nil)
 		s2Icon.Image = UIAssets.Icons[recipe.BaseSkill] or UIAssets.Icons.Empty
-		s2Name.Text = recipe.AwakenedSkill
+		s2Name.Text = if def then def.Name else recipe.AwakenedSkill
 		s2Element.Text = `{baseElem} • Awakened`
 		s2Element.TextColor3 = Color3.fromRGB(100, 220, 255)
 		s2Glow.ImageColor3 = Color3.fromRGB(100, 220, 255)
@@ -1313,7 +1313,24 @@ local function renderDetails()
 		resultTitle.TextColor3 = Color3.fromRGB(120, 230, 255)
 		resultAura.ImageColor3 = Color3.fromRGB(100, 220, 255)
 
-		-- Material Requirements in Horizontal Scroll with Progress Bars
+		-- Material Requirements in Horizontal Scroll with Progress Bars.
+		-- Fused awakenings list exact materials (both nations' Essences and Shards).
+		if recipe.Materials then
+			local mats = {}
+			for mat in recipe.Materials do
+				table.insert(mats, mat)
+			end
+			local function rank(mat)
+				return if mat == "RiftShard" then 999 else (table.find(Items.Order, mat) or 500)
+			end
+			table.sort(mats, function(a, b)
+				return rank(a) < rank(b)
+			end)
+			for _, mat in mats do
+				local mDef = Items.Defs[mat]
+				addReqCard(UIAssets.Items[mat] or UIAssets.Icons.Empty, mDef and mDef.Name or mat, cachedInventory[mat] or 0, recipe.Materials[mat], false, ItemNeonColors[mat] or Color3.fromRGB(180, 170, 210))
+			end
+		else
 		local essCount = cachedInventory[recipe.Essence] or 0
 		local coreCount = cachedInventory[recipe.Core] or 0
 		local catIcon = if essCount >= 1 then UIAssets.Items[recipe.Essence] else (UIAssets.Items[recipe.Core] or UIAssets.Icons.Empty)
@@ -1330,6 +1347,7 @@ local function renderDetails()
 
 		local riftCount = cachedInventory.RiftShard or 0
 		addReqCard(UIAssets.Items.RiftShard, "Rift Shard", riftCount, recipe.RiftShardCount, false, ItemNeonColors.RiftShard)
+		end
 
 		-- Gold Fee as a Requirement Card with Progress Bar
 		addReqCard(UIAssets.Coin, "Gold", gold, recipe.Gold, true, NeonColors.Gold)

@@ -523,7 +523,7 @@ function BuildService.Merge(player, idA, idB)
 	return true, result
 end
 
--- Ascends a base skill into its Awakened form. Preserves level, equipped slot,
+-- Ascends a base or fused skill into its Awakened form. Preserves level, equipped slot,
 -- and socketed runes.
 function BuildService.Awaken(player, baseSkillId, awakenedId)
 	local b = builds[player]

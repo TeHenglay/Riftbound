@@ -14,7 +14,7 @@ local function key(a, b)
 end
 
 for id, def in Skills.Defs do
-	if #def.Elements == 2 then
+	if #def.Elements == 2 and not def.Awakened then
 		recipes[key(def.Elements[1], def.Elements[2])] = id
 	end
 end

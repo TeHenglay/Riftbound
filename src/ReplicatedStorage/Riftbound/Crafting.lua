@@ -143,6 +143,8 @@ Crafting.ForgeRecipes = {
 -- Water Shard, Ember Core and Abyssal Pearl. (Essences, from Act 3, are for
 -- Awakening only.) This replaces the Materials written in the recipes above.
 local FUSE_SHARDS, FUSE_CORES, FUSE_RIFT = 4, 3, 10
+local FUSE_GOLD = 10000 -- every fusion
+Crafting.AwakenGold = 10000 -- every awakening, base or fused
 local NATION_OF = { Fire = "Fire", Water = "Water", Earth = "Earth", Air = "Wind", Lightning = "Lightning" }
 
 for _, recipe in Crafting.ForgeRecipes do
@@ -153,6 +155,7 @@ for _, recipe in Crafting.ForgeRecipes do
 		materials[Items.NationCores[nation]] = FUSE_CORES
 	end
 	recipe.Materials = materials
+	recipe.Gold = FUSE_GOLD
 end
 
 -- Ordered list of forge recipes for clean UI rendering.
@@ -170,7 +173,8 @@ Crafting.ForgeOrder = {
 }
 
 -- 2. Base Skill Awakening Recipes (The Awakening Altar)
--- Requires Base Skill at Level 5 Mastery + Nation Essence/Cores + 8 Nation Shards + 15 Rift Shards + 2,500 Gold.
+-- Requires Base Skill at Level 5 Mastery + Nation Essence/Cores + 8 Nation Shards + 15 Rift Shards + gold
+-- (Crafting.AwakenGold, set below; the Gold written here is replaced).
 Crafting.AwakenRecipes = {
 	Fireball = {
 		BaseSkill = "Fireball",
@@ -252,6 +256,38 @@ Crafting.AwakenOrder = {
 	"SparkBolt",
 }
 
+-- Fused skills awaken too. They need the fusion at level 5 and, from both of
+-- its nations, an Essence (Act 3) and Shards, plus Rift Shards. These recipes
+-- list their costs in Materials (base awakenings use Essence / Core / Shard).
+local AWAKEN_FUSED_SHARDS, AWAKEN_FUSED_RIFT = 6, 20
+for _, fusionId in Crafting.ForgeOrder do
+	local forge = Crafting.ForgeRecipes[fusionId]
+	local awakened = Skills.Defs[fusionId .. "Awakened"]
+	if forge and awakened then
+		local materials = { RiftShard = AWAKEN_FUSED_RIFT }
+		for _, skillId in forge.Skills do
+			local nation = NATION_OF[Skills.Defs[skillId].Elements[1]]
+			materials[nation .. "Essence"] = 1
+			materials[Items.NationShards[nation]] = AWAKEN_FUSED_SHARDS
+		end
+		Crafting.AwakenRecipes[fusionId] = {
+			BaseSkill = fusionId,
+			AwakenedSkill = fusionId .. "Awakened",
+			RequiredLevel = 5,
+			Materials = materials,
+			Title = awakened.Name,
+			PerkName = awakened.PerkName,
+			Fused = true,
+			Description = "+20% Damage, +25% Area, effects last 25% longer (zones +1s), +30% Knockback.",
+		}
+		table.insert(Crafting.AwakenOrder, fusionId)
+	end
+end
+
+for _, recipe in Crafting.AwakenRecipes do
+	recipe.Gold = Crafting.AwakenGold
+end
+
 -- Checks if a player meets all crafting conditions for a Forge recipe.
 function Crafting.CanCraft(recipeId, ownedSkills, inventory, playerGold)
 	local recipe = Crafting.ForgeRecipes[recipeId]
@@ -289,6 +325,17 @@ function Crafting.CanAwaken(baseSkillId, ownedSkills, inventory, playerGold)
 	end
 	if (playerGold or 0) < recipe.Gold then
 		return false, `Insufficient Gold ({playerGold or 0}/{recipe.Gold})`
+	end
+	-- Fused awakenings list their exact materials.
+	if recipe.Materials then
+		for item, count in recipe.Materials do
+			local owned = inventory and inventory[item] or 0
+			if owned < count then
+				local itemDef = Items.Defs[item]
+				return false, `Missing materials: {itemDef and itemDef.Name or item} ({owned}/{count})`
+			end
+		end
+		return true
 	end
 	-- Requires 1x Essence OR 2x Cores
 	local essenceCount = inventory and inventory[recipe.Essence] or 0

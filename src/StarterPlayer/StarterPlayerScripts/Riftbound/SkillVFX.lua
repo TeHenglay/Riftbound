@@ -4217,6 +4217,10 @@ function SkillVFX.Init(Remotes, cameraRig)
 	folder.Parent = workspace
 	Remotes:WaitForChild("SkillFx").OnClientEvent:Connect(function(e)
 		local handler = typeof(e) == "table" and HANDLERS[e.Type]
+		-- Awakened skills look like their skill (bigger numbers come in the event).
+		if handler and type(e.Skill) == "string" and e.Skill:sub(-8) == "Awakened" then
+			e.Skill = e.Skill:sub(1, -9)
+		end
 		if handler then
 			local ok, err = pcall(handler, e)
 			if not ok then

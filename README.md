@@ -178,6 +178,19 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   fused skill at **level 1**, whatever the levels of the two skills (if you
   already own it, it keeps its level and you get a duplicate copy instead).
 
+## Forge and Awakening costs
+
+- **Fusing** two base skills costs 10,000 gold, plus 4 Shards (Act 1) and 3
+  Cores (Act 2) from each of the two nations and 10 Rift Shards
+  (`Crafting.lua`: `FUSE_*`).
+- **Awakening** costs 10,000 gold (`Crafting.AwakenGold`). Base skills need
+  level 5, their nation's Essence (or 2 Cores), 8 Shards and 15 Rift Shards.
+- **Fused skills awaken too** (e.g. Steam Cloud Awakened): level 5, plus 1
+  Essence (Act 3) and 6 Shards from each nation and 20 Rift Shards. Awakened
+  fusions are made in `Skills.lua` from the fusion: +20% damage, +25% area,
+  effects last 25% longer (zones +1s), +30% knockback. Awakened skills reuse
+  their skill's visuals, sounds and icon until they get their own.
+
 ## Skill levels (duplicates)
 
 - Getting a skill you already own (Story drops, fusing one you have) adds a

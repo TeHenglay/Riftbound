@@ -168,6 +168,51 @@ Skills.Defs = {
 	},
 }
 
+-- Awakened fusions: every fused skill has an Awakened form (made at the
+-- Awakening Altar). Built from the fusion: +20% damage, +25% area, effects
+-- last 25% longer (zones +1s), +30% knockback. Visuals reuse the fusion's
+-- (clients strip "Awakened" from the id).
+local AWAKEN_AREA = { "Radius", "InnerRadius", "PoolRadius", "Width", "JumpRange" }
+local fusions = {}
+for id, def in Skills.Defs do
+	if #def.Elements == 2 and not def.Awakened then
+		table.insert(fusions, id)
+	end
+end
+for _, id in fusions do
+	local base = Skills.Defs[id]
+	local def = table.clone(base)
+	def.Name = base.Name .. " Awakened"
+	def.Awakened = true
+	def.BaseSkill = id
+	def.PerkName = "Ascended " .. base.Name
+	def.Damage = (base.Damage or 0) * 1.2
+	if base.TickDamage then
+		def.TickDamage = base.TickDamage * 1.2
+	end
+	for _, key in AWAKEN_AREA do
+		if base[key] then
+			def[key] = base[key] * 1.25
+		end
+	end
+	if base.Duration then
+		def.Duration = base.Duration + 1
+	end
+	if base.Knockback then
+		def.Knockback = base.Knockback * 1.3
+	end
+	if base.Status then
+		def.Status = {}
+		for name, params in base.Status do
+			params = table.clone(params)
+			params.Duration = (params.Duration or 1) * 1.25
+			def.Status[name] = params
+		end
+	end
+	def.Description = base.Description .. " Awakened: hits 20% harder over a 25% bigger area, and its effects last longer."
+	Skills.Defs[id .. "Awakened"] = def
+end
+
 for id, def in Skills.Defs do
 	def.Id = id
 end

@@ -54,7 +54,7 @@ function CraftingService.Craft(player, recipeId)
 	return true, result
 end
 
--- Ascends a Level 5 base skill at the Awakening Altar.
+-- Ascends a Level 5 base or fused skill at the Awakening Altar.
 function CraftingService.Awaken(player, baseSkillId)
 	if typeof(baseSkillId) ~= "string" then
 		return false, "Invalid request"
@@ -78,17 +78,24 @@ function CraftingService.Awaken(player, baseSkillId)
 		return false, "Failed to deduct gold"
 	end
 
-	-- Deduct 1 Essence OR 2 Cores
-	local essenceCount = inv[recipe.Essence] or 0
-	if essenceCount >= 1 then
-		InventoryService.Take(player, recipe.Essence, 1)
+	if recipe.Materials then
+		-- Fused awakenings: both nations' Essences and Shards, plus Rift Shards.
+		for item, count in recipe.Materials do
+			InventoryService.Take(player, item, count)
+		end
 	else
-		InventoryService.Take(player, recipe.Core, 2)
-	end
+		-- Deduct 1 Essence OR 2 Cores
+		local essenceCount = inv[recipe.Essence] or 0
+		if essenceCount >= 1 then
+			InventoryService.Take(player, recipe.Essence, 1)
+		else
+			InventoryService.Take(player, recipe.Core, 2)
+		end
 
-	-- Deduct shards
-	InventoryService.Take(player, recipe.Shard, recipe.ShardCount)
-	InventoryService.Take(player, "RiftShard", recipe.RiftShardCount)
+		-- Deduct shards
+		InventoryService.Take(player, recipe.Shard, recipe.ShardCount)
+		InventoryService.Take(player, "RiftShard", recipe.RiftShardCount)
+	end
 
 	-- Execute ascension
 	local success, result = BuildService.Awaken(player, baseSkillId, recipe.AwakenedSkill)

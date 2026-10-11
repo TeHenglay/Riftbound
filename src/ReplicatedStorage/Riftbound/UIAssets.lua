@@ -26,6 +26,16 @@ UIAssets.Icons = {
 	Thunderstorm = "rbxassetid://121682361605198",
 	TidalWave = "rbxassetid://106996248145687",
 }
+-- Awakened skills (base and fused) use their skill's icon until they get
+-- their own art: Icons.SteamCloudAwakened -> Icons.SteamCloud.
+setmetatable(UIAssets.Icons, {
+	__index = function(icons, id)
+		if type(id) == "string" and id:sub(-8) == "Awakened" then
+			return rawget(icons, id:sub(1, -9))
+		end
+		return nil
+	end,
+})
 
 UIAssets.Banner = "rbxassetid://84682450012208"
 UIAssets.Bar = "rbxassetid://102404203272404"
