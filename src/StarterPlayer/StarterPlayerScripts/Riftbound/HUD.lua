@@ -1680,7 +1680,7 @@ end
 
 local function fusionRow(parent, option, order)
 	local a, b, r = Skills.Defs[option.A], Skills.Defs[option.B], Skills.Defs[option.Result]
-	-- Matches BuildService.Merge: the better level (owning it already adds a copy).
+	-- Matches BuildService.Merge: level 1, or the level you already have (plus a copy).
 	local level = Merge.ResultLevel(build.Skills[option.A], build.Skills[option.B])
 	if build.Skills[option.Result] then
 		level = math.max(build.Skills[option.Result], level)

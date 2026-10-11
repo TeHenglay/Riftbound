@@ -363,8 +363,9 @@ function BuildService.Equip(player, slot, id)
 	BuildService.OnChanged(player)
 end
 
--- Fuses two owned base skills. Both are consumed; the result keeps the
--- higher level (or gains a level if you already own it).
+-- Fuses two owned base skills. Both are consumed; the result
+-- starts at level 1 (or, if you already own it, keeps its level and gains a
+-- duplicate copy).
 function BuildService.Merge(player, idA, idB)
 	local b = builds[player]
 	if not b or typeof(idA) ~= "string" or typeof(idB) ~= "string" then
@@ -378,8 +379,8 @@ function BuildService.Merge(player, idA, idB)
 		return false, "Those skills can't be fused"
 	end
 
-	-- The fusion keeps the higher level; fusing one you already own keeps the
-	-- better level and adds a duplicate copy of it.
+	-- A new fusion starts at level 1; fusing one you already own keeps its
+	-- level and adds a duplicate copy of it.
 	local level = Merge.ResultLevel(b.Skills[idA], b.Skills[idB])
 	local existing = b.Skills[result]
 	if existing then

@@ -175,8 +175,8 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 
 - Five elements: Fire, Water, Earth, Air, Lightning. Each grants one base skill.
 - Fusing two base skills of different elements consumes both and gives the
-  fused skill at the higher of the two levels (a duplicate copy of it if you
-  already own it).
+  fused skill at **level 1**, whatever the levels of the two skills (if you
+  already own it, it keeps its level and you get a duplicate copy instead).
 
 ## Skill levels (duplicates)
 

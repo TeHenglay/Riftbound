@@ -36,9 +36,11 @@ function Merge.All()
 	return recipes
 end
 
--- Fused level: the higher of the two inputs.
-function Merge.ResultLevel(levelA, levelB)
-	return math.max(levelA, levelB)
+-- Fused level: a new fusion always starts at level 1, whatever the levels of
+-- the two skills fused into it; it levels up with duplicate copies like any
+-- skill (Skills.LevelCost).
+function Merge.ResultLevel(_levelA, _levelB)
+	return 1
 end
 
 return Merge
