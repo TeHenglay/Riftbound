@@ -8,6 +8,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local Enemies = require(script.Parent.Parent.Enemies)
+local StatService = require(script.Parent.Parent.StatService)
 
 local FoeKit = {}
 
@@ -138,12 +139,13 @@ function FoeKit.Burn(char, dps, duration)
 	end)
 end
 
--- Slow / root: scales WalkSpeed for a while. The speed is only restored if
--- nothing else changed it in the meantime (flask, shield, stat upgrades).
+-- Slow / root: scales a player's speed for a while (a "FoeSlow" modifier in
+-- StatService, so it stacks safely with the shield and flask). The strongest
+-- slow wins and the longest duration counts.
 local slowed = {}
 function FoeKit.Slow(char, mult, duration)
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hum then
+	local player = Players:GetPlayerFromCharacter(char)
+	if not player then
 		return
 	end
 	local st = slowed[char]
@@ -151,23 +153,21 @@ function FoeKit.Slow(char, mult, duration)
 		st.Until = math.max(st.Until, os.clock() + duration)
 		if mult < st.Mult then
 			st.Mult = mult
-			st.Set = st.Base * mult
-			hum.WalkSpeed = st.Set
+			StatService.SetSpeedMod(player, "FoeSlow", mult)
 		end
 		return
 	end
-	st = { Base = hum.WalkSpeed, Mult = mult, Until = os.clock() + duration }
-	st.Set = st.Base * mult
+	st = { Mult = mult, Until = os.clock() + duration }
 	slowed[char] = st
-	hum.WalkSpeed = st.Set
+	StatService.SetSpeedMod(player, "FoeSlow", mult)
 	task.spawn(function()
-		while os.clock() < st.Until do
+		while os.clock() < st.Until and char.Parent do
 			task.wait(0.1)
 		end
-		if hum.Parent and hum.WalkSpeed == st.Set then
-			hum.WalkSpeed = st.Base
-		end
 		slowed[char] = nil
+		if player.Character == char then
+			StatService.SetSpeedMod(player, "FoeSlow", nil)
+		end
 	end)
 end
 

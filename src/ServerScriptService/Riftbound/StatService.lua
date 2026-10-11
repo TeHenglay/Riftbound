@@ -1,5 +1,9 @@
 -- Stat points: 1 per level gained, spent on Vitality / Might / Swiftness / Focus.
 -- Published as player attributes StatPoints and Stat_<Name> (rank).
+-- Also the one place that sets a player's WalkSpeed: base speed (Swiftness and
+-- nation) times every active speed modifier (shield, flask sip, foe slows).
+-- Modifiers are keyed, so overlapping slows can never leave you stuck slow,
+-- and they're cleared on respawn and at the start of every run.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Stats = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Stats"))
@@ -14,6 +18,7 @@ StatService.OnNotify = function(_player, _text, _color) end
 StatService.OnHealthChanged = function(_player) end -- re-apply max health after Vitality
 
 local data = {}
+local speedMods = {} -- [player] = { [key] = multiplier }
 
 local function publish(player)
 	local d = data[player]
@@ -30,8 +35,28 @@ local function applySpeed(player)
 	local d = data[player]
 	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
 	if d and hum then
-		hum.WalkSpeed = BASE_WALK_SPEED * Stats.SpeedMult(d.Ranks.Swiftness) * Nations.SpeedMult(player)
+		local mult = 1
+		for _, m in speedMods[player] or {} do
+			mult *= m
+		end
+		hum.WalkSpeed = BASE_WALK_SPEED * Stats.SpeedMult(d.Ranks.Swiftness) * Nations.SpeedMult(player) * mult
 	end
+end
+
+-- Sets (or with nil, removes) a speed modifier, e.g. ("Block", 0.5).
+function StatService.SetSpeedMod(player, key, mult)
+	if not data[player] then
+		return
+	end
+	speedMods[player] = speedMods[player] or {}
+	speedMods[player][key] = mult
+	applySpeed(player)
+end
+
+-- Drops every modifier: back to full speed.
+function StatService.ClearSpeedMods(player)
+	speedMods[player] = nil
+	applySpeed(player)
 end
 
 function StatService.Init(player)
@@ -42,6 +67,7 @@ function StatService.Init(player)
 	data[player] = { Points = 0, Ranks = ranks }
 	publish(player)
 	player.CharacterAdded:Connect(function(char)
+		speedMods[player] = nil -- a new body starts at full speed
 		char:WaitForChild("Humanoid")
 		applySpeed(player)
 	end)
@@ -57,6 +83,7 @@ end
 
 function StatService.Remove(player)
 	data[player] = nil
+	speedMods[player] = nil
 end
 
 function StatService.GrantPoints(player, count)

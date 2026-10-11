@@ -803,6 +803,19 @@ end
 
 local offerScreen
 local offerShown -- the offer table currently drawn
+local offerKey -- which offer was last animated in (so re-draws don't replay it)
+
+-- Rune screen sounds; SoundFX is set up by SoundBoot, so play softly if it isn't ready.
+local SoundFX
+do
+	local ok, module = pcall(require, script.Parent:WaitForChild("SoundFX", 5))
+	SoundFX = if ok then module else nil
+end
+local function playSound(name)
+	if SoundFX then
+		pcall(SoundFX.Play, name)
+	end
+end
 
 local function chooseRune(index, slot)
 	if runeBusy then
@@ -813,6 +826,8 @@ local function chooseRune(index, slot)
 	runeBusy = false
 	if not ok or not done then
 		HUD.Toast(if ok then (why or "Can't take that rune") else "Couldn't reach the server", C.Crimson)
+	else
+		playSound("RunePick")
 	end
 end
 
@@ -844,7 +859,7 @@ local function buildOfferScreen()
 		ZIndex = 40,
 		Parent = offerScreen,
 	}, { new("UIScale", {}) })
-	text({ Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Choose a Rune"), FontFace = F.Title, TextSize = 34, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 41, Parent = holder })
+	text({ Name = "Header", Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Choose a Rune"), FontFace = F.Title, TextSize = 34, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 41, Parent = holder })
 	text({ Name = "Timer", Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 0, 18), FontFace = F.Label, TextSize = 13, TextColor3 = C.Gold, ZIndex = 41, Parent = holder })
 	local row = new("Frame", {
 		Name = "Cards",
@@ -856,6 +871,9 @@ local function buildOfferScreen()
 	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 20), SortOrder = Enum.SortOrder.LayoutOrder }) })
 	for i = 1, Runes.Choices do
 		local card = slab({ Name = "Card" .. i, Size = UDim2.fromOffset(255, 350), LayoutOrder = i, ZIndex = 41, Parent = row })
+		new("UIScale", { Name = "Pop", Parent = card })
+		-- A rarity-coloured flash that fades as the card lands.
+		new("Frame", { Name = "Flash", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 46, Parent = card })
 		new("Frame", { Name = "Glow", Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 0, 4), BorderSizePixel = 0, ZIndex = 42, Parent = card })
 		text({ Name = "Title", Position = UDim2.fromOffset(20, 28), Size = UDim2.new(1, -40, 0, 52), FontFace = F.TitleBold, TextSize = 21, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
 		text({ Name = "Rarity", Position = UDim2.fromOffset(20, 82), Size = UDim2.new(1, -40, 0, 14), FontFace = F.Label, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
@@ -916,6 +934,36 @@ local function buildOfferScreen()
 	end)
 end
 
+-- The pick screen arriving: the dim fades in, the title drops, and the cards
+-- spin and pop in one after another with a flash of their rarity colour.
+local function animateOffer(offer)
+	local holder = offerScreen.Holder
+	offerScreen.BackgroundTransparency = 1
+	tween(offerScreen, 0.3, { BackgroundTransparency = 0.4 })
+	holder.Header.TextTransparency = 1
+	holder.Header.Position = UDim2.fromOffset(0, -24)
+	tween(holder.Header, 0.4, { TextTransparency = 0, Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back)
+	playSound("RuneOffer")
+	for i = 1, Runes.Choices do
+		local card = holder.Cards["Card" .. i]
+		local id = offer.Ids[i]
+		local def = id and Runes.Defs[id]
+		card.Pop.Scale = 0.05
+		card.Rotation = if i % 2 == 0 then 12 else -12
+		card.Flash.BackgroundColor3 = if def then runeColor(id) else Color3.new(1, 1, 1)
+		card.Flash.BackgroundTransparency = 0
+		task.delay(0.12 + (i - 1) * 0.14, function()
+			if offerKey ~= offer.Ends then
+				return -- a newer offer (or none) replaced this one
+			end
+			tween(card.Pop, 0.45, { Scale = 1 }, Enum.EasingStyle.Back)
+			tween(card, 0.45, { Rotation = 0 }, Enum.EasingStyle.Back)
+			tween(card.Flash, 0.6, { BackgroundTransparency = 1 })
+			playSound(if def and def.Rarity == "Legendary" then "RuneLegendary" else "RuneCard")
+		end)
+	end
+end
+
 local function refreshOffer()
 	if not offerScreen then
 		return
@@ -923,6 +971,7 @@ local function refreshOffer()
 	local offer = build.Offer
 	if not offer or not inRun() then
 		offerShown = nil
+		offerKey = nil
 		offerScreen.Visible = false
 		return
 	end
@@ -958,6 +1007,11 @@ local function refreshOffer()
 		end
 	end
 	offerScreen.Visible = true
+	-- Build updates re-draw the cards; only a new offer plays the entrance.
+	if offerKey ~= offer.Ends then
+		offerKey = offer.Ends
+		animateOffer(offer)
+	end
 end
 
 -- Keys 1 / 2 / 3 socket the shown rune into LMB / Q / E (see Controls).

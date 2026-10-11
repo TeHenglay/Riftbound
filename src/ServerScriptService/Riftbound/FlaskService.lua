@@ -11,6 +11,7 @@ local COOLDOWN = 1
 local HEAL_COLOR = Color3.fromRGB(255, 84, 104)
 
 local Nations = require(game:GetService("ReplicatedStorage"):WaitForChild("Riftbound"):WaitForChild("Nations"))
+local StatService = require(script.Parent.StatService)
 
 local FlaskService = {}
 
@@ -74,12 +75,11 @@ function FlaskService.Drink(player)
 	d.Charges -= 1
 	publish(player)
 
-	local speed = hum.WalkSpeed
-	hum.WalkSpeed = speed * SIP_SLOW
+	StatService.SetSpeedMod(player, "Flask", SIP_SLOW)
 	task.delay(SIP_TIME, function()
 		d.Drinking = false
+		StatService.SetSpeedMod(player, "Flask", nil)
 		if hum.Parent and hum.Health > 0 then
-			hum.WalkSpeed = speed
 			hum.Health = math.min(hum.MaxHealth, hum.Health + hum.MaxHealth * (HEAL_FRACTION + Nations.FlaskBonus(player)))
 			if root.Parent then
 				healEffect(root)

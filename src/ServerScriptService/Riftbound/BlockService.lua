@@ -8,6 +8,7 @@
 -- BlockReadyAt (server time the shield can be raised again); visuals go
 -- through the SkillFx remote (Shield, Blocked).
 local Enemies = require(script.Parent.Enemies)
+local StatService = require(script.Parent.StatService)
 
 local GUARD_TIME = 3
 local COOLDOWN = 0.6
@@ -17,7 +18,7 @@ local SLOW = 0.5
 
 local BlockService = {}
 
-local states = {} -- [player] = { Raised, Since, ReadyAt, Speed, Token }
+local states = {} -- [player] = { Raised, Since, ReadyAt, Token }
 
 local function fx(payload)
 	local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Riftbound"):FindFirstChild("Remotes")
@@ -43,10 +44,8 @@ local function lower(player, broken)
 		return
 	end
 	st.Raised = false
-	local hum, root = parts(player)
-	if hum and st.Speed then
-		hum.WalkSpeed = st.Speed
-	end
+	local _, root = parts(player)
+	StatService.SetSpeedMod(player, "Block", nil)
 	local cooldown = if broken then BREAK_COOLDOWN else COOLDOWN
 	st.ReadyAt = os.clock() + cooldown
 	player:SetAttribute("Blocking", nil)
@@ -74,8 +73,7 @@ function BlockService.Set(player, on)
 	st.Raised = true
 	st.Since = os.clock()
 	st.Token += 1
-	st.Speed = hum.WalkSpeed
-	hum.WalkSpeed = st.Speed * SLOW
+	StatService.SetSpeedMod(player, "Block", SLOW)
 	player:SetAttribute("Blocking", true)
 	fx({ Type = "Shield", Target = root, Up = true, GuardTime = GUARD_TIME })
 	local token = st.Token

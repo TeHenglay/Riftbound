@@ -18,12 +18,16 @@ This document details the complete design, mechanics, and catalog for the **Rune
 
 ## 2. Drop Rarity & Wave Progression
 
+Every rune that works has the **same chance** to be offered, from wave 1 on
+(weights and wave windows in `Runes.Rarity` are all equal). Rarity only sets
+the card colour and the one-Legendary-per-skill limit.
+
 | Rarity | Visual Border / Aura | Wave Window | Drop Weight |
 | :--- | :--- | :--- | :--- |
-| **Common (⚪)** | Slate White / Gray | Waves 1+ | High (~60% in early waves) |
-| **Rare (🔵)** | Rift Blue | Waves 3+ | Moderate (~30%) |
-| **Epic (🟣)** | Deep Violet | Waves 7+ | Low (~10% from normal waves, guaranteed on mini-bosses) |
-| **Legendary (🌟)** | Prismatic Gold / Radiant | Wave 10+ / Bosses | Very Rare (~3% or guaranteed Boss clear choice) |
+| **Common (⚪)** | Slate White / Gray | Waves 1+ | Same as every rune |
+| **Rare (🔵)** | Rift Blue | Waves 1+ | Same as every rune |
+| **Epic (🟣)** | Deep Violet | Waves 1+ | Same as every rune |
+| **Legendary (🌟)** | Prismatic Gold / Radiant | Waves 1+ | Same as every rune |
 
 ---
 

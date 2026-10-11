@@ -27,6 +27,8 @@ local ProgressionService = require(script.Parent.ProgressionService)
 local InventoryService = require(script.Parent.InventoryService)
 local StoryBuilder = require(script.Parent.StoryBuilder)
 local PartyService = require(script.Parent.PartyService)
+local StatService = require(script.Parent.StatService)
+local BlockService = require(script.Parent.BlockService)
 
 -- Nation foes replace the husks when the NationFoes module is in the place:
 -- every wave mob is the nation's element golem, the nation's named grunt and
@@ -465,6 +467,17 @@ local function release(run)
 	end
 end
 
+-- A fresh start for a run: full speed (no leftover shield, flask or foe
+-- slow), not frozen from a rune pick.
+local function freshBody(player)
+	BlockService.Reset(player)
+	StatService.ClearSpeedMods(player)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.Anchored = false
+	end
+end
+
 local function join(run, player)
 	if not NationService.EnterArea(player, "Story", run.Arena.Entry) then
 		return false
@@ -473,6 +486,7 @@ local function join(run, player)
 	player:SetAttribute("StoryRun", run.Name)
 	BuildService.ResetRunes(player) -- every run starts with empty sockets
 	RunStats.Reset(player)
+	freshBody(player)
 	return true
 end
 
@@ -558,6 +572,7 @@ function StoryService.Retry(player)
 	for p in run.Players do
 		BuildService.ResetRunes(p) -- a fresh run starts with empty sockets
 		RunStats.Reset(p)
+		freshBody(p)
 		local char = p.Character
 		if char and entry then
 			char:PivotTo(entry.CFrame + Vector3.new(0, 4, 0))

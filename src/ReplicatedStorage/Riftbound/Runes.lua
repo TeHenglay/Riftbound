@@ -17,13 +17,15 @@ Runes.SlotKeys = { M1 = "LMB", Q = "Q", E = "E" }
 Runes.MaxLegendary = 1 -- per slot
 Runes.MaxCooldownCut = 0.8
 
--- MinWave is the run wave (see Runes.RunWave) from which a rarity can drop.
+-- MinWave is the run wave (see Runes.RunWave) from which a rarity can drop;
+-- Weight is how often a rune of that rarity is rolled. Every rarity has the
+-- same weight and drops from wave 1, so every working rune is equally likely.
 Runes.RarityOrder = { "Common", "Rare", "Epic", "Legendary" }
 Runes.Rarity = {
-	Common = { Name = "Common", Color = Color3.fromRGB(200, 204, 212), Weight = 60, MinWave = 1 },
-	Rare = { Name = "Rare", Color = Color3.fromRGB(70, 150, 255), Weight = 30, MinWave = 3 },
-	Epic = { Name = "Epic", Color = Color3.fromRGB(160, 80, 240), Weight = 10, MinWave = 7 },
-	Legendary = { Name = "Legendary", Color = Color3.fromRGB(255, 200, 70), Weight = 3, MinWave = 10 },
+	Common = { Name = "Common", Color = Color3.fromRGB(200, 204, 212), Weight = 1, MinWave = 1 },
+	Rare = { Name = "Rare", Color = Color3.fromRGB(70, 150, 255), Weight = 1, MinWave = 1 },
+	Epic = { Name = "Epic", Color = Color3.fromRGB(160, 80, 240), Weight = 1, MinWave = 1 },
+	Legendary = { Name = "Legendary", Color = Color3.fromRGB(255, 200, 70), Weight = 1, MinWave = 1 },
 }
 
 local function rune(rarity, name, effect, mods, ready)

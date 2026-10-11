@@ -142,6 +142,15 @@ SoundLibrary.Sounds = {
 	Fuse = { Id = 9113445305, Volume = 0.55, Pitch = 0.9, Length = 1.5, Group = "UI", Layer = { "FuseShimmer" } },
 	FuseShimmer = { Id = 107149510023542, Volume = 0.55, Group = "UI" },
 
+	-- Rune pick screen (played by the HUD) -----------------------------------
+	-- A rift whoosh and shimmer as the screen opens, a chime per card as it
+	-- flips in (a fanfare for Legendary), and a confirm when you take one.
+	RuneOffer = { Id = 107149510023542, Volume = 0.6, Pitch = 1.1, Group = "UI", Layer = { "RuneWhoosh" } },
+	RuneWhoosh = { Id = 130019457938272, Volume = 0.45, Pitch = 1.15, Group = "UI" },
+	RuneCard = { Id = 98451543907155, Volume = 0.3, Pitch = { 1.2, 1.3 }, Group = "UI", Gap = 0.05 },
+	RuneLegendary = { Id = 126004530261272, Volume = 0.4, Pitch = 1.1, Group = "UI" },
+	RunePick = { Id = 107096409622186, Volume = 0.5, Pitch = 1.1, Group = "UI" },
+
 	-- UI -------------------------------------------------------------------
 	UIClick = { Ids = { 106642438444356, 127006080624447 }, Volume = 0.5, Group = "UI", Gap = 0.03 },
 	UIHover = { Id = 135028017202421, Volume = 0.15, Group = "UI", Gap = 0.05 },
