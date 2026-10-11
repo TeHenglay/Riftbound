@@ -24,8 +24,11 @@ local gui, left, right, holder, panel
 local shown = false
 local openId
 
-local TILE = 112
-local GAP = 22
+local TILE = 80
+-- Space between buttons. Each outline reaches 4px out (12px at the bottom,
+-- with its drop shadow), so this leaves a clear ~8px gap between them.
+local GAP = 16
+local STORE_H = 54 -- height of the wide Store bar
 local EDGE = 16
 
 local BUTTONS = {
@@ -569,8 +572,8 @@ end
 
 local function keyBadge(parent, key)
 	local plate = new("Frame", {
-		Position = UDim2.fromOffset(-8, -8),
-		Size = UDim2.fromOffset(26, 26),
+		Position = UDim2.fromOffset(-6, -6),
+		Size = UDim2.fromOffset(20, 20),
 		BackgroundColor3 = OUTLINE,
 		ZIndex = 6,
 		Parent = parent,
@@ -579,7 +582,7 @@ local function keyBadge(parent, key)
 		Size = UDim2.fromScale(1, 1),
 		Text = key,
 		FontFace = F.TitleBold,
-		TextSize = 16,
+		TextSize = 13,
 		TextColor3 = Color3.new(1, 1, 1),
 		ZIndex = 7,
 		Parent = plate,
@@ -592,15 +595,15 @@ end
 local function framed(button, tint)
 	new("Frame", {
 		Name = "Outline",
-		Position = UDim2.fromOffset(-6, -6),
-		Size = UDim2.new(1, 12, 1, 17),
+		Position = UDim2.fromOffset(-4, -4),
+		Size = UDim2.new(1, 8, 1, 12),
 		BackgroundColor3 = OUTLINE,
 		ZIndex = 1,
 		Parent = button,
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 14) }) })
 	local rim = new("UIStroke", {
 		Color = tint,
-		Thickness = 3,
+		Thickness = 2.5,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	})
 	new("Frame", {
@@ -660,17 +663,17 @@ local function tile(parent, id, x, y)
 	icon(id, {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 2),
-		Size = UDim2.fromOffset(78, 78),
+		Size = UDim2.fromOffset(54, 54),
 		ZIndex = 4,
 		Parent = button,
 	})
 	outlined({
 		Name = "Label",
-		Position = UDim2.new(0, 0, 1, -30),
-		Size = UDim2.new(1, 0, 0, 24),
+		Position = UDim2.new(0, 0, 1, -22),
+		Size = UDim2.new(1, 0, 0, 18),
 		Text = info.Title,
 		FontFace = F.TitleBold,
-		TextSize = 21,
+		TextSize = 15,
 		TextColor3 = Color3.new(1, 1, 1),
 		ZIndex = 5,
 		Parent = button,
@@ -691,7 +694,7 @@ local function storeBar(parent)
 	local width = TILE * 2 + GAP
 	local button = new("TextButton", {
 		Name = "Store",
-		Size = UDim2.fromOffset(width, 76),
+		Size = UDim2.fromOffset(width, STORE_H),
 		BackgroundTransparency = 1,
 		Text = "",
 		AutoButtonColor = false,
@@ -701,17 +704,17 @@ local function storeBar(parent)
 	local rim = framed(button, info.Tint)
 	icon("Store", {
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 4, 0.5, -2),
-		Size = UDim2.fromOffset(76, 76),
+		Position = UDim2.new(0, 4, 0.5, -1),
+		Size = UDim2.fromOffset(52, 52),
 		ZIndex = 4,
 		Parent = button,
 	})
 	outlined({
-		Position = UDim2.fromOffset(86, 0),
-		Size = UDim2.new(1, -96, 1, 0),
+		Position = UDim2.fromOffset(62, 0),
+		Size = UDim2.new(1, -70, 1, 0),
 		Text = info.Title,
 		FontFace = F.TitleBold,
-		TextSize = 32,
+		TextSize = 22,
 		TextColor3 = Color3.new(1, 1, 1),
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 5,
@@ -724,7 +727,7 @@ local function storeBar(parent)
 end
 
 local LEFT_W = TILE * 2 + GAP
-local LEFT_H = 76 + GAP + TILE * 2 + GAP
+local LEFT_H = STORE_H + GAP + TILE * 2 + GAP
 local RIGHT_H = TILE * 2 + GAP
 local LEFT_IN, LEFT_OUT = UDim2.new(0, EDGE, 0.56, 0), UDim2.new(0, -LEFT_W - 40, 0.56, 0)
 local RIGHT_IN, RIGHT_OUT = UDim2.new(1, -EDGE, 0.56, 0), UDim2.new(1, TILE + 40, 0.56, 0)
@@ -740,7 +743,7 @@ local function buildColumns()
 		Parent = holder,
 	})
 	storeBar(left)
-	local top = 76 + GAP
+	local top = STORE_H + GAP
 	tile(left, "Items", 0, top)
 	tile(left, "Quests", TILE + GAP, top)
 	tile(left, "Areas", 0, top + TILE + GAP)
@@ -766,6 +769,12 @@ local function setShown(on)
 	end
 	shown = on
 	HUD.SetLobby(on)
+	-- In the lobby the gold bar sits above the Store button and slides with it.
+	if on then
+		HUD.DockGold(left, UDim2.fromOffset(0, -(HUD.GoldHeight + GAP)), LEFT_W)
+	else
+		HUD.DockGold(nil)
+	end
 	if on then
 		left.Visible = true
 		right.Visible = true

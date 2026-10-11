@@ -31,6 +31,19 @@ for _, prompt in arena:GetDescendants() do
 			end)
 		end
 		if prompt:GetAttribute("Forge") then
+			prompt.ActionText = "Equip & Test Skills"
+			prompt.ObjectText = "The Forge"
+			local forgeModel = prompt:FindFirstAncestor("Forge")
+			if forgeModel then
+				local core = forgeModel:FindFirstChild("Core")
+				local bb = core and core:FindFirstChildOfClass("BillboardGui")
+				if bb then
+					local sub = bb:FindFirstChild("Subtitle")
+					if sub and sub:IsA("TextLabel") then
+						sub.Text = "Equip & Test Skills"
+					end
+				end
+			end
 			prompt.Triggered:Connect(function(player)
 				OpenForge:FireClient(player)
 			end)
@@ -49,12 +62,7 @@ local function spawnAt(marker)
 		Regen = training,
 		Damage = 6,
 		Xp = if training then nil else 15,
-		Gold = if training then nil else { 4, 8 },
-		Loot = if training then nil else {
-			{ Id = "RiftShard", Chance = 0.6, Min = 1, Max = 2 },
-			{ Id = "HuskIchor", Chance = 0.25 },
-			{ Id = "EmberCore", Chance = 0.06 },
-		},
+		Gold = if training then nil else { 30, 50 },
 		Color = if training then Color3.fromRGB(95, 80, 70) else Color3.fromRGB(60, 40, 90),
 	})
 	model:FindFirstChildOfClass("Humanoid").Died:Connect(function()
@@ -77,6 +85,8 @@ if RunService:IsStudio() then
 	debugHook.OnInvoke = function(action, ...)
 		if action == "Grant" then
 			return BuildService.Grant(...)
+		elseif action == "GrantRune" then
+			return BuildService.GrantRune(...)
 		elseif action == "Merge" then
 			return BuildService.Merge(...)
 		elseif action == "Snapshot" then

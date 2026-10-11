@@ -99,6 +99,27 @@ for _, counter in workspace.NationLobbies:GetDescendants() do
 		end
 	end
 end
+
+-- Crafting & Awakening stations in the Crossroads.
+local mainRemotes = Shared:WaitForChild("Remotes")
+local OpenForge = mainRemotes:WaitForChild("OpenForge")
+local OpenAwakening = mainRemotes:WaitForChild("OpenAwakening")
+
+for _, station in workspace.NationLobbies:GetDescendants() do
+	if station:IsA("BasePart") and station:GetAttribute("Interaction") then
+		local prompt = station:FindFirstChildOfClass("ProximityPrompt")
+		if prompt then
+			prompt.Triggered:Connect(function(player)
+				local kind = station:GetAttribute("Interaction")
+				if kind == "Forge" then
+					OpenForge:FireClient(player)
+				elseif kind == "Awaken" then
+					OpenAwakening:FireClient(player)
+				end
+			end)
+		end
+	end
+end
 MarketBuy.OnServerInvoke = function(player, offerId)
 	return MarketService.Buy(player, offerId)
 end

@@ -6,10 +6,12 @@ This document details the complete design, mechanics, and catalog for the **Rune
 
 ## 1. System Overview
 
-### Core Concept
-* **3 Rune Slots per Skill**: Every equipped skill (Rift Bolt / LMB, Skill Q, Skill E) features 3 socket slots for modifiers.
-* **Wave Clear Reward**: Clearing each enemy wave in the Rift drops **1 Rune** (or offers a choice of runes).
-* **Skill Customization**: Runes socket directly into a skill, modifying its damage, behavior, shape, elemental interactions, or cooldown flow.
+### Core Concept: Temporary In-Run Modifiers (The *Hades* Model)
+* **Temporary In-Run Drops**: Runes are **mid-run powerups** earned exclusively by clearing enemy waves inside a match. They do **NOT save** to the player's permanent lobby inventory.
+* **Match Reset**: At the start of every match, all 3 sockets on your equipped skills (LMB, Q, E, Anime skills) start **completely empty**. When the match ends (victory, defeat, or exit), all socketed runes are cleared/reset for the next run.
+* **3 Sockets Per Skill**: Every equipped combat skill features 3 socket slots. Dash has 0 sockets (pure mobility).
+* **Wave Clear Reward**: Clearing each enemy wave in the Rift drops **1 Rune** (or a 3-choice pick).
+* **Dynamic Build Crafting**: Players adaptively socket runes during the run to create wildly different, synergistic builds each match.
 * **Stacking**: Players can stack duplicate runes across multiple slots unless marked unique (e.g. stacking two `+1 Projectile` runes yields `+2 Projectiles`).
 
 ---
@@ -99,7 +101,8 @@ This document details the complete design, mechanics, and catalog for the **Rune
 
 ## 4. Socketing Rules & Limitations
 
-1. **Slots per Skill**: Each skill has exactly **3 sockets**.
+1. **Slots per Skill**: Each skill has exactly **3 sockets**. Dash has 0 sockets.
 2. **Legendary Limit**: A maximum of **1 Legendary Rune** may be equipped per skill (1 Legendary + 2 Normal/Rare/Epic Runes) to preserve balance.
 3. **Additive Stacking**: Common and Rare stat runes stack additively (e.g. two *Rune of Expansion* socketed = `+30% Area`).
 4. **Hot-Swapping**: Runes can be unsocketed or swapped between skills in the Backpack (`B`) or during post-wave reward menus.
+5. **Temporary Lifecycle (No Carryover)**: Runes exist strictly within the active match. Once the run ends (victory, defeat, or leaving), all runes are wiped, guaranteeing that every single run is a fresh, new rogue-lite build experience!

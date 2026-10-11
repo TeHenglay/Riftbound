@@ -181,9 +181,9 @@ forgeLight.Color = Color3.fromRGB(170, 120, 255)
 forgeLight.Range = 20
 forgeLight.Brightness = 3
 forgeLight.Parent = core
-billboard(core, "THE FORGE", "Fuse two elements", Color3.fromRGB(190, 150, 255))
+billboard(core, "THE FORGE", "Equip & Test Skills", Color3.fromRGB(190, 150, 255))
 local forgePrompt = Instance.new("ProximityPrompt")
-forgePrompt.ActionText = "Open Forge"
+forgePrompt.ActionText = "Equip & Test Skills"
 forgePrompt.ObjectText = "The Forge"
 forgePrompt.KeyboardKeyCode = Enum.KeyCode.F
 forgePrompt.HoldDuration = 0

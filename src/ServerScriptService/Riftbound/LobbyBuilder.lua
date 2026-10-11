@@ -300,10 +300,10 @@ local function buildBoard(lobby, def, c)
 		c2.Parent = t
 		return t
 	end
-	local serif = Font.new(Font.fromEnum(Enum.Font.Bodoni).Family, Enum.FontWeight.Bold)
-	local label2 = Font.new(Font.fromEnum(Enum.Font.Oswald).Family, Enum.FontWeight.Bold)
-	local italic = Font.new(Font.fromEnum(Enum.Font.Garamond).Family, Enum.FontWeight.Regular, Enum.FontStyle.Italic)
-	local body = Font.new(Font.fromEnum(Enum.Font.Merriweather).Family)
+	local serif = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Bold)
+	local label2 = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Bold)
+	local italic = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Medium)
+	local body = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family)
 	local element = if def.Id == "Wind" then "WIND" else def.Element:upper()
 	label(0.07, 0.1, (element:gsub("(.)", "%1 ")) .. " N A T I O N", label2, def.Color, 40)
 	label(0.18, 0.2, def.Name, serif, GOLD, 90)
@@ -397,7 +397,7 @@ local function buildPortal(lobby, def, c, opts)
 	title.BackgroundTransparency = 1
 	title.Size = UDim2.new(1, 0, 0, 34)
 	title.Text = opts.Title or "T H E   R I F T"
-	title.FontFace = Font.new(Font.fromEnum(Enum.Font.Bodoni).Family, Enum.FontWeight.Bold)
+	title.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Bold)
 	title.TextSize = 30
 	title.TextColor3 = glow:Lerp(Color3.new(1, 1, 1), 0.5)
 	title.TextStrokeTransparency = 0.3
@@ -406,7 +406,7 @@ local function buildPortal(lobby, def, c, opts)
 	sub.Position = UDim2.fromOffset(0, 34)
 	sub.Size = UDim2.new(1, 0, 0, 20)
 	sub.Text = opts.Subtitle or "walk through to begin your run"
-	sub.FontFace = Font.new(Font.fromEnum(Enum.Font.Garamond).Family, Enum.FontWeight.Regular, Enum.FontStyle.Italic)
+	sub.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Medium)
 	sub.TextSize = 18
 	sub.TextColor3 = PARCHMENT
 	sub.Parent = tag
@@ -839,7 +839,7 @@ local function billboard(parent, title, subtitle, color, height)
 	t.BackgroundTransparency = 1
 	t.Size = UDim2.new(1, 0, 0, 32)
 	t.Text = title
-	t.FontFace = Font.new(Font.fromEnum(Enum.Font.Bodoni).Family, Enum.FontWeight.Bold)
+	t.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Bold)
 	t.TextSize = 28
 	t.TextColor3 = color
 	t.TextStrokeTransparency = 0.3
@@ -848,7 +848,7 @@ local function billboard(parent, title, subtitle, color, height)
 	s.Position = UDim2.fromOffset(0, 32)
 	s.Size = UDim2.new(1, 0, 0, 20)
 	s.Text = subtitle
-	s.FontFace = Font.new(Font.fromEnum(Enum.Font.Garamond).Family, Enum.FontWeight.Regular, Enum.FontStyle.Italic)
+	s.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Medium)
 	s.TextSize = 18
 	s.TextColor3 = PARCHMENT
 	s.Parent = tag
@@ -892,6 +892,112 @@ local function buildStall(hub, c, offset, market, title, subtitle, cloth)
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = counter
 	billboard(counter, title, subtitle, GOLD, 12)
+end
+
+-- The Forge: Craftsman workshop where players combine and fuse elemental skills.
+local function buildForge(hub, c, offset)
+	local at = c + offset
+	local base = CFrame.lookAt(at, Vector3.new(c.X, at.Y, c.Z))
+	local forge = Instance.new("Model")
+	forge.Name = "TheForge"
+	forge.Parent = hub
+
+	-- Hearth Stone Arch & Fire Core
+	part({ Name = "HearthBase", Size = Vector3.new(16, 2, 10), CFrame = base * CFrame.new(0, 1, 3), Material = Enum.Material.Basalt, Color = Color3.fromRGB(35, 30, 36), Parent = forge })
+	part({ Name = "HearthBack", Size = Vector3.new(14, 12, 3), CFrame = base * CFrame.new(0, 6, 6.5), Material = Enum.Material.Slate, Color = Color3.fromRGB(50, 44, 48), Parent = forge })
+	part({ Name = "HearthChimney", Size = Vector3.new(6, 10, 5), CFrame = base * CFrame.new(0, 15, 6), Material = Enum.Material.Basalt, Color = Color3.fromRGB(38, 34, 40), Parent = forge })
+	for _, x in { -6, 6 } do
+		part({ Name = "HearthPillar", Size = Vector3.new(2.4, 12, 4), CFrame = base * CFrame.new(x, 6, 4.5), Material = Enum.Material.Basalt, Color = Color3.fromRGB(42, 36, 44), Parent = forge })
+	end
+	part({ Name = "HearthRoof", Size = Vector3.new(16, 2, 8), CFrame = base * CFrame.new(0, 12.5, 4), Material = Enum.Material.Slate, Color = Color3.fromRGB(60, 52, 56), Parent = forge })
+
+	-- Molten Crucible & Lava Glow
+	local pit = part({ Name = "MoltenCore", Size = Vector3.new(8, 1.2, 5), CFrame = base * CFrame.new(0, 2, 3.5), Material = Enum.Material.Neon, Color = Color3.fromRGB(255, 110, 25), CanCollide = false, Parent = forge })
+	light(pit, Color3.fromRGB(255, 120, 40), 28, 2.5, true)
+	emitter(pit, UIAssets.Fx.Flame, Color3.fromRGB(255, 160, 50), { Rate = 14, Speed = NumberRange.new(2, 5), Lifetime = NumberRange.new(1, 2) })
+	emitter(pit, UIAssets.Fx.Smoke, Color3.fromRGB(60, 50, 55), { Rate = 6, Speed = NumberRange.new(3, 6), Lifetime = NumberRange.new(2, 3) })
+
+	-- Heavy Iron Anvil
+	part({ Name = "AnvilStump", Shape = Enum.PartType.Cylinder, Size = Vector3.new(3.2, 5, 5), CFrame = base * CFrame.new(-3, 1.6, -3) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(70, 50, 36), Parent = forge })
+	part({ Name = "AnvilBase", Size = Vector3.new(4, 1.2, 2.6), CFrame = base * CFrame.new(-3, 3.8, -3), Material = Enum.Material.Metal, Color = Color3.fromRGB(30, 30, 34), Parent = forge })
+	part({ Name = "AnvilTop", Size = Vector3.new(5.6, 1.4, 2.2), CFrame = base * CFrame.new(-3, 4.8, -3), Material = Enum.Material.Metal, Color = Color3.fromRGB(55, 55, 62), Parent = forge })
+	part({ Name = "AnvilHorn", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 1.8, 1.8), CFrame = base * CFrame.new(-6.2, 4.8, -3) * CFrame.Angles(0, math.rad(90), 0), Material = Enum.Material.Metal, Color = Color3.fromRGB(55, 55, 62), Parent = forge })
+
+	-- Quench Trough with Water
+	part({ Name = "WaterTrough", Size = Vector3.new(7, 3, 3.6), CFrame = base * CFrame.new(5, 1.5, -3), Material = Enum.Material.WoodPlanks, Color = Color3.fromRGB(80, 56, 40), Parent = forge })
+	part({ Name = "TroughWater", Size = Vector3.new(6.2, 0.4, 2.8), CFrame = base * CFrame.new(5, 2.7, -3), Material = Enum.Material.Glass, Color = Color3.fromRGB(70, 160, 220), Transparency = 0.3, CanCollide = false, Parent = forge })
+
+	-- Blacksmith Master NPC
+	part({ Name = "SmithBody", Shape = Enum.PartType.Cylinder, Size = Vector3.new(5.4, 3.2, 3.2), CFrame = base * CFrame.new(0, 2.7, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(90, 50, 35), Parent = forge })
+	part({ Name = "SmithApron", Size = Vector3.new(2.8, 4.2, 0.4), CFrame = base * CFrame.new(0, 2.6, -1.5), Material = Enum.Material.Fabric, Color = Color3.fromRGB(55, 40, 32), Parent = forge })
+	part({ Name = "SmithHead", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.9, CFrame = base * CFrame.new(0, 6.2, 0), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(214, 165, 125), Parent = forge })
+
+	-- Tool Racks & Crates
+	prop(forge, "MarketCrates", base * CFrame.new(-9, 0, 1) * CFrame.Angles(0, math.rad(15), 0), 4.5)
+	prop(forge, "MarketCrates", base * CFrame.new(9, 0, 1) * CFrame.Angles(0, math.rad(-25), 0), 4)
+
+	-- Interactive Forge Prompt
+	local promptPart = part({ Name = "ForgePrompt", Size = Vector3.new(14, 6, 6), CFrame = base * CFrame.new(0, 3, -4), Transparency = 1, CanCollide = false, Parent = forge })
+	promptPart:SetAttribute("Interaction", "Forge")
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Craft Skills"
+	prompt.ObjectText = "The Forge"
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 15
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = promptPart
+	billboard(promptPart, "THE FORGE", "craft & fuse elemental skills", Color3.fromRGB(255, 165, 60), 13)
+end
+
+-- The Awakening Altar: Ancient sacred circle where players awaken and ascend base skills.
+local function buildAltar(hub, c, offset)
+	local at = c + offset
+	local base = CFrame.lookAt(at, Vector3.new(c.X, at.Y, c.Z))
+	local altar = Instance.new("Model")
+	altar.Name = "AwakeningAltar"
+	altar.Parent = hub
+
+	-- Raised Runic Dais
+	part({ Name = "AltarDaisOuter", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.4, 20, 20), CFrame = base * CFrame.new(0, 0.7, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Basalt, Color = OBSIDIAN, Parent = altar })
+	part({ Name = "AltarDaisRing", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 17, 17), CFrame = base * CFrame.new(0, 1.2, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Neon, Color = Color3.fromRGB(70, 210, 255), CanCollide = false, Parent = altar })
+	part({ Name = "AltarDaisInner", Shape = Enum.PartType.Cylinder, Size = Vector3.new(1.8, 14, 14), CFrame = base * CFrame.new(0, 1.4, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Marble, Color = Color3.fromRGB(220, 226, 235), Parent = altar })
+	part({ Name = "AltarPillar", Shape = Enum.PartType.Cylinder, Size = Vector3.new(4, 5, 5), CFrame = base * CFrame.new(0, 3.2, 0) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Basalt, Color = OBSIDIAN, Parent = altar })
+
+	-- Floating Radiant Core
+	local core = part({ Name = "AwakeningCore", Size = Vector3.new(3, 5, 3), CFrame = base * CFrame.new(0, 8.5, 0) * CFrame.Angles(0, math.rad(45), math.rad(15)), Material = Enum.Material.Neon, Color = Color3.fromRGB(120, 230, 255), CanCollide = false, Parent = altar })
+	core:SetAttribute("Spin", 20)
+	light(core, Color3.fromRGB(100, 220, 255), 32, 2.8)
+	emitter(core, UIAssets.Fx.Swirl, Color3.fromRGB(160, 245, 255), { Rate = 8, Speed = NumberRange.new(0.5, 2), Lifetime = NumberRange.new(2, 3), Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 4), NumberSequenceKeypoint.new(1, 10) }) })
+	emitter(core, UIAssets.Fx.Spark, Color3.fromRGB(80, 210, 255), { Rate = 14, Speed = NumberRange.new(2, 5), SpreadAngle = Vector2.new(180, 180) })
+
+	-- 3 Floating Orbiting Monolith Runestones
+	for k = 0, 2 do
+		local a = k / 3 * math.pi * 2
+		local stonePos = base * CFrame.new(math.cos(a) * 7.5, 7 + (k % 2) * 1.5, math.sin(a) * 7.5) * CFrame.Angles(math.rad(10), a, math.rad(15))
+		local runeStone = part({ Name = "OrbitRuneStone", Size = Vector3.new(1.4, 4.6, 1.4), CFrame = stonePos, Material = Enum.Material.Basalt, Color = OBSIDIAN, CanCollide = false, Parent = altar })
+		runeStone:SetAttribute("Spin", 15 + k * 8)
+		local runeGlow = part({ Name = "RuneGlyphGlow", Size = Vector3.new(1.45, 1.8, 1.45), CFrame = stonePos, Material = Enum.Material.Neon, Color = Color3.fromRGB(110, 225, 255), CanCollide = false, Parent = altar })
+		light(runeGlow, Color3.fromRGB(90, 220, 255), 14, 1.2)
+	end
+
+	-- Master Shaper / Ancient Sage NPC
+	part({ Name = "SageBody", Shape = Enum.PartType.Cylinder, Size = Vector3.new(5.2, 2.6, 2.6), CFrame = base * CFrame.new(0, 2.6, -5) * CFrame.Angles(0, 0, math.rad(90)), Material = Enum.Material.Fabric, Color = Color3.fromRGB(45, 36, 68), Parent = altar })
+	part({ Name = "SageMantle", Size = Vector3.new(3.4, 3.8, 0.4), CFrame = base * CFrame.new(0, 2.8, -4.2), Material = Enum.Material.Fabric, Color = GOLD, Parent = altar })
+	part({ Name = "SageHead", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.9, CFrame = base * CFrame.new(0, 6, -5), Material = Enum.Material.SmoothPlastic, Color = Color3.fromRGB(220, 180, 140), Parent = altar })
+
+	-- Interactive Awakening Prompt
+	local promptPart = part({ Name = "AwakenPrompt", Size = Vector3.new(12, 6, 6), CFrame = base * CFrame.new(0, 3, -6.5), Transparency = 1, CanCollide = false, Parent = altar })
+	promptPart:SetAttribute("Interaction", "Awaken")
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Awaken Skill"
+	prompt.ObjectText = "Awakening Altar"
+	prompt.KeyboardKeyCode = Enum.KeyCode.F
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 15
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = promptPart
+	billboard(promptPart, "AWAKENING ALTAR", "awaken & ascend base skills", Color3.fromRGB(110, 225, 255), 13)
 end
 
 function LobbyBuilder.BuildHub()
@@ -941,7 +1047,7 @@ function LobbyBuilder.BuildHub()
 		img.Position = UDim2.fromScale(0.5, 0.08)
 		img.Size = UDim2.fromScale(0.8, 0.46)
 		img.ScaleType = Enum.ScaleType.Fit
-		img.Image = ({ Fire = UIAssets.Icons.Fireball, Earth = UIAssets.Icons.StoneSpike, Water = UIAssets.Icons.TidalWave, Wind = UIAssets.Icons.Gust, Lightning = UIAssets.Icons.ChainShock })[id]
+		img.Image = UIAssets.Nations[id]
 		img.Parent = gui
 		local name = Instance.new("TextLabel")
 		name.BackgroundTransparency = 1
@@ -950,7 +1056,7 @@ function LobbyBuilder.BuildHub()
 		name.Text = def.Name
 		name.TextScaled = true
 		name.TextWrapped = true
-		name.FontFace = Font.new(Font.fromEnum(Enum.Font.Bodoni).Family, Enum.FontWeight.Bold)
+		name.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Bold)
 		name.TextColor3 = GOLD
 		name.Parent = gui
 		local flame = part({ Name = "BannerFlame", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.4, CFrame = face * CFrame.new(0, 22.6, 0), Material = Enum.Material.Neon, Color = def.Color, CanCollide = false, Parent = hub })
@@ -972,14 +1078,19 @@ function LobbyBuilder.BuildHub()
 	buildStall(hub, c, Vector3.new(66, 0, -26), "Shop", "The Rift Shop", "flasks, tomes and materials", Color3.fromRGB(120, 60, 160))
 	buildStall(hub, c, Vector3.new(66, 0, 26), "Merchant", "Goods Merchant", "sells gold for your loot", Color3.fromRGB(160, 110, 40))
 
-	-- Paved paths from the plaza to each gate, the stalls and the arrival pad.
+	-- The Forge and Awakening Altar on the west side.
+	buildForge(hub, c, Vector3.new(-66, 0, -26))
+	buildAltar(hub, c, Vector3.new(-66, 0, 26))
+
+	-- Paved paths from the plaza to each gate, the stalls, the craft stations and the arrival pad.
 	local pathColor = Color3.fromRGB(96, 88, 84)
-	for _, target in { Vector3.new(0, 0, -76), Vector3.new(56, 0, 0), Vector3.new(0, 0, 68) } do
+	for _, target in { Vector3.new(0, 0, -76), Vector3.new(56, 0, 0), Vector3.new(-56, 0, 0), Vector3.new(0, 0, 68) } do
 		local from = c + target.Unit * 33
 		local to = c + target
 		part({ Name = "Path", Size = Vector3.new(12, 0.3, (to - from).Magnitude), CFrame = CFrame.lookAt((from + to) / 2, to) + Vector3.new(0, 0.15, 0), Material = Enum.Material.Slate, Color = pathColor, Parent = hub })
 	end
 	part({ Name = "MarketSquare", Size = Vector3.new(26, 0.3, 82), CFrame = CFrame.new(c + Vector3.new(62, 0.16, 0)), Material = Enum.Material.Slate, Color = pathColor, Parent = hub })
+	part({ Name = "CraftSquare", Size = Vector3.new(26, 0.3, 82), CFrame = CFrame.new(c + Vector3.new(-62, 0.16, 0)), Material = Enum.Material.Slate, Color = pathColor, Parent = hub })
 	-- Benches and planters between the paths.
 	for k = 0, 7 do
 		local a = math.rad(22.5 + k * 45)
@@ -1010,7 +1121,7 @@ function LobbyBuilder.BuildHub()
 			prop(hub, "EarthTree", CFrame.new(c + Vector3.new(math.cos(ta) * 94, 0, math.sin(ta) * 94)) * CFrame.Angles(0, rng:NextNumber(0, 6.28), 0), rng:NextNumber(20, 26))
 		end
 	end
-	for _, gate in { Vector3.new(0, 0, -84), Vector3.new(66, 0, -26), Vector3.new(66, 0, 26) } do
+	for _, gate in { Vector3.new(0, 0, -84), Vector3.new(66, 0, -26), Vector3.new(66, 0, 26), Vector3.new(-66, 0, -26), Vector3.new(-66, 0, 26) } do
 		for _, child in hub:GetChildren() do
 			if child.Name == "EarthTree" and ((child:GetPivot().Position - (c + gate)) * Vector3.new(1, 0, 1)).Magnitude < 22 then
 				child:Destroy()
@@ -1072,7 +1183,7 @@ function LobbyBuilder.BuildAll(rebuild)
 		end
 	end
 	local hub = folder:FindFirstChild("Crossroads")
-	if hub and rebuild then
+	if hub and (rebuild or not hub:FindFirstChild("TheForge")) then
 		hub:Destroy()
 		hub = nil
 	end

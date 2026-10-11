@@ -10,6 +10,7 @@ local InventoryService = require(script.Parent.InventoryService)
 local StatService = require(script.Parent.StatService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local SkillEffects = require(script.Parent.SkillEffects)
+local CraftingService = require(script.Parent.CraftingService)
 
 local remotes = Shared:FindFirstChild("Remotes") or Instance.new("Folder")
 remotes.Name = "Remotes"
@@ -24,16 +25,22 @@ end
 local Cast = remote("RemoteEvent", "Cast")
 local Equip = remote("RemoteEvent", "Equip")
 local MergeSkills = remote("RemoteFunction", "Merge")
+local CraftSkill = remote("RemoteFunction", "CraftSkill")
+local AwakenSkill = remote("RemoteFunction", "AwakenSkill")
 local GetBuild = remote("RemoteFunction", "GetBuild")
 local BuildChanged = remote("RemoteEvent", "BuildChanged")
 local Notify = remote("RemoteEvent", "Notify")
-remote("RemoteEvent", "OpenForge")
-remote("RemoteEvent", "SkillFx")
+local OpenForge = remote("RemoteEvent", "OpenForge")
+local OpenAwakening = remote("RemoteEvent", "OpenAwakening")
+local SkillFx = remote("RemoteEvent", "SkillFx")
 local UseFlask = remote("RemoteEvent", "UseFlask")
 local Block = remote("RemoteEvent", "Block")
 local GetInventory = remote("RemoteFunction", "GetInventory")
 local InventoryChanged = remote("RemoteEvent", "InventoryChanged")
 local SpendStat = remote("RemoteFunction", "SpendStat")
+local RuneAction = remote("RemoteFunction", "Rune")
+remote("RemoteEvent", "CooldownReset")
+local TestEquipSkill = remote("RemoteFunction", "TestEquipSkill")
 remotes.Parent = Shared
 
 BuildService.OnChanged = function(player)
@@ -97,8 +104,48 @@ Equip.OnServerEvent:Connect(function(player, slot, id)
 	end
 end)
 
+TestEquipSkill.OnServerInvoke = function(player, slot, id)
+	if typeof(slot) ~= "string" or typeof(id) ~= "string" then
+		return false, "Invalid request"
+	end
+	if slot ~= "Q" and slot ~= "E" then
+		return false, "Slot must be Q or E"
+	end
+	local Skills = require(Shared:WaitForChild("Skills"))
+	if not Skills.Defs[id] then
+		return false, "Unknown skill"
+	end
+	local b = BuildService.Snapshot(player)
+	if not b or not b.Skills[id] then
+		BuildService.Grant(player, id)
+	end
+	BuildService.Equip(player, slot, id)
+	return true, id
+end
+
+-- ("Choose", offerIndex, slot or nil), ("Socket", pouchIndex, slot) or
+-- ("Unsocket", skillId, socketIndex).
+RuneAction.OnServerInvoke = function(player, action, a, b)
+	if action == "Choose" and typeof(a) == "number" and (b == nil or typeof(b) == "string") then
+		return BuildService.ChooseRune(player, a, b)
+	elseif action == "Socket" and typeof(a) == "number" and typeof(b) == "string" then
+		return BuildService.Socket(player, a, b)
+	elseif action == "Unsocket" and typeof(a) == "string" and typeof(b) == "number" then
+		return BuildService.Unsocket(player, a, b)
+	end
+	return false, "Invalid request"
+end
+
 MergeSkills.OnServerInvoke = function(player, idA, idB)
 	return BuildService.Merge(player, idA, idB)
+end
+
+CraftSkill.OnServerInvoke = function(player, recipeId)
+	return CraftingService.Craft(player, recipeId)
+end
+
+AwakenSkill.OnServerInvoke = function(player, baseSkillId)
+	return CraftingService.Awaken(player, baseSkillId)
 end
 
 Cast.OnServerEvent:Connect(function(player, slot, target)
@@ -108,9 +155,9 @@ Cast.OnServerEvent:Connect(function(player, slot, target)
 	if target.X ~= target.X or target.Y ~= target.Y or target.Z ~= target.Z then
 		return -- NaN
 	end
-	local id, level = BuildService.TryCast(player, slot)
+	local id, level, mods = BuildService.TryCast(player, slot)
 	if id then
-		SkillEffects.Cast(player, id, level, target)
+		SkillEffects.Cast(player, id, level, target, mods)
 	end
 end)
 

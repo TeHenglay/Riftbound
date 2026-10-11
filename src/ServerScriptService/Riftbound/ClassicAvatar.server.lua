@@ -3,12 +3,14 @@
 -- clothing is taken off, while the player's own head (dynamic heads included),
 -- classic shirt and pants, face, hats and skin colours stay. Works with any
 -- spawn path (NationService loads characters itself), since it runs on
--- CharacterAdded.
+-- CharacterAdded. Every avatar is also drawn at AVATAR_SCALE (90%).
 local Players = game:GetService("Players")
 
 local BODY_PARTS = { "Torso", "LeftArm", "RightArm", "LeftLeg", "RightLeg" }
--- Widest a head may be, in studs (the classic torso is 2 wide).
-local MAX_HEAD_WIDTH = 1.7
+-- Characters are drawn 10% smaller than the standard Roblox body.
+local AVATAR_SCALE = 0.9
+-- Widest a head may be, in studs (the classic torso is 2 wide before scaling).
+local MAX_HEAD_WIDTH = 1.7 * AVATAR_SCALE
 
 local function classic(description)
 	for _, part in BODY_PARTS do
@@ -16,9 +18,10 @@ local function classic(description)
 	end
 	description.BodyTypeScale = 0
 	description.ProportionScale = 0
-	description.HeightScale = 1
-	description.WidthScale = 1
-	description.DepthScale = 1
+	description.HeightScale = AVATAR_SCALE
+	description.WidthScale = AVATAR_SCALE
+	description.DepthScale = AVATAR_SCALE
+	description.HeadScale *= AVATAR_SCALE
 	-- Classic 2D clothing only: drop layered (3D) clothing, keep rigid accessories.
 	local kept = {}
 	for _, accessory in description:GetAccessories(true) do

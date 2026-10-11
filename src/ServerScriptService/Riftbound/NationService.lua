@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Nations = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Nations"))
+local BuildService = require(script.Parent.BuildService)
 
 local STORE_NAME = "RiftboundNation_v1"
 local RIFT_SPAWN_NAME = "SpawnLocation" -- gameplay spawn in workspace
@@ -86,6 +87,7 @@ local function load(player)
 	end
 	if id and Nations.Defs[id] then
 		player:SetAttribute("Nation", id)
+		BuildService.GrantHomeSkill(player, id)
 	else
 		player:SetAttribute("NeedsNation", true)
 	end
@@ -144,6 +146,7 @@ function NationService.Choose(player, id)
 	player:SetAttribute("Nation", id)
 	local def = Nations.Defs[id]
 	NationService.OnNotify(player, `Sworn to the {def.Name}`, def.Color)
+	BuildService.GrantHomeSkill(player, id)
 	task.delay(0.6, spawnCharacter, player)
 	return true
 end

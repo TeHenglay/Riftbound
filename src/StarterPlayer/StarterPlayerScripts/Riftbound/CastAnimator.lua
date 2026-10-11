@@ -122,7 +122,7 @@ local MOVES = {
 	},
 }
 
-local KIND_MOVE = { Projectile = "Throw", Line = "Push", Cone = "Breath", Nova = "Burst", Strike = "Slam", Zone = "Summon", Chain = "Point", Tornado = "Summon", Magnet = "Yank", Roller = "Heave", Meteor = "CallDown", Leap = "Leap" }
+local KIND_MOVE = { Projectile = "Throw", Line = "Push", Cone = "Breath", Nova = "Burst", Strike = "Slam", Zone = "Summon", Chain = "Point", Serpent = "Push", Tornado = "Summon", Magnet = "Yank", Roller = "Heave", Meteor = "CallDown", Leap = "Leap" }
 -- Skills with their own move instead of their kind's.
 local SKILL_MOVE = { PlasmaLance = "Javelin" }
 

@@ -24,6 +24,7 @@ local spin, ticker
 
 local RAID_LEVEL = 25
 local CARD_W, CARD_H, CARD_GAP = 440, 214, 22
+local MODES_SCALE = 1.25 -- how much larger the mode cards draw
 
 -- Card order is the grid order: Story, Raid / Training, Daily Challenge.
 local MODES = {
@@ -612,6 +613,16 @@ local function build(holder)
 		ZIndex = 21,
 		Parent = screen,
 	})
+	-- The cards draw 25% larger, shrinking back if the window can't fit them
+	-- (right of the preview, above the bottom bar).
+	local modesScale = new("UIScale", { Parent = right })
+	local function fitModes()
+		local view = workspace.CurrentCamera.ViewportSize
+		local w, h = right.Size.X.Offset, right.Size.Y.Offset
+		modesScale.Scale = math.min(MODES_SCALE, (view.X * 0.34 - 16) * 2 / w, (view.Y - 104 - 48) / h)
+	end
+	fitModes()
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitModes)
 	local banner = new("ImageLabel", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.fromScale(0.5, 0),

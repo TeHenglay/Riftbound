@@ -13,6 +13,7 @@ Nations.Defs = {
 		Id = "Fire",
 		Name = "Ember Dominion",
 		Element = "Fire",
+		HomeSkill = "Fireball",
 		Motto = "Burn bright, burn first.",
 		Color = Color3.fromRGB(255, 106, 43),
 		Deep = Color3.fromRGB(110, 26, 8),
@@ -23,6 +24,7 @@ Nations.Defs = {
 		Id = "Earth",
 		Name = "Stonehold Clans",
 		Element = "Earth",
+		HomeSkill = "StoneSpike",
 		Motto = "The mountain does not kneel.",
 		Color = Color3.fromRGB(176, 122, 64),
 		Deep = Color3.fromRGB(62, 40, 18),
@@ -33,6 +35,7 @@ Nations.Defs = {
 		Id = "Water",
 		Name = "Tidewater Court",
 		Element = "Water",
+		HomeSkill = "TidalWave",
 		Motto = "Every tide returns.",
 		Color = Color3.fromRGB(52, 152, 255),
 		Deep = Color3.fromRGB(10, 40, 92),
@@ -43,6 +46,7 @@ Nations.Defs = {
 		Id = "Wind",
 		Name = "Skyreach Nomads",
 		Element = "Air", -- the game's element id for Wind
+		HomeSkill = "Gust",
 		Motto = "Never caught, never still.",
 		Color = Color3.fromRGB(159, 240, 216),
 		Deep = Color3.fromRGB(26, 80, 72),
@@ -53,6 +57,7 @@ Nations.Defs = {
 		Id = "Lightning",
 		Name = "Stormcall Order",
 		Element = "Lightning",
+		HomeSkill = "SparkBolt",
 		Motto = "Strike before the thunder.",
 		Color = Color3.fromRGB(250, 225, 60),
 		Deep = Color3.fromRGB(70, 52, 120),
@@ -60,6 +65,11 @@ Nations.Defs = {
 		PerkText = { "+10% Lightning skill damage", "Skills recharge 8% faster" },
 	},
 }
+
+function Nations.HomeSkillOf(nationId)
+	local def = Nations.Defs[nationId]
+	return def and def.HomeSkill
+end
 
 function Nations.Of(player)
 	local id = player and player:GetAttribute("Nation")

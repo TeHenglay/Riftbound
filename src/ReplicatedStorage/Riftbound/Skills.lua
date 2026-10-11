@@ -66,6 +66,42 @@ Skills.Defs = {
 		Description = "Lightning that jumps between enemies. Shocked enemies take extra damage.",
 	},
 
+	-- Awakened base skills (Vertical Pinnacle Ascension) -----------------
+	FireballAwakened = {
+		Name = "Fireball Awakened", Elements = { "Fire" }, Kind = "Projectile",
+		Damage = 26.4, Cooldown = 1.6, Speed = 85, Range = 75, Radius = 10.4,
+		Status = { Burn = { Duration = 3.5, Dps = 8 } },
+		Awakened = true, BaseSkill = "Fireball", PerkName = "Molten Crater",
+		Description = "Massive raging sun-sphere. Detonation leaves a fiery scorch crater ticking burn damage.",
+	},
+	TidalWaveAwakened = {
+		Name = "Tidal Wave Awakened", Elements = { "Water" }, Kind = "Line",
+		Damage = 19.2, Cooldown = 2.5, Length = 46, Width = 16, Knockback = 60,
+		Status = { Soak = { Duration = 6 } },
+		Awakened = true, BaseSkill = "TidalWave", PerkName = "Surging Rapids",
+		Description = "Towering wall of foaming rapids with +50% knockback that leaves flooded ground.",
+	},
+	StoneSpikeAwakened = {
+		Name = "Stone Spike Awakened", Elements = { "Earth" }, Kind = "Strike",
+		Damage = 36, Cooldown = 3, Range = 55, Radius = 9.1, Delay = 0.45,
+		Status = { Stun = { Duration = 1.6 } },
+		Awakened = true, BaseSkill = "StoneSpike", PerkName = "Crush & Concuss",
+		Description = "Three crystalline monoliths erupt from the earth, stunning for 1.6s and increasing earth damage taken.",
+	},
+	GustAwakened = {
+		Name = "Gust Awakened", Elements = { "Air" }, Kind = "Nova",
+		Damage = 12, Cooldown = 2.2, Radius = 21.6, Knockback = 90, Windup = 0.15,
+		Awakened = true, BaseSkill = "Gust", PerkName = "Inward Vortex",
+		Description = "Ferocious hurricane vortex that yanks nearby foes inward before blasting them away.",
+	},
+	SparkBoltAwakened = {
+		Name = "Spark Bolt Awakened", Elements = { "Lightning" }, Kind = "Chain",
+		Damage = 16.8, Cooldown = 1.8, Range = 65, Jumps = 5, JumpRange = 24,
+		Status = { Shock = { Duration = 4 } },
+		Awakened = true, BaseSkill = "SparkBolt", PerkName = "Static Tether",
+		Description = "Blinding lightning that arcs across 5 targets, creating static tethers that shock foes who cross them.",
+	},
+
 	-- Fused skills -------------------------------------------------------
 	SteamCloud = {
 		Name = "Steam Cloud", Elements = { "Fire", "Water" }, Kind = "Zone",
@@ -104,11 +140,13 @@ Skills.Defs = {
 		Status = { Freeze = { Duration = 2 }, Slow = { Duration = 4, Amount = 0.4 } },
 		Description = "Breathes a blizzard in a wide cone, freezing enemies solid in blocks of ice.",
 	},
+	-- Id kept as ChainShock (saves, crafting and icons use it); it plays as
+	-- Thunder Serpent now. Jumps = how many enemies it steers toward.
 	ChainShock = {
-		Name = "Chain Shock", Elements = { "Water", "Lightning" }, Kind = "Chain",
-		Damage = 22, Cooldown = 3, Range = 60, Jumps = 7, JumpRange = 22,
+		Name = "Thunder Serpent", Elements = { "Water", "Lightning" }, Kind = "Serpent",
+		Damage = 22, Cooldown = 3, Range = 60, Jumps = 7, JumpRange = 22, Speed = 48, Radius = 3.5,
 		Status = { Soak = { Duration = 3 }, Shock = { Duration = 3 } },
-		Description = "Lightning that leaps through a whole crowd and soaks it.",
+		Description = "A serpent of water and lightning that weaves through a crowd, biting, soaking and shocking every enemy it passes.",
 	},
 	Sandstorm = {
 		Name = "Quake Leap", Elements = { "Earth", "Air" }, Kind = "Leap",
@@ -150,7 +188,7 @@ end
 -- The base skill granted by an element (e.g. "Fire" -> "Fireball").
 function Skills.BaseFor(element)
 	for id, def in Skills.Defs do
-		if #def.Elements == 1 and def.Elements[1] == element then
+		if #def.Elements == 1 and not def.Awakened and def.Elements[1] == element then
 			return id
 		end
 	end

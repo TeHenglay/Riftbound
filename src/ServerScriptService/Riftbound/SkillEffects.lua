@@ -3,6 +3,9 @@
 -- Visuals are not built here: the server fires the SkillFx remote with what
 -- happened (cast, projectile flight, strike, zone, bolt, impact) and every
 -- client renders it with StarterPlayerScripts.Riftbound.SkillVFX.
+-- Socketed runes (ReplicatedStorage.Riftbound.Runes) arrive as summed Mods:
+-- stat runes reshape a copy of the skill def before it runs, the rest hook
+-- into hit().
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -10,12 +13,24 @@ local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local Elements = require(Shared:WaitForChild("Elements"))
 local Nations = require(Shared:WaitForChild("Nations"))
 local Skills = require(Shared:WaitForChild("Skills"))
+local BuildService = require(script.Parent.BuildService)
+local RunStats = require(script.Parent.RunStats)
 local Enemies = require(script.Parent.Enemies)
 local ProgressionService = require(script.Parent.ProgressionService)
 local StatService = require(script.Parent.StatService)
 
 local DEFAULT_RANGE = 60
-local GROUND_OFFSET = 2.9 -- HumanoidRootPart height above the floor for a standard avatar
+local GROUND_OFFSET = 2.9 -- fallback HumanoidRootPart height above the floor
+
+-- How high the caster's root sits above the floor (avatars are scaled, so
+-- read it rather than assume the standard 2.9).
+local function groundOffset(root)
+	local hum = root.Parent and root.Parent:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		return GROUND_OFFSET
+	end
+	return hum.HipHeight + root.Size.Y / 2
+end
 local PROJECTILE_START = 2.5 -- studs in front of the caster
 
 local SkillEffects = {}
@@ -32,15 +47,132 @@ local function fx(payload)
 	end
 end
 
-local function hit(ctx, model, mult)
-	Enemies.Damage(model, ctx.Damage * (mult or 1), ctx.Def.Elements, ctx.Color)
+local function remoteEvent(name)
+	local remotes = Shared:FindFirstChild("Remotes")
+	return remotes and remotes:FindFirstChild(name)
+end
+
+-- Pulls every enemy within `reach` of `center` toward it. `speed` caps the pull.
+local function pullIn(center, reach, speed, duration)
+	for _, model in Enemies.InRadius(center, reach) do
+		local p = model.PrimaryPart.Position
+		local toCenter = Vector3.new(center.X - p.X, 0, center.Z - p.Z)
+		local dist = toCenter.Magnitude
+		if dist > 1 then
+			Enemies.Push(model, toCenter.Unit * math.min(dist / math.max(duration, 0.05), speed), duration)
+		end
+	end
+end
+
+local hit
+
+-- Damage over time (pools, zones, vortexes); counts toward the caster's run stats.
+local function tickHit(ctx, model, amount)
+	local hum = model:FindFirstChildOfClass("Humanoid")
+	local before = hum and hum.Health or 0
+	Enemies.Damage(model, amount, ctx.Def.Elements, ctx.Color)
+	if hum then
+		local dealt = before - hum.Health
+		RunStats.AddDamage(ctx.Player, dealt)
+		if dealt > 0 and hum.Health <= 0 then
+			RunStats.AddKill(ctx.Player)
+		end
+	end
+end
+
+-- Rune effects that fire once per cast, where it first lands.
+local function onImpact(ctx, at)
+	local mods = ctx.Mods
+	if mods.Gravity then
+		pullIn(at, mods.Gravity, 80, 0.35)
+	end
+	if mods.Aftershock then
+		task.delay(0.5, function()
+			local radius = math.max(ctx.Def.Radius or 0, 8)
+			fx({ Type = "Impact", Skill = ctx.Def.Id, At = at })
+			local echo = table.clone(ctx)
+			echo.Echo = true
+			for _, model in Enemies.InRadius(at, radius) do
+				hit(echo, model, mods.Aftershock)
+			end
+		end)
+	end
+end
+
+-- Rune effects when this skill lands a killing blow.
+local function onKill(ctx, at)
+	local mods = ctx.Mods
+	if mods.Cascade then
+		BuildService.ResetCooldown(ctx.Player, ctx.Def.Id)
+		local reset = remoteEvent("CooldownReset")
+		if reset then
+			reset:FireClient(ctx.Player, ctx.Def.Id)
+		end
+	end
+	if mods.Detonate then
+		fx({ Type = "Impact", Skill = ctx.Def.Id, At = at })
+		local echo = table.clone(ctx)
+		echo.Echo = true
+		for _, model in Enemies.InRadius(at, 10) do
+			hit(echo, model, mods.Detonate)
+		end
+	end
+end
+
+hit = function(ctx, model, mult)
+	local mods = ctx.Mods
+	local hum = model:FindFirstChildOfClass("Humanoid")
+	if not hum then
+		return
+	end
+	local damage = ctx.Damage * (mult or 1)
+	if mods.Execute and hum.Health < hum.MaxHealth * 0.35 then
+		damage *= 1 + mods.Execute
+	end
+	if mods.GiantHunter and (model:GetAttribute("Elite") or model:GetAttribute("Boss")) then
+		damage *= 1 + mods.GiantHunter
+	end
+	if mods.Crit and math.random() < mods.Crit then
+		damage *= 1.75
+	end
+	if mods.Loot then
+		model:SetAttribute("LootBonus", math.max(model:GetAttribute("LootBonus") or 0, mods.Loot))
+	end
+	local before = hum.Health
+	Enemies.Damage(model, damage, ctx.Def.Elements, ctx.Color)
+	local dealt = before - hum.Health
+	RunStats.AddDamage(ctx.Player, dealt)
+	if dealt > 0 and not Enemies.IsAlive(model) then
+		RunStats.AddKill(ctx.Player)
+	end
 	if ctx.Def.Status then
 		for name, params in ctx.Def.Status do
 			Enemies.ApplyStatus(model, name, params)
 		end
 	end
-	if model.PrimaryPart then
-		fx({ Type = "Impact", Skill = ctx.Def.Id, At = model.PrimaryPart.Position })
+	if mods.Chill then
+		Enemies.ApplyStatus(model, "Slow", { Duration = 3, Amount = 0.15 })
+	end
+	ctx.Cast.Hits += 1
+	if mods.Siphon and dealt > 0 then
+		local char = ctx.Player.Character
+		local own = char and char:FindFirstChildOfClass("Humanoid")
+		if own and own.Health > 0 then
+			own.Health = math.min(own.MaxHealth, own.Health + dealt * mods.Siphon)
+		end
+	end
+	local at = model.PrimaryPart and model.PrimaryPart.Position
+	if at then
+		fx({ Type = "Impact", Skill = ctx.Def.Id, At = at })
+		if not ctx.Echo then
+			if not ctx.Impacted then
+				ctx.Impacted = true
+				onImpact(ctx, at)
+			end
+			if dealt > 0 and not Enemies.IsAlive(model) then
+				onKill(ctx, at)
+			end
+		end
 	end
 end
 
@@ -208,7 +340,7 @@ function Kinds.Meteor(ctx)
 			task.wait(def.TickRate)
 			elapsed += def.TickRate
 			for _, model in Enemies.InRadius(center, def.PoolRadius) do
-				Enemies.Damage(model, tickDamage, def.Elements, ctx.Color)
+				tickHit(ctx, model, tickDamage)
 				for name, params in def.Status or {} do
 					Enemies.ApplyStatus(model, name, params)
 				end
@@ -233,7 +365,7 @@ function Kinds.Leap(ctx)
 		while os.clock() - start < 2.5 and hum.FloorMaterial == Enum.Material.Air and root.Parent do
 			task.wait()
 		end
-		local at = root.Position - Vector3.new(0, GROUND_OFFSET, 0)
+		local at = root.Position - Vector3.new(0, groundOffset(root), 0)
 		fx({ Type = "LeapSlam", Skill = def.Id, At = at, Inner = def.InnerRadius, Radius = def.Radius })
 		local struck = {}
 		for _, model in Enemies.InRadius(at, def.InnerRadius) do
@@ -305,7 +437,7 @@ function Kinds.Zone(ctx)
 			elapsed += def.TickRate
 			local inside = Enemies.InRadius(center, def.Radius)
 			for _, model in inside do
-				Enemies.Damage(model, tickDamage, def.Elements, ctx.Color)
+				tickHit(ctx, model, tickDamage)
 				for name, params in def.Status or {} do
 					Enemies.ApplyStatus(model, name, params)
 				end
@@ -361,16 +493,88 @@ function Kinds.Chain(ctx)
 	end)
 end
 
--- Pulls every enemy within `reach` of `center` toward it. `speed` caps the pull.
-local function pullIn(center, reach, speed, duration)
-	for _, model in Enemies.InRadius(center, reach) do
-		local p = model.PrimaryPart.Position
-		local toCenter = Vector3.new(center.X - p.X, 0, center.Z - p.Z)
-		local dist = toCenter.Magnitude
-		if dist > 1 then
-			Enemies.Push(model, toCenter.Unit * math.min(dist / math.max(duration, 0.05), speed), duration)
-		end
+-- Thunder Serpent: a serpent slithers along the ground from the caster,
+-- steering through up to def.Jumps enemies (nearest to the aim point first,
+-- then nearest to the last one), and bites anything within def.Radius of its
+-- head on the way. Each bite does 10% less than the one before.
+function Kinds.Serpent(ctx)
+	local def = ctx.Def
+	local floorY = ctx.Floor
+	local function flat(p)
+		return Vector3.new(p.X, floorY, p.Z)
 	end
+	local start = flat(ctx.Origin) + ctx.Dir * 2
+	local points = { start }
+	local routed = {}
+	local function nearest(pos, maxDist)
+		local best, bestDist = nil, maxDist
+		for _, model in Enemies.GetAll() do
+			if not routed[model] then
+				local d = (flat(model.PrimaryPart.Position) - pos).Magnitude
+				if d < bestDist then
+					best, bestDist = model, d
+				end
+			end
+		end
+		return best
+	end
+	local range = def.Range or DEFAULT_RANGE
+	local current = nearest(flat(ctx.Target), 16)
+	if current and (flat(current.PrimaryPart.Position) - start).Magnitude > range + 5 then
+		current = nil
+	end
+	if not current then
+		-- Nobody to chase: slither straight to the aim point.
+		local to = flat(ctx.Target)
+		if (to - start).Magnitude < 8 then
+			to = start + ctx.Dir * 20
+		end
+		table.insert(points, to)
+	end
+	for _ = 1, def.Jumps or 7 do
+		if not current then
+			break
+		end
+		routed[current] = true
+		table.insert(points, flat(current.PrimaryPart.Position))
+		current = nearest(points[#points], def.JumpRange or 22)
+	end
+	-- Carry on a little past the last point, then dive.
+	local last, prev = points[#points], points[#points - 1]
+	local heading = last - prev
+	heading = if heading.Magnitude > 0.1 then heading.Unit else ctx.Dir
+	table.insert(points, last + heading * 6)
+
+	local speed = def.Speed or 48
+	local length = 0
+	for i = 2, #points do
+		length += (points[i] - points[i - 1]).Magnitude
+	end
+	fx({ Type = "Serpent", Skill = def.Id, At = start, Points = points, Speed = speed, Floor = floorY, Radius = def.Radius, Duration = length / speed })
+
+	task.spawn(function()
+		local bitten = {}
+		local mult = 1
+		for i = 2, #points do
+			local a, b = points[i - 1], points[i]
+			local len = (b - a).Magnitude
+			local t = 0
+			while t < len do
+				local dt = task.wait()
+				t = math.min(t + speed * dt, len)
+				local head = a:Lerp(b, if len > 0 then t / len else 1)
+				for _, model in Enemies.InRadius(head, def.Radius or 3.5) do
+					if not bitten[model] then
+						bitten[model] = true
+						fx({ Type = "SerpentBite", Skill = def.Id, At = model.PrimaryPart.Position, Floor = floorY })
+						hit(ctx, model, mult)
+						mult *= 0.9
+					end
+				end
+			end
+		end
+		fx({ Type = "SerpentDive", Skill = def.Id, At = points[#points], Floor = floorY })
+	end)
 end
 
 function Kinds.Tornado(ctx)
@@ -391,7 +595,7 @@ function Kinds.Tornado(ctx)
 			if elapsed >= nextTick then
 				nextTick += def.TickRate
 				for _, model in Enemies.InRadius(center, def.Radius) do
-					Enemies.Damage(model, tickDamage, def.Elements, ctx.Color)
+					tickHit(ctx, model, tickDamage)
 					for name, params in def.Status or {} do
 						Enemies.ApplyStatus(model, name, params)
 					end
@@ -422,8 +626,50 @@ function Kinds.Magnet(ctx)
 	end)
 end
 
-function SkillEffects.Cast(player, id, level, targetPos)
-	local def = Skills.Defs[id]
+local AREA_KEYS = { "Radius", "InnerRadius", "PoolRadius", "Width" }
+local RANGE_KEYS = { "Range", "Length" }
+
+-- A copy of the skill def reshaped by the slot's stat runes.
+local function withMods(def, mods)
+	if not def or not next(mods) then
+		return def
+	end
+	def = table.clone(def)
+	for _, key in AREA_KEYS do
+		if def[key] and mods.Area then
+			def[key] *= 1 + mods.Area
+		end
+	end
+	for _, key in RANGE_KEYS do
+		if def[key] and mods.Range then
+			def[key] *= 1 + mods.Range
+		end
+	end
+	if def.Knockback and mods.Knockback then
+		def.Knockback *= 1 + mods.Knockback
+	end
+	if def.Speed and mods.Speed then
+		def.Speed *= math.max(1 + mods.Speed, 0.2)
+	end
+	if def.Duration and mods.Duration then
+		def.Duration += mods.Duration
+	end
+	if def.Status and (mods.Duration or mods.Stun) then
+		local status = {}
+		for name, params in def.Status do
+			params = table.clone(params)
+			params.Duration = (params.Duration or 1) + (mods.Duration or 0) + (if name == "Stun" then mods.Stun or 0 else 0)
+			status[name] = params
+		end
+		def.Status = status
+	end
+	return def
+end
+
+-- `mods` are the casting slot's summed rune mods (BuildService.TryCast).
+function SkillEffects.Cast(player, id, level, targetPos, mods)
+	mods = mods or {}
+	local def = withMods(Skills.Defs[id], mods)
 	local char = player.Character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not def or not root then
@@ -439,7 +685,7 @@ function SkillEffects.Cast(player, id, level, targetPos)
 		dir = Vector3.new(look.X, 0, look.Z).Unit
 	end
 	local range = def.Range or DEFAULT_RANGE
-	local groundY = origin.Y - GROUND_OFFSET
+	local groundY = origin.Y - groundOffset(root)
 	local target = Vector3.new(targetPos.X, math.clamp(targetPos.Y, groundY - 4, groundY + 4), targetPos.Z)
 	if flat.Magnitude > range then
 		target = Vector3.new(origin.X, target.Y, origin.Z) + dir * range
@@ -447,19 +693,55 @@ function SkillEffects.Cast(player, id, level, targetPos)
 
 	fx({ Type = "Cast", Skill = id, At = origin, Dir = dir, Caster = player })
 
-	local powerMult = ProgressionService.DamageMult(player) * StatService.DamageMult(player) * Nations.ElementMult(player, def.Elements)
-	Kinds[def.Kind]({
-		Player = player,
-		Def = def,
-		Level = level,
-		Damage = def.Damage * Skills.DamageMult(level) * powerMult,
-		PowerMult = powerMult,
-		Color = Elements.ColorOf(def.Elements),
-		Origin = origin,
-		Target = target,
-		Dir = dir,
-		Floor = groundY,
-	})
+	local powerMult = ProgressionService.DamageMult(player) * StatService.DamageMult(player) * Nations.ElementMult(player, def.Elements) * (1 + (mods.Damage or 0))
+	local cast = { Hits = 0 }
+	local function run(aim)
+		Kinds[def.Kind]({
+			Player = player,
+			Def = def,
+			Level = level,
+			Damage = def.Damage * Skills.DamageMult(level) * powerMult,
+			PowerMult = powerMult,
+			Color = Elements.ColorOf(def.Elements),
+			Origin = origin,
+			Target = target,
+			Dir = aim,
+			Floor = groundY,
+			Mods = mods,
+			Cast = cast,
+		})
+	end
+	run(dir)
+	-- Multishot: extra projectiles fanned out to alternating sides.
+	if def.Kind == "Projectile" then
+		for n = 1, mods.Projectiles or 0 do
+			local side = if n % 2 == 1 then 1 else -1
+			run(CFrame.Angles(0, math.rad(12 * math.ceil(n / 2) * side), 0):VectorToWorldSpace(dir))
+		end
+	end
+
+	-- Blood Pact: pay 5% of current health, refunded if the cast hits 3+.
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if mods.BloodPact and hum and hum.Health > 1 then
+		local cost = hum.Health * mods.BloodPact
+		hum.Health -= cost
+		task.delay(1.2, function()
+			if cast.Hits >= 3 and hum.Health > 0 then
+				hum.Health = math.min(hum.MaxHealth, hum.Health + cost)
+			end
+		end)
+	end
+	-- Twin Spark: sometimes the skill goes off again for free.
+	if mods.Twin and math.random() < mods.Twin then
+		local again = table.clone(mods)
+		again.Twin = nil
+		again.BloodPact = nil
+		task.delay(0.3, function()
+			if player.Character == char and root.Parent then
+				SkillEffects.Cast(player, id, level, targetPos, again)
+			end
+		end)
+	end
 end
 
 return SkillEffects
