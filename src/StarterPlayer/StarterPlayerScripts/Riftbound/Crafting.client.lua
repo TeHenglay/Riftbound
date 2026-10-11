@@ -876,13 +876,15 @@ local matScroll = new("ScrollingFrame", {
 })
 
 -------------------------------------------------------------------------------
--- Quick Equip to Test (Slots Q & E)
+-- Quick Equip to Test (Slots Q & E): removed from the Forge screen, so the
+-- row is kept hidden. Equip skills from the Backpack (B) instead.
 -------------------------------------------------------------------------------
 local equipSection = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 1),
 	Position = UDim2.new(0.5, 0, 1, -58),
 	Size = UDim2.new(1, -24, 0, 44),
 	BackgroundTransparency = 1,
+	Visible = false,
 	ZIndex = 3,
 	Parent = rightPanel,
 })
@@ -1395,7 +1397,7 @@ local function renderDetails()
 		addReqCard(UIAssets.Menu.Play or UIAssets.Icons.Empty, "Free Equip", 1, 1, false, Color3.fromRGB(90, 220, 140))
 
 		actionBtn.Active = true
-		actionBtn.Text = "EQUIP ON [Q] OR [E] TO TEST"
+		actionBtn.Text = "EQUIP ON [Q] TO TEST"
 		actionBtn.TextColor3 = Color3.fromRGB(220, 245, 235)
 		actionBtn.UIStroke.Color = Color3.fromRGB(60, 180, 120)
 		actionBtn.UIStroke.Thickness = 1.5
