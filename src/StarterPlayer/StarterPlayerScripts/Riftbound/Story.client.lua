@@ -138,11 +138,23 @@ new("Frame", { Position = UDim2.fromOffset(28, 636), Size = UDim2.new(1, -56, 0,
 local function toggle(x, label, value)
 	local f = new("Frame", { Position = UDim2.fromOffset(x, 652), Size = UDim2.fromOffset(200, 44), BackgroundColor3 = Color3.fromRGB(20, 16, 26), Parent = content }, { corner(3), stroke(C.Bronze, 1, 0.6) })
 	text({ Position = UDim2.fromOffset(12, 4), Size = UDim2.new(1, -24, 0, 18), Text = label, FontFace = F.Label, TextSize = 13, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, Parent = f })
-	text({ Position = UDim2.fromOffset(12, 22), Size = UDim2.new(1, -24, 0, 16), Text = value, FontFace = F.Italic, TextSize = 14, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, Parent = f })
+	return text({ Position = UDim2.fromOffset(12, 22), Size = UDim2.new(1, -24, 0, 16), Text = value, FontFace = F.Italic, TextSize = 14, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, Parent = f })
 end
--- Parties aren't built yet: these show their state but can't be changed.
-toggle(28, "FRIENDS ONLY", "Off · parties coming soon")
-toggle(240, "MAX PLAYERS", "Open · anyone can join your act")
+-- Runs are private to you and your party (invite from Play > Party).
+local partyLabel = toggle(28, "PARTY", "")
+toggle(240, "LOBBY", "Private · just you and your party")
+local function refreshParty()
+	if player:GetAttribute("PartyLeader") then
+		partyLabel.Text = "You lead · they come with you"
+	elseif player:GetAttribute("PartyId") then
+		partyLabel.Text = "Your leader picks the act"
+	else
+		partyLabel.Text = "Solo · invite in Play > Party"
+	end
+end
+refreshParty()
+player:GetAttributeChangedSignal("PartyId"):Connect(refreshParty)
+player:GetAttributeChangedSignal("PartyLeader"):Connect(refreshParty)
 local status = text({ Position = UDim2.fromOffset(456, 652), Size = UDim2.fromOffset(420, 44), FontFace = F.Italic, TextSize = 16, TextWrapped = true, TextColor3 = C.Ash, Parent = content })
 local leaveBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -28, 0, 652), Size = UDim2.fromOffset(150, 46), BackgroundColor3 = Color3.fromRGB(40, 20, 26), Text = "LEAVE", TextColor3 = C.Parchment, TextSize = 18, FontFace = F.Label, Parent = content }, { corner(3), stroke(C.Bad, 1.5, 0.2) })
 local startBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -190, 0, 652), Size = UDim2.fromOffset(190, 46), BackgroundColor3 = Color3.fromRGB(28, 54, 30), Text = "START", TextColor3 = C.Gold, TextSize = 20, FontFace = F.Label, Parent = content }, { corner(3), stroke(C.Good, 2, 0) })
@@ -177,6 +189,16 @@ local function tile(parent, order, w, icon, title, sub, color, on, locked)
 	return b
 end
 
+-- A small label hanging over a button's top-right corner (RARE DROP, CLEARED).
+local function cornerTag(b, label, color)
+	local tag = new("Frame", { Name = "CornerTag", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, -9), Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = color, ZIndex = (b.ZIndex or 1) + 2, Parent = b }, {
+		new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
+		Theme.Edged(2),
+	})
+	text({ Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Text = label, FontFace = F.BodyBold, TextSize = 11, TextColor3 = Color3.fromRGB(16, 20, 12), ZIndex = (b.ZIndex or 1) + 3, Parent = tag })
+	return tag
+end
+
 -- Gold frame and a corner tag: marks the rare skill drop wherever it shows.
 local function rareStyle(b, label)
 	b.BackgroundColor3 = Color3.fromRGB(40, 32, 14)
@@ -184,11 +206,7 @@ local function rareStyle(b, label)
 	edge.Color = Theme.C.Coin
 	edge.Thickness = 3
 	edge.Transparency = 0
-	local tag = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, -9), Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Theme.C.Coin, ZIndex = (b.ZIndex or 1) + 2, Parent = b }, {
-		new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
-		Theme.Edged(2),
-	})
-	text({ Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Text = label, FontFace = F.BodyBold, TextSize = 11, TextColor3 = Color3.fromRGB(20, 16, 6), ZIndex = (b.ZIndex or 1) + 3, Parent = tag })
+	cornerTag(b, label, Theme.C.Coin)
 end
 
 local render
@@ -243,6 +261,11 @@ function render()
 		local sub = if not BUILT[act] then "Coming soon" elseif not unlocked then "Locked" elseif cleared then "Cleared" else "Ready"
 		local b = tile(acts, act, 220, nil, "Act " .. act, actDef.Name .. "  ·  " .. sub, if cleared then C.Good else C.Gold, act == selectedAct, not BUILT[act] or not unlocked)
 		b.Size = UDim2.fromOffset(220, 96)
+		if cleared then
+			-- Green corner tag; it says HARD too once the act is beaten on Hard.
+			local hard = done[Story.Key(selected, act, "Hard")]
+			cornerTag(b, if hard then "CLEARED · HARD" else "CLEARED", C.Good)
+		end
 		b.Activated:Connect(function()
 			selectedAct = act
 			render()
