@@ -295,12 +295,18 @@ During Play, casts every skill at the dummies and checks fusion.
 ## Story mode
 
 - One story per nation, three acts each (`src/ReplicatedStorage/Riftbound/Story.lua`).
-  Act 1 of all five stories is built so far (`workspace.StoryArenas`, made by
-  `StoryBuilder.lua`); Acts 2 and 3 show as coming soon.
+  Acts 1 and 2 of all five stories are built (`workspace.StoryArenas`, made by
+  `StoryBuilder.lua`; `StoryBuilder.BuiltActs` and Story.client's `BUILT`);
+  Act 3 shows as coming soon.
+- Act 1's boss is the nation's named foe (e.g. Shalecrag Monk). Act 2's boss is
+  its elite (Kiln Oni Captain, Gravemaw Warden, Abyssal Court Knight, Cyclone
+  Kunoichi, Stormbreaker Paladin) in an arena ringed by rift obelisks. Act 2
+  clears pay the nation's Core (Ember Core, Abyssal Pearl, ...), needed for
+  fusions.
 - Open the story screen from the Play page's Story card
   (`NationRemotes.OpenStoryLocal:Fire()`): pick a map (story), an act and a
   difficulty, then Start. Easy and Medium are open; Hard needs the act cleared
-  on Medium, Nightmare on Hard. Players who start the same act join the same run.
+  on Medium, Nightmare on Hard. Each run is private to you and your party.
 - A run is waves of husks and brutes (plus a boss in Act 3). Clearing pays gold
   (double on a first clear per difficulty) and that nation's Essence (×1.5 in your
   own nation's story), unlocks the next act and opens a gate back to the

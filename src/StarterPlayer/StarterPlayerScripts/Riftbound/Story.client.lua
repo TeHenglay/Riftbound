@@ -33,7 +33,7 @@ local C = Theme.Palette()
 local F = Theme.F
 local EMBLEM = UIAssets.Nations
 -- Acts with arenas so far; the rest show as coming soon.
-local BUILT = { [1] = true }
+local BUILT = { [1] = true, [2] = true } -- matches StoryBuilder.BuiltActs
 
 local function new(class, props, children)
 	local inst = Instance.new(class)

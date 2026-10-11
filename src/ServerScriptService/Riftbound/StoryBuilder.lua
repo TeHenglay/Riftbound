@@ -15,8 +15,9 @@ StoryBuilder.Spacing = 900
 StoryBuilder.Height = 150
 StoryBuilder.Z = 4700
 
--- Acts that have arenas so far (the user asked for every Act 1 first).
-StoryBuilder.BuiltActs = { 1 }
+-- Acts that have arenas so far: Act 1 (named-foe boss) and Act 2 (the
+-- nation's elite boss, e.g. Gravemaw Warden). Keep Story.client's BUILT in step.
+StoryBuilder.BuiltActs = { 1, 2 }
 
 function StoryBuilder.Center(nationId, act)
 	local index = table.find(Story.Order, nationId)
@@ -59,6 +60,19 @@ function StoryBuilder.Build(nationId, act)
 		L.disc(arena, mark.Position + Vector3.new(0, 0.1, 0), 5, 0.1, Enum.Material.Neon, story.Color, { Name = "RiftScar", Transparency = 0.5, CanCollide = false })
 	end
 	L.part({ Name = "BossSpawn", Size = Vector3.new(6, 1, 6), CFrame = CFrame.new(c + Vector3.new(0, 0.5, -20)), Transparency = 1, CanCollide = false, CanQuery = false, Parent = spawns })
+
+	-- Act 2+: the elite's lair. A ring of rift obelisks glowing in the
+	-- nation's colour around the fight, and a boss circle where it rises.
+	if act >= 2 then
+		for i = 0, 5 do
+			local a = math.rad(i * 60 + 30)
+			local at = c + Vector3.new(math.cos(a) * 46, 0, math.sin(a) * 46)
+			L.part({ Name = "RiftObelisk", Size = Vector3.new(3, 14, 3), CFrame = CFrame.new(at + Vector3.new(0, 7, 0)) * CFrame.Angles(0, a, math.rad(rng:NextNumber(-6, 6))), Material = theme.Plaza, Color = theme.PlazaColor, Parent = arena })
+			L.part({ Name = "ObeliskCrystal", Size = Vector3.new(1.6, 4, 1.6), CFrame = CFrame.new(at + Vector3.new(0, 16, 0)) * CFrame.Angles(0, a + math.rad(45), 0), Material = Enum.Material.Neon, Color = story.Color, CanCollide = false, Parent = arena })
+		end
+		L.disc(arena, c + Vector3.new(0, 0.12, -20), 26, 0.1, Enum.Material.Neon, story.Color, { Name = "BossCircle", Transparency = 0.65, CanCollide = false })
+		L.disc(arena, c + Vector3.new(0, 0.14, -20), 20, 0.1, Enum.Material.Neon, L.Colors.Rift, { Name = "BossCircleInner", Transparency = 0.75, CanCollide = false })
+	end
 
 	-- Act title over the arrival pad.
 	L.billboard(entry, `A C T   {act}`, `{story.Title} · {story.Acts[act].Name}`, story.Color, 14)
