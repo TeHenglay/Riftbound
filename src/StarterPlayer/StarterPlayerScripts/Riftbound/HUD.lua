@@ -1894,7 +1894,7 @@ end
 local ITEM_CELLS = 18 -- 6 x 3 grid: room for every material
 local inventory = {}
 local backpack
-local refreshBackpack
+local refreshBackpack, refreshSkillsTab, showBackpackTab
 local levelBusy = false -- a Level Up request is on its way
 
 local function showItemTooltip(id, count)
@@ -1930,6 +1930,304 @@ local BP_RIGHT_X = BP_PAD + BP_LEFT_W + 24
 local BP_RIGHT_W = BP_W - BP_RIGHT_X - BP_PAD
 local BP_HEAD_Y = 84 -- section headers
 local BP_TOP = 126 -- section content
+
+local function clearGui(parent)
+	for _, child in parent:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+-------------------------------------------------------------------------------
+-- Backpack: Skills tab (every owned skill; level up with duplicate copies)
+-------------------------------------------------------------------------------
+
+local skillsTab
+local skillsSelected -- skill id shown on the right
+local backpackTab = "Items"
+local SK_LIST_W = 400
+local SK_DETAIL_X = BP_PAD + SK_LIST_W + 28
+local SK_DETAIL_W = BP_W - SK_DETAIL_X - BP_PAD
+
+local function cooldownAt(id, level)
+	return Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")) * Nations.CooldownMult(player)
+end
+
+local function levelUp(id)
+	if levelBusy then
+		return
+	end
+	levelBusy = true
+	local ok, done, why = pcall(remotes.LevelSkill.InvokeServer, remotes.LevelSkill, id)
+	levelBusy = false
+	if not ok or not done then
+		HUD.Toast(if ok then (why or "Can't level up") else "Couldn't reach the server", C.Crimson)
+	end
+end
+
+local function buildSkillsTab(tab)
+	skillsTab = tab
+	sectionHeader(tab, "Skills", BP_PAD, BP_HEAD_Y)
+	text({
+		Name = "Count",
+		Position = UDim2.fromOffset(BP_PAD + 120, BP_HEAD_Y + 6),
+		Size = UDim2.fromOffset(SK_LIST_W - 120, 16),
+		FontFace = F.Label,
+		TextSize = 11,
+		TextColor3 = C.Ash,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		ZIndex = 22,
+		Parent = tab,
+	})
+	new("ScrollingFrame", {
+		Name = "List",
+		Position = UDim2.fromOffset(BP_PAD, BP_TOP),
+		Size = UDim2.fromOffset(SK_LIST_W, BP_H - BP_TOP - 24),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = C.Rift,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
+		ZIndex = 22,
+		Parent = tab,
+	}, {
+		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIPadding", { PaddingRight = UDim.new(0, 8) }),
+	})
+	new("Frame", {
+		Position = UDim2.fromOffset(SK_DETAIL_X - 14, BP_HEAD_Y),
+		Size = UDim2.new(0, 1, 1, -BP_HEAD_Y - 24),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.9,
+		BorderSizePixel = 0,
+		ZIndex = 22,
+		Parent = tab,
+	})
+	new("Frame", { Name = "Detail", Position = UDim2.fromOffset(SK_DETAIL_X, BP_HEAD_Y), Size = UDim2.fromOffset(SK_DETAIL_W, BP_H - BP_HEAD_Y - 24), BackgroundTransparency = 1, ZIndex = 22, Parent = tab })
+end
+
+-- One row in the skill list: icon, name, level, copies bar.
+local function skillListRow(list, order, id)
+	local def = Skills.Defs[id]
+	local level = build.Skills[id]
+	local color = skillColor(id)
+	local copies = (build.Copies or {})[id] or 0
+	local need = Skills.CopiesToLevel(level)
+	local temp = (build.Temp or {})[id]
+	local selected = id == skillsSelected
+	local row = new("TextButton", {
+		Size = UDim2.new(1, 0, 0, 64),
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = if selected then color:Lerp(Theme.C.Raised, 0.75) else Theme.C.Raised,
+		LayoutOrder = order,
+		ZIndex = 23,
+		Parent = list,
+	}, { Theme.Edged(2) })
+	if selected then
+		stroke(color, 2).Parent = row
+	end
+	new("Frame", { Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 24, Parent = row })
+	local icon = shard(id, 50, row, 24)
+	icon.Position = UDim2.fromOffset(10, 7)
+	text({
+		Position = UDim2.fromOffset(70, 8),
+		Size = UDim2.new(1, -170, 0, 20),
+		Text = def.Name,
+		FontFace = F.BodyBold,
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		ZIndex = 24,
+		Parent = row,
+	})
+	text({
+		Position = UDim2.fromOffset(70, 28),
+		Size = UDim2.new(1, -170, 0, 14),
+		Text = `{NUMERALS[level]}   ·   {if #def.Elements == 2 then "Fusion" else (def.Elements[1] or "Rift")}`,
+		FontFace = F.Label,
+		TextSize = 11,
+		TextColor3 = C.Ash,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 24,
+		Parent = row,
+	})
+	-- Copies toward the next level.
+	local bar = new("Frame", { Position = UDim2.fromOffset(70, 46), Size = UDim2.new(1, -170, 0, 6), BackgroundColor3 = Theme.C.Ink, BorderSizePixel = 0, ZIndex = 24, Parent = row })
+	local ratio = if need then math.clamp(copies / need, 0, 1) else 1
+	new("Frame", { Size = UDim2.fromScale(ratio, 1), BackgroundColor3 = if need and copies >= need then C.Good else color, BorderSizePixel = 0, ZIndex = 25, Parent = bar })
+	local ready = need ~= nil and copies >= need and not temp
+	text({
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -12, 0.5, 0),
+		Size = UDim2.fromOffset(88, 20),
+		Text = if temp then "TRAINING" elseif not need then "MAX" elseif ready then "▲ READY" else `{copies} / {need}`,
+		FontFace = F.Label,
+		TextSize = 12,
+		TextColor3 = if temp then C.RiftHot elseif not need then C.Gold elseif ready then C.Good else C.Ash,
+		TextXAlignment = Enum.TextXAlignment.Right,
+		ZIndex = 24,
+		Parent = row,
+	})
+	row.Activated:Connect(function()
+		skillsSelected = id
+		refreshSkillsTab()
+	end)
+end
+
+-- The right side: everything about the selected skill, and Level Up.
+local function skillDetail(panel, id)
+	local def = Skills.Defs[id]
+	local level = build.Skills[id]
+	local color = skillColor(id)
+	local copies = (build.Copies or {})[id] or 0
+	local need = Skills.CopiesToLevel(level)
+	local temp = (build.Temp or {})[id]
+
+	local icon = shard(id, 92, panel, 23)
+	icon.Position = UDim2.fromOffset(0, 0)
+	text({ Position = UDim2.fromOffset(108, 4), Size = UDim2.new(1, -108, 0, 30), Text = def.Name, FontFace = F.TitleBold, TextSize = 26, TextColor3 = color, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 23, Parent = panel })
+	local elements = if #def.Elements > 0 then table.concat(def.Elements, " + ") else "Rift"
+	text({ Position = UDim2.fromOffset(108, 36), Size = UDim2.new(1, -108, 0, 16), Text = spaced(`{elements}  ·  {def.Kind}`), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
+	-- Level pips.
+	for pip = 1, Skills.MaxLevel do
+		new("Frame", {
+			Position = UDim2.fromOffset(112 + (pip - 1) * 22, 66),
+			Size = UDim2.fromOffset(12, 12),
+			Rotation = 45,
+			BackgroundColor3 = if pip <= level then color else Theme.C.Ink,
+			BorderSizePixel = 0,
+			ZIndex = 23,
+			Parent = panel,
+		}, { stroke(if pip <= level then color else C.Bronze, 1, 0.3) })
+	end
+	text({ Position = UDim2.fromOffset(112 + Skills.MaxLevel * 22 + 6, 62), Size = UDim2.fromOffset(160, 20), Text = `LEVEL {NUMERALS[level]} / {NUMERALS[Skills.MaxLevel]}`, FontFace = F.Label, TextSize = 13, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
+
+	text({ Position = UDim2.fromOffset(0, 106), Size = UDim2.new(1, 0, 0, 58), Text = emphasize(def.Description), RichText = true, FontFace = F.Body, TextSize = 14, TextWrapped = true, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 23, Parent = panel })
+
+	-- Now -> next level.
+	local statsBox = new("Frame", { Position = UDim2.fromOffset(0, 172), Size = UDim2.new(1, 0, 0, 92), BackgroundColor3 = Theme.C.Raised, ZIndex = 23, Parent = panel }, { Theme.Edged(2) })
+	text({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -28, 0, 14), Text = if need then spaced("Now  →  Next level") else spaced("Max level"), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = statsBox })
+	local label, now = headlineStat(def, level)
+	local _, nextValue = headlineStat(def, math.min(level + 1, Skills.MaxLevel))
+	local rows = {
+		{ label, now, nextValue },
+		{ "Cooldown", string.format("%.2fs", cooldownAt(id, level)), string.format("%.2fs", cooldownAt(id, math.min(level + 1, Skills.MaxLevel))) },
+	}
+	for i, r in rows do
+		local y = 28 + (i - 1) * 28
+		text({ Position = UDim2.fromOffset(14, y), Size = UDim2.fromOffset(170, 22), Text = r[1], FontFace = F.Body, TextSize = 15, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = statsBox })
+		text({
+			Position = UDim2.fromOffset(184, y),
+			Size = UDim2.new(1, -198, 0, 22),
+			Text = if need then `{r[2]}   <font color="{hex(C.Ash)}">→</font>   <font color="{hex(C.Good)}">{r[3]}</font>` else r[2],
+			RichText = true,
+			FontFace = F.BodyBold,
+			TextSize = 15,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			ZIndex = 24,
+			Parent = statsBox,
+		})
+	end
+
+	-- Duplicate copies.
+	text({ Position = UDim2.fromOffset(0, 278), Size = UDim2.new(1, 0, 0, 14), Text = spaced("Duplicate copies"), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
+	text({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 276), Size = UDim2.fromOffset(160, 18), Text = if need then `{copies} / {need}` else `{copies}`, FontFace = F.TitleBold, TextSize = 16, TextColor3 = if need and copies >= need then C.Good else C.Parchment, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 23, Parent = panel })
+	local bar = new("Frame", { Position = UDim2.fromOffset(0, 300), Size = UDim2.new(1, 0, 0, 14), BackgroundColor3 = Theme.C.Ink, BorderSizePixel = 0, ZIndex = 23, Parent = panel }, { Theme.Edged(2) })
+	new("Frame", { Size = UDim2.fromScale(if need then math.clamp(copies / need, 0, 1) else 1, 1), BackgroundColor3 = if need and copies >= need then C.Good else color, BorderSizePixel = 0, ZIndex = 24, Parent = bar })
+	text({ Position = UDim2.fromOffset(0, 320), Size = UDim2.new(1, 0, 0, 32), Text = "Get copies from Story skill drops and by fusing into a skill you already own.", FontFace = F.Italic, TextSize = 13, TextWrapped = true, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 23, Parent = panel })
+
+	-- Level Up.
+	local ready = need ~= nil and copies >= need and not temp
+	local label2 = if temp then "TRAINING SKILL  ·  CAN'T LEVEL UP"
+		elseif not need then "MAX LEVEL"
+		elseif ready then `LEVEL UP  ·  USE {need} COPIES`
+		else `NEED {need - copies} MORE {if need - copies == 1 then "COPY" else "COPIES"}`
+	local up = new("TextButton", {
+		Position = UDim2.fromOffset(0, 362),
+		Size = UDim2.new(1, 0, 0, 54),
+		Text = label2,
+		FontFace = F.Title,
+		TextSize = 18,
+		TextColor3 = if ready then C.Parchment else C.Ash,
+		BackgroundColor3 = if ready then Color3.fromRGB(40, 120, 64) elseif not need then Color3.fromRGB(60, 50, 24) else Theme.C.Ink,
+		AutoButtonColor = ready,
+		ZIndex = 24,
+		Parent = panel,
+	}, { stroke(if ready then C.Good elseif not need then Color3.fromRGB(255, 200, 80) else C.Bronze, 2, if ready or not need then 0 else 0.4) })
+	if ready then
+		up.Activated:Connect(function()
+			levelUp(id)
+		end)
+	end
+
+	-- Equip on Q / E.
+	for i, slot in { "Q", "E" } do
+		local on = build.Slots[slot] == id
+		local b = new("TextButton", {
+			Position = UDim2.new((i - 1) * 0.5, if i == 1 then 0 else 5, 0, 428),
+			Size = UDim2.new(0.5, -5, 0, 40),
+			Text = if on then `EQUIPPED ON {slot}` else `EQUIP ON {slot}`,
+			FontFace = F.Label,
+			TextSize = 13,
+			TextColor3 = if on then Theme.C.Ink else C.Parchment,
+			BackgroundColor3 = if on then color else Theme.C.Raised,
+			AutoButtonColor = not on,
+			ZIndex = 24,
+			Parent = panel,
+		}, { Theme.Edged(2) })
+		if not on then
+			b.Activated:Connect(function()
+				remotes.Equip:FireServer(slot, id)
+			end)
+		end
+	end
+end
+
+refreshSkillsTab = function()
+	if not skillsTab or not skillsTab.Visible then
+		return
+	end
+	local owned = sortedOwned()
+	if not skillsSelected or not build.Skills[skillsSelected] then
+		skillsSelected = owned[1]
+	end
+	local list = skillsTab.List
+	clearGui(list)
+	local ready = 0
+	for i, id in owned do
+		skillListRow(list, i, id)
+		local need = Skills.CopiesToLevel(build.Skills[id])
+		if need and ((build.Copies or {})[id] or 0) >= need and not (build.Temp or {})[id] then
+			ready += 1
+		end
+	end
+	skillsTab.Count.Text = (if #owned == 1 then "1   S K I L L" else `{#owned}   S K I L L S`) .. (if ready > 0 then `   ·   {ready}   R E A D Y` else "")
+	local detail = skillsTab.Detail
+	clearGui(detail)
+	if skillsSelected then
+		skillDetail(detail, skillsSelected)
+	else
+		text({ Size = UDim2.new(1, 0, 0, 60), Text = "No skills yet. Seek the elemental shrines or clear Story acts.", FontFace = F.Italic, TextSize = 17, TextWrapped = true, TextColor3 = C.Ash, ZIndex = 23, Parent = detail })
+	end
+end
+
+showBackpackTab = function(name)
+	backpackTab = name
+	backpack.ItemsTab.Visible = name == "Items"
+	backpack.SkillsTab.Visible = name == "Skills"
+	for _, tab in backpack.Tabs:GetChildren() do
+		if tab:IsA("TextButton") then
+			local on = tab.Name == name
+			tab.BackgroundColor3 = if on then C.Rift:Lerp(Theme.C.Ink, 0.35) else Theme.C.Raised
+			tab.TextColor3 = if on then C.Parchment else C.Ash
+		end
+	end
+	hideTooltip()
+	refreshBackpack()
+end
 
 local function buildBackpack()
 	backpack = new("Frame", {
@@ -1967,15 +2265,45 @@ local function buildBackpack()
 		HUD.SetBackpack(false)
 	end)
 
+	-- Tabs: Items (equipment, inventory, powers) and Skills (list + level up).
+	local itemsTab = new("Frame", { Name = "ItemsTab", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, ZIndex = 21, Parent = backpack })
+	local skillsTab = new("Frame", { Name = "SkillsTab", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 21, Parent = backpack })
+	local tabRow = new("Frame", {
+		Name = "Tabs",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -72, 0, 24),
+		Size = UDim2.fromOffset(2 * 130 + 8, 34),
+		BackgroundTransparency = 1,
+		ZIndex = 23,
+		Parent = backpack,
+	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	for i, name in { "Items", "Skills" } do
+		local tab = new("TextButton", {
+			Name = name,
+			Size = UDim2.fromOffset(130, 34),
+			Text = spaced(name),
+			FontFace = F.Label,
+			TextSize = 13,
+			AutoButtonColor = true,
+			LayoutOrder = i,
+			ZIndex = 24,
+			Parent = tabRow,
+		}, { stroke(C.Bronze, 2) })
+		tab.Activated:Connect(function()
+			showBackpackTab(name)
+		end)
+	end
+	buildSkillsTab(skillsTab)
+
 	-- Left column: equipment + stats
-	sectionHeader(backpack, "Equipment", BP_PAD, BP_HEAD_Y)
+	sectionHeader(itemsTab, "Equipment", BP_PAD, BP_HEAD_Y)
 	new("Frame", {
 		Name = "Equipment",
 		Position = UDim2.fromOffset(BP_PAD, BP_TOP),
 		Size = UDim2.fromOffset(BP_LEFT_W, 6 * 53),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
-		Parent = backpack,
+		Parent = itemsTab,
 	}, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
 	new("Frame", {
 		Name = "Stats",
@@ -1983,7 +2311,7 @@ local function buildBackpack()
 		Size = UDim2.fromOffset(BP_LEFT_W, 100),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
-		Parent = backpack,
+		Parent = itemsTab,
 	}, {
 		new("UIGridLayout", { CellSize = UDim2.fromOffset(136, 44), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
@@ -1996,11 +2324,11 @@ local function buildBackpack()
 		BackgroundTransparency = 0.9,
 		BorderSizePixel = 0,
 		ZIndex = 22,
-		Parent = backpack,
+		Parent = itemsTab,
 	})
 
 	-- Right column: inventory + powers
-	sectionHeader(backpack, "Inventory", BP_RIGHT_X, BP_HEAD_Y)
+	sectionHeader(itemsTab, "Inventory", BP_RIGHT_X, BP_HEAD_Y)
 	text({
 		Name = "ItemCount",
 		AnchorPoint = Vector2.new(1, 0),
@@ -2011,7 +2339,7 @@ local function buildBackpack()
 		TextColor3 = C.Ash,
 		TextXAlignment = Enum.TextXAlignment.Right,
 		ZIndex = 22,
-		Parent = backpack,
+		Parent = itemsTab,
 	})
 	new("Frame", {
 		Name = "Items",
@@ -2019,13 +2347,13 @@ local function buildBackpack()
 		Size = UDim2.fromOffset(BP_RIGHT_W, 3 * 72 + 2 * 10),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
-		Parent = backpack,
+		Parent = itemsTab,
 	}, {
 		new("UIGridLayout", { CellSize = UDim2.fromOffset(72, 72), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 	local powersY = BP_TOP + 3 * 72 + 2 * 10 + 26
-	sectionHeader(backpack, "Powers", BP_RIGHT_X, powersY)
-	-- Scrolls: each skill shows its level, duplicate copies and Level Up.
+	sectionHeader(itemsTab, "Powers", BP_RIGHT_X, powersY)
+	-- Scrolls; click a power to open it in the Skills tab.
 	new("ScrollingFrame", {
 		Name = "Powers",
 		Position = UDim2.fromOffset(BP_RIGHT_X, powersY + 42),
@@ -2037,18 +2365,10 @@ local function buildBackpack()
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ZIndex = 22,
-		Parent = backpack,
+		Parent = itemsTab,
 	}, {
-		new("UIGridLayout", { CellSize = UDim2.fromOffset(76, 112), CellPadding = UDim2.fromOffset(6, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(70, 86), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
-end
-
-local function clearGui(parent)
-	for _, child in parent:GetChildren() do
-		if child:IsA("GuiObject") then
-			child:Destroy()
-		end
-	end
 end
 
 local function equipmentRow(parent, order, iconId, key, title, subtitle, color, hover, rightPad)
@@ -2144,9 +2464,10 @@ refreshBackpack = function()
 	if not backpack or not backpack.Visible then
 		return
 	end
+	refreshSkillsTab()
 
 	-- Equipment
-	local equipment = backpack.Equipment
+	local equipment = backpack.ItemsTab.Equipment
 	clearGui(equipment)
 	for i, entry in SLOTS do
 		if entry.Fixed then
@@ -2180,7 +2501,7 @@ refreshBackpack = function()
 	end)
 
 	-- Stats
-	local stats = backpack.Stats
+	local stats = backpack.ItemsTab.Stats
 	clearGui(stats)
 	local level = player:GetAttribute("Level") or 1
 	local hum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
@@ -2200,7 +2521,7 @@ refreshBackpack = function()
 	stat(stats, 6, "Powers", tostring(#sortedOwned()))
 
 	-- Inventory
-	local grid = backpack.Items
+	local grid = backpack.ItemsTab.Items
 	clearGui(grid)
 	local kinds, pieces = 0, 0
 	for _, id in Items.Order do
@@ -2254,75 +2575,34 @@ refreshBackpack = function()
 			Parent = grid,
 		}, { corner(4), stroke(C.Bronze, 1, 0.65) })
 	end
-	backpack.ItemCount.Text = if pieces > 0 then `{pieces}   I T E M S` else "C L E A R   S T O R Y   A C T S   T O   C O L L E C T"
+	backpack.ItemsTab.ItemCount.Text = if pieces > 0 then `{pieces}   I T E M S` else "C L E A R   S T O R Y   A C T S   T O   C O L L E C T"
 
 	-- Powers (owned skills)
-	local powers = backpack.Powers
+	local powers = backpack.ItemsTab.Powers
 	clearGui(powers)
 	local owned = sortedOwned()
 	for i, id in owned do
 		local level = build.Skills[id]
-		local copies = (build.Copies or {})[id] or 0
 		local need = Skills.CopiesToLevel(level)
-		local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i, ZIndex = 22, Parent = powers })
+		local ready = need ~= nil and ((build.Copies or {})[id] or 0) >= need and not (build.Temp or {})[id]
+		local cell = new("TextButton", { Text = "", BackgroundTransparency = 1, AutoButtonColor = false, LayoutOrder = i, ZIndex = 22, Parent = powers })
 		local s = shard(id, 62, cell, 23)
-		s.Position = UDim2.fromOffset(7, 0)
+		s.Position = UDim2.fromOffset(4, 0)
 		text({
 			Position = UDim2.fromOffset(0, 62),
 			Size = UDim2.new(1, 0, 0, 16),
-			Text = if need then `{NUMERALS[level]}   ·   {copies}/{need}` else `{NUMERALS[level]}   ·   MAX`,
+			-- A green arrow marks a skill that can level up right now.
+			Text = NUMERALS[level] .. (if ready then "  ▲" else ""),
 			FontFace = F.TitleBold,
-			TextSize = 13,
-			TextColor3 = if need and copies >= need then C.Good else C.Gold,
+			TextSize = 14,
+			TextColor3 = if ready then C.Good else C.Gold,
 			ZIndex = 23,
 			Parent = cell,
 		})
-		-- Training skills are only borrowed: no levelling, gone when you leave.
-		local temp = (build.Temp or {})[id]
-		if temp then
-			local tag = text({
-				Position = UDim2.fromOffset(2, 82),
-				Size = UDim2.new(1, -4, 0, 24),
-				Text = "TRAINING",
-				FontFace = F.Label,
-				TextSize = 11,
-				TextColor3 = C.RiftHot,
-				BackgroundColor3 = Theme.C.Ink,
-				BackgroundTransparency = 0,
-				ZIndex = 24,
-				Parent = cell,
-			})
-			stroke(C.Rift, 1.5, 0.3).Parent = tag
-		end
-		-- Level Up: lights up once enough duplicate copies are collected.
-		if need and not temp then
-			local ready = copies >= need
-			local b = new("TextButton", {
-				Position = UDim2.fromOffset(2, 82),
-				Size = UDim2.new(1, -4, 0, 24),
-				Text = if ready then "LEVEL UP" else `{need - copies} MORE`,
-				FontFace = F.Label,
-				TextSize = 11,
-				TextColor3 = if ready then C.Parchment else C.Ash,
-				BackgroundColor3 = if ready then Color3.fromRGB(40, 110, 60) else Theme.C.Ink,
-				AutoButtonColor = ready,
-				ZIndex = 24,
-				Parent = cell,
-			}, { stroke(if ready then C.Good else C.Bronze, 1.5, if ready then 0 else 0.4) })
-			if ready then
-				b.Activated:Connect(function()
-					if levelBusy then
-						return
-					end
-					levelBusy = true
-					local ok, done, why = pcall(remotes.LevelSkill.InvokeServer, remotes.LevelSkill, id)
-					levelBusy = false
-					if not ok or not done then
-						HUD.Toast(if ok then (why or "Can't level up") else "Couldn't reach the server", C.Crimson)
-					end
-				end)
-			end
-		end
+		cell.Activated:Connect(function()
+			skillsSelected = id
+			showBackpackTab("Skills")
+		end)
 		hoverable(cell, function()
 			return id, build.Skills[id]
 		end)
@@ -2794,7 +3074,7 @@ function HUD.SetBackpack(open)
 		forge.Visible = false
 		attributes.Visible = false
 		backpack.Visible = true
-		refreshBackpack()
+		showBackpackTab(backpackTab) -- reopens on the last tab used (and refreshes)
 		-- Opening the backpack brings back runes waiting to be socketed.
 		runeDismissed = 0
 		refreshRunes()
