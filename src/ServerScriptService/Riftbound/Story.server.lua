@@ -67,18 +67,23 @@ end
 
 -- Exit gates (shown when an act is cleared) lead back to the Crossroads.
 local lastTouch = {}
-for _, gate in arenas:GetDescendants() do
-	if gate:IsA("BasePart") and gate:GetAttribute("Travel") then
-		gate.Touched:Connect(function(hit)
-			local player = Players:GetPlayerFromCharacter(hit.Parent)
-			if not player or os.clock() - (lastTouch[player] or 0) < 2 then
-				return
-			end
-			lastTouch[player] = os.clock()
-			exitStory(player, gate:GetAttribute("Travel"))
-		end)
+local function hookGates(arena)
+	for _, gate in arena:GetDescendants() do
+		if gate:IsA("BasePart") and gate:GetAttribute("Travel") then
+			gate.Touched:Connect(function(hit)
+				local player = Players:GetPlayerFromCharacter(hit.Parent)
+				if not player or os.clock() - (lastTouch[player] or 0) < 2 then
+					return
+				end
+				lastTouch[player] = os.clock()
+				exitStory(player, gate:GetAttribute("Travel"))
+			end)
+		end
 	end
 end
+hookGates(arenas)
+-- Each party gets its own copy of an act's arena; hook the copies' gates too.
+StoryService.OnArenaCreated = hookGates
 
 local function track(player)
 	task.spawn(StoryService.Init, player)

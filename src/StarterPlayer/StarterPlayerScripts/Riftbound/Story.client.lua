@@ -194,6 +194,9 @@ end
 local render
 
 local function canStart()
+	if player:GetAttribute("PartyId") and not player:GetAttribute("PartyLeader") then
+		return false, "Your party leader picks the act."
+	end
 	local done = progress()
 	if selectedAct > 1 and not done[Story.Key(selected, selectedAct - 1)] then
 		return false, "Clear Act " .. (selectedAct - 1) .. " first."
@@ -625,6 +628,7 @@ remotes:WaitForChild("StoryBanner").OnClientEvent:Connect(function(payload)
 	if payload.Kind == "Cleared" then
 		showResults(payload)
 	elseif payload.Kind == "Act" then
+		results.Visible = false -- the party leader picked Retry or Next
 		showBanner(payload, 5)
 	else
 		showBanner(payload, 2.5)

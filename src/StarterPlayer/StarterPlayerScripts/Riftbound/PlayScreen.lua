@@ -2,13 +2,16 @@
 -- Your Riftwalker stands on the left; mode cards fill the right (Story, Raid,
 -- Training, Daily Challenge). Only Training is playable for now: it fires
 -- EnterRift("Training") into the current arena. Story and Daily Challenge are
--- display cards; Raid is level-locked.
+-- display cards; Raid is level-locked. The bottom bar shows your party and a
+-- Party button that opens the invite panel (PartyPanel); in a party only the
+-- leader picks the match and the rest come along.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
+local PartyPanel = require(script.Parent:WaitForChild("PartyPanel"))
 
 local PlayScreen = {}
 
@@ -21,6 +24,7 @@ local C, F, new, stroke, text, tween, spaced, slab
 local screen, viewport, levelLabel, nameLabel, nationLabel, resetLabels, storyLabels
 local isOpen = false
 local spin, ticker
+local partyStrip, partyButton, hintLabel
 
 local RAID_LEVEL = 25
 local CARD_W, CARD_H, CARD_GAP = 440, 214, 22
@@ -146,7 +150,16 @@ end
 -- Mode cards
 -------------------------------------------------------------------------------
 
+-- In a party, only the leader picks the match.
+local function follower()
+	return player:GetAttribute("PartyId") ~= nil and not player:GetAttribute("PartyLeader")
+end
+
 local function enter(mode)
+	if follower() then
+		HUD.Toast("Your party leader picks the match.", C.Ash)
+		return
+	end
 	local remote = remotes:FindFirstChild("EnterRift")
 	if not remote then
 		HUD.Toast("The way into the Rift isn't open yet.", C.Ash)
@@ -163,7 +176,9 @@ local function storyHook()
 end
 
 local function activate(info)
-	if info.Story then
+	if follower() and (info.Story or info.Mode) then
+		HUD.Toast("Your party leader picks the match.", C.Ash)
+	elseif info.Story then
 		local hook = storyHook()
 		if hook then
 			PlayScreen.Close()
@@ -717,10 +732,37 @@ local function build(holder)
 		Parent = bar,
 	}, { stroke(C.Bronze, 2) })
 	back.Activated:Connect(PlayScreen.Close)
-	text({
+	partyButton = new("TextButton", {
+		Name = "Party",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 316, 0.5, 0),
+		Size = UDim2.fromOffset(220, 62),
+		Text = spaced("Party"),
+		FontFace = F.Title,
+		TextSize = 24,
+		TextColor3 = C.Parchment,
+		BackgroundColor3 = C.Rift:Lerp(C.Ink, 0.55),
+		AutoButtonColor = true,
+		ZIndex = 26,
+		Parent = bar,
+	}, { stroke(C.Bronze, 2) })
+	partyButton.Activated:Connect(PartyPanel.Open)
+	-- Headshots of everyone in your party, right of the Party button.
+	partyStrip = new("Frame", {
+		Name = "PartyStrip",
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 556, 0.5, 0),
+		Size = UDim2.fromOffset(4 * 58, 52),
+		BackgroundTransparency = 1,
+		ZIndex = 26,
+		Parent = bar,
+	}, {
+		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), VerticalAlignment = Enum.VerticalAlignment.Center }),
+	})
+	hintLabel = text({
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -40, 0.5, 0),
-		Size = UDim2.fromOffset(560, 30),
+		Size = UDim2.fromOffset(440, 30),
 		Text = "Pick a mode to step into the Rift.",
 		FontFace = F.Italic,
 		TextSize = 20,
@@ -729,6 +771,32 @@ local function build(holder)
 		ZIndex = 26,
 		Parent = bar,
 	})
+end
+
+local function refreshParty(party)
+	if not partyStrip then
+		return
+	end
+	for _, child in partyStrip:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+	local members = party and party.Members or {}
+	partyButton.Text = spaced(if party then `Party {#members}/{party.Max}` else "Party")
+	for i, m in members do
+		new("ImageLabel", {
+			Size = UDim2.fromOffset(52, 52),
+			BackgroundColor3 = C.Card,
+			Image = `rbxthumb://type=AvatarHeadShot&id={m.UserId}&w=60&h=60`,
+			LayoutOrder = i,
+			ZIndex = 27,
+		}, { stroke(if m.Leader then Color3.fromRGB(255, 200, 80) else C.Bronze, 2) }).Parent = partyStrip
+	end
+	hintLabel.Text = if party and party.Leader ~= player.UserId
+		then "Your party leader picks the match."
+		elseif party then "Pick a mode: your party comes with you."
+		else "Pick a mode to step into the Rift."
 end
 
 function PlayScreen.IsOpen()
@@ -765,6 +833,7 @@ function PlayScreen.Close()
 	end
 	isOpen = false
 	screen.Visible = false
+	PartyPanel.Close()
 	clearModel()
 	if ticker then
 		task.cancel(ticker)
@@ -781,6 +850,7 @@ function PlayScreen.Hide()
 	if isOpen then
 		isOpen = false
 		screen.Visible = false
+		PartyPanel.Close()
 		clearModel()
 		if ticker then
 			task.cancel(ticker)
@@ -799,6 +869,8 @@ function PlayScreen.Init(holder, hud, remoteFolder)
 	C, F, new, stroke, text, tween, spaced, slab =
 		style.C, style.F, style.new, style.stroke, style.text, style.tween, style.spaced, style.slab
 	build(holder)
+	PartyPanel.OnChanged = refreshParty
+	refreshParty(PartyPanel.Party())
 end
 
 return PlayScreen

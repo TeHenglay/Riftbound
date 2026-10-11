@@ -14,6 +14,7 @@ local Progression = require(Shared:WaitForChild("Progression"))
 local Stats = require(Shared:WaitForChild("Stats"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
 local PlayScreen = require(script.Parent:WaitForChild("PlayScreen"))
+local PartyPanel = require(script.Parent:WaitForChild("PartyPanel"))
 
 local LobbyMenu = {}
 
@@ -855,8 +856,8 @@ function LobbyMenu.Init(remoteFolder, hud)
 	end
 
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed or input.KeyCode ~= Enum.KeyCode.Escape then
-			return
+		if processed or input.KeyCode ~= Enum.KeyCode.Escape or PartyPanel.IsOpen() then
+			return -- the party panel closes itself first
 		end
 		if PlayScreen.IsOpen() then
 			PlayScreen.Close()

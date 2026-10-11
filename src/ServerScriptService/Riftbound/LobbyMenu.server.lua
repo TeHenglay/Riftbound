@@ -1,10 +1,12 @@
 -- Lobby menu: picking a match on the Play screen fires EnterRift(mode). Only
 -- Training (the current arena) is open; it walks the player through their
--- nation's portal (same path as touching the gate).
+-- nation's portal (same path as touching the gate). In a party only the
+-- leader can start, and every member waiting in a lobby comes along.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
 local NationService = require(script.Parent.NationService)
+local PartyService = require(script.Parent.PartyService)
 
 local remotes = Shared:WaitForChild("Remotes")
 local EnterRift = remotes:FindFirstChild("EnterRift") or Instance.new("RemoteEvent")
@@ -24,13 +26,29 @@ EnterRift.OnServerEvent:Connect(function(player, mode)
 		return
 	end
 	lastFire[player] = os.clock()
+	local notify = remotes:FindFirstChild("Notify")
+	local function tell(p, message)
+		if notify then
+			notify:FireClient(p, message)
+		end
+	end
+	if not PartyService.CanStart(player) then
+		tell(player, "Only your party leader can start a match")
+		return
+	end
 	-- Only from a lobby: nation chosen and not already in the Rift.
 	if player:GetAttribute("Nation") and not player:GetAttribute("InRift") then
+		local followers, busy = PartyService.Followers(player)
 		player:SetAttribute("MatchMode", mode)
 		NationService.EnterRift(player)
-		local notify = remotes:FindFirstChild("Notify")
-		if notify then
-			notify:FireClient(player, "Entering " .. MODES[mode])
+		tell(player, "Entering " .. MODES[mode])
+		for _, p in followers do
+			p:SetAttribute("MatchMode", mode)
+			NationService.EnterRift(p)
+			tell(p, player.DisplayName .. " is taking the party to " .. MODES[mode])
+		end
+		for _, p in busy do
+			tell(player, p.DisplayName .. " is busy and stayed behind")
 		end
 	end
 end)

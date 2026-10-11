@@ -1,5 +1,8 @@
 -- Story runs: a player starts an act from the story screen and is sent to its
--- arena; others starting the same act join the same run. Waves of husks rise
+-- arena with their party (PartyService); every run is private, so two parties
+-- on the same act each get their own copy of the arena (cloned on demand and
+-- reused, ARENA_OFFSET apart). Only the party leader starts, retries or moves
+-- on to the next act. Waves of husks rise
 -- from the rift scars, then the act's boss if it has one. Mobs drop only gold
 -- and XP; clearing pays gold plus the act's material bundle, unlocks the next
 -- act and opens the exit gate. Each cleared wave pauses the run for up to
@@ -23,6 +26,7 @@ local Enemies = require(script.Parent.Enemies)
 local ProgressionService = require(script.Parent.ProgressionService)
 local InventoryService = require(script.Parent.InventoryService)
 local StoryBuilder = require(script.Parent.StoryBuilder)
+local PartyService = require(script.Parent.PartyService)
 
 -- Nation foes replace the husks when the NationFoes module is in the place:
 -- every wave mob is the nation's element golem, the nation's named grunt and
@@ -39,12 +43,14 @@ end
 
 local WAVE_GAP = 3 -- seconds between waves
 local START_DELAY = 4
+local ARENA_OFFSET = Vector3.new(0, 0, 4000) -- between copies of one act's arena
 
 local StoryService = {}
 
 -- Set by Story.server.
 StoryService.OnNotify = function(_player, _text, _color) end
 StoryService.OnBanner = function(_player, _payload) end
+StoryService.OnArenaCreated = function(_arena) end -- a new arena copy (hook its exit gate)
 
 local store
 pcall(function()
@@ -53,6 +59,7 @@ end)
 
 local cleared = {} -- [player] = { ["Fire:1"] = true }
 local runs = {} -- [arenaName] = run
+local pools = {} -- ["Fire_Act1"] = { Template = Model, Arenas = { Model, ... } }
 
 local function publish(player)
 	local set = cleared[player] or {}
@@ -394,27 +401,117 @@ local function play(run)
 	showExit(run)
 end
 
-local function getRun(nationId, act)
+-- One pool of arenas per act: the built arena plus copies made when every one
+-- is taken. Returns nil if the act has no built arena.
+local function getPool(nationId, act)
 	local name = StoryBuilder.Name(nationId, act)
-	local arenas = workspace:FindFirstChild("StoryArenas")
-	local arena = arenas and arenas:FindFirstChild(name)
-	if not arena then
+	local pool = pools[name]
+	if pool then
+		return pool
+	end
+	local folder = workspace:FindFirstChild("StoryArenas")
+	local base = folder and folder:FindFirstChild(name)
+	if not base then
 		return nil
 	end
-	local run = runs[name]
-	if not run then
-		run = { Name = name, Nation = nationId, Act = act, Arena = arena, Players = {}, Enemies = {}, State = "Idle", Token = 0, Difficulty = Story.DefaultDifficulty }
-		runs[name] = run
+	-- Copied before any run touches it, so copies start with the gate hidden.
+	pool = { Name = name, Template = base:Clone(), Arenas = { base }, Folder = folder }
+	pools[name] = pool
+	return pool
+end
+
+local function freeArena(pool)
+	for _, arena in pool.Arenas do
+		if not runs[arena.Name] then
+			return arena
+		end
 	end
+	local slot = #pool.Arenas
+	local offset = ARENA_OFFSET * slot
+	local arena = pool.Template:Clone()
+	arena.Name = pool.Name .. "_" .. slot
+	arena:PivotTo(arena:GetPivot() + offset)
+	local center = arena:GetAttribute("Center")
+	if center then
+		arena:SetAttribute("Center", center + offset)
+		workspace.Terrain:FillBlock(CFrame.new(center + offset + Vector3.new(0, 20, 0)), Vector3.new(680, 420, 680), Enum.Material.Air)
+	end
+	local exit = arena:FindFirstChild("ExitGate", true)
+	local shown = exit and exit:GetAttribute("ShownPivot")
+	if shown then
+		exit:SetAttribute("ShownPivot", shown + offset)
+	end
+	arena.Parent = pool.Folder
+	table.insert(pool.Arenas, arena)
+	StoryService.OnArenaCreated(arena)
+	return arena
+end
+
+local function newRun(nationId, act, difficulty)
+	local pool = getPool(nationId, act)
+	if not pool then
+		return nil
+	end
+	local arena = freeArena(pool)
+	local run = { Name = arena.Name, Nation = nationId, Act = act, Arena = arena, Players = {}, Enemies = {}, State = "Idle", Token = 0, Difficulty = difficulty }
+	runs[run.Name] = run
 	return run
 end
 
--- Returns ok, message.
+local function release(run)
+	cleanup(run)
+	if runs[run.Name] == run then
+		runs[run.Name] = nil
+	end
+end
+
+local function join(run, player)
+	if not NationService.EnterArea(player, "Story", run.Arena.Entry) then
+		return false
+	end
+	run.Players[player] = true
+	player:SetAttribute("StoryRun", run.Name)
+	BuildService.ResetRunes(player) -- every run starts with empty sockets
+	RunStats.Reset(player)
+	return true
+end
+
+-- Sends the player and `followers` into a fresh run of the act; `busy` are
+-- party members who couldn't come. Returns ok, message.
+local function begin(player, nationId, act, difficulty, followers, busy)
+	local run = newRun(nationId, act, difficulty)
+	if not run then
+		return false, "This act isn't built yet"
+	end
+	if not join(run, player) then
+		release(run)
+		return false, "Can't travel right now"
+	end
+	local story = Story.Defs[nationId]
+	local actName = story.Acts[act].Name
+	for _, p in followers do
+		if join(run, p) then
+			StoryService.OnNotify(p, player.DisplayName .. " is taking the party to " .. actName, story.Color)
+		end
+	end
+	for _, p in busy do
+		StoryService.OnNotify(player, p.DisplayName .. " is busy and stayed behind", story.Color)
+	end
+	run.State = "Fighting"
+	task.spawn(play, run)
+	return true, "Entering " .. actName
+end
+
+-- Starts a private run for the player and the party members waiting in a
+-- lobby. Returns ok, message.
 function StoryService.Start(player, nationId, act, difficulty)
 	difficulty = difficulty or Story.DefaultDifficulty
 	local diff = Story.Difficulties[difficulty]
 	if not Story.Defs[nationId] or typeof(act) ~= "number" or not Story.Defs[nationId].Acts[act] or not diff then
 		return false, "Unknown act"
+	end
+	if not PartyService.CanStart(player) then
+		return false, "Only your party leader can start"
 	end
 	if not StoryService.IsUnlocked(player, nationId, act) then
 		return false, "Clear the previous act first"
@@ -425,35 +522,19 @@ function StoryService.Start(player, nationId, act, difficulty)
 	if player:GetAttribute("InRift") or not player:GetAttribute("Nation") or not player.Character then
 		return false, "Start a story from a lobby"
 	end
-	local run = getRun(nationId, act)
-	if not run then
-		return false, "This act isn't built yet"
-	end
-	if run.State == "Cleared" and next(run.Players) == nil then
-		cleanup(run)
-	end
-	if not NationService.EnterArea(player, "Story", run.Arena.Entry) then
-		return false, "Can't travel right now"
-	end
-	run.Players[player] = true
-	player:SetAttribute("StoryRun", run.Name)
-	BuildService.ResetRunes(player) -- every run starts with empty sockets
-	RunStats.Reset(player)
-	if run.State == "Idle" then
-		run.Difficulty = difficulty
-		run.State = "Fighting"
-		task.spawn(play, run)
-	elseif run.Difficulty ~= difficulty then
-		StoryService.OnNotify(player, "Joined a run already in progress on " .. run.Difficulty, Story.Defs[nationId].Color)
-	elseif run.State == "Cleared" then
-		StoryService.OnNotify(player, "This act was just cleared. Walk through the gate to leave.", Story.Defs[nationId].Color)
-	end
-	return true, "Entering " .. Story.Defs[nationId].Acts[act].Name
+	return begin(player, nationId, act, difficulty, PartyService.Followers(player))
 end
 
 local function runOf(player)
 	local name = player:GetAttribute("StoryRun")
 	return name and runs[name]
+end
+
+-- In a party, the leader picks Retry / Next for the run, unless they already
+-- left it.
+local function canChoose(player, run)
+	local party = PartyService.Get(player)
+	return not party or party.Leader == player or not run.Players[party.Leader]
 end
 
 -- Replays a cleared act for everyone still in it, on the same difficulty.
@@ -465,6 +546,9 @@ function StoryService.Retry(player)
 	end
 	if run.State ~= "Cleared" then
 		return false, "Finish the act first"
+	end
+	if not canChoose(player, run) then
+		return false, "Your party leader chooses what's next"
 	end
 	local difficulty = run.Difficulty
 	cleanup(run) -- clears leftovers, hides the exit gate, bumps the token
@@ -483,18 +567,21 @@ function StoryService.Retry(player)
 	return true
 end
 
--- Moves the player from a cleared act straight into the next one. Hard falls
+-- Moves everyone in a cleared act straight into the next one. Hard falls
 -- back to Normal if the next act hasn't been cleared on Normal yet.
 function StoryService.Next(player)
 	local run = runOf(player)
 	if not run or run.State ~= "Cleared" then
 		return false, "Finish the act first"
 	end
+	if not canChoose(player, run) then
+		return false, "Your party leader chooses what's next"
+	end
 	local nationId, act = run.Nation, run.Act + 1
 	if not Story.Defs[nationId].Acts[act] then
 		return false, "That was the last act"
 	end
-	if not getRun(nationId, act) then
+	if not getPool(nationId, act) then
 		return false, "The next act isn't built yet"
 	end
 	local difficulty = run.Difficulty
@@ -502,9 +589,24 @@ function StoryService.Next(player)
 	if need and not (cleared[player] or {})[Story.Key(nationId, act, need)] then
 		difficulty = Story.DefaultDifficulty
 	end
-	StoryService.Leave(player)
-	player:SetAttribute("InRift", false) -- Start only works from outside a run
-	return StoryService.Start(player, nationId, act, difficulty)
+	local companions = {}
+	for p in run.Players do
+		if p ~= player then
+			table.insert(companions, p)
+		end
+	end
+	for _, p in { player, table.unpack(companions) } do
+		StoryService.Leave(p)
+		p:SetAttribute("InRift", false) -- EnterArea only works from outside a run
+	end
+	local ok, message = begin(player, nationId, act, difficulty, companions, {})
+	if not ok then
+		-- Nowhere to go: send everyone home instead of leaving them in an empty arena.
+		for _, p in { player, table.unpack(companions) } do
+			NationService.GoTo(p, "Crossroads")
+		end
+	end
+	return ok, message
 end
 
 -- Called when a player leaves a run (death, gate, quitting).
@@ -518,7 +620,7 @@ function StoryService.Leave(player)
 	end
 	run.Players[player] = nil
 	if next(run.Players) == nil then
-		cleanup(run)
+		release(run)
 	end
 end
 

@@ -51,6 +51,26 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 - Code: `src/StarterPlayer/StarterPlayerScripts/Riftbound/LobbyMenu.lua`. Tile art
   is `menu_*` in `tools/art/build.js`; its uploaded ids go in `UIAssets.Menu`.
 
+## Parties (multiplayer)
+
+- Open **Play** and press **Party** in the bottom bar. The panel lists your
+  party (up to 4 players, leader included) and everyone else in the server
+  with an **Invite** button. Inviting makes you the party leader.
+- The invited player gets a popup with **Accept** / **Decline** (it expires
+  after 30 seconds). Party headshots show next to the Party button.
+- Only the leader picks the match. Starting **Training** or a **Story** act
+  brings every member who is waiting in a lobby; members already in a match
+  stay behind (the leader is told). Other members see "Your party leader
+  picks the match".
+- Story runs are private: each party gets its own copy of the act's arena
+  (cloned on demand 4000 studs apart and reused), so two parties on the same
+  act never meet. On the results screen the leader picks **Retry** or
+  **Next Act** for everyone; anyone can go back to the **Lobby**.
+- The leader can remove members; anyone can leave. If the leader leaves, the
+  next member leads; a party of one breaks up.
+- Code: `PartyService.lua` / `Party.server.lua` (server, party size in
+  `PartyService.Max`) and `PartyPanel.lua` (client panel and invite popups).
+
 ## Rift Flask
 
 - Press **R** to drink: after a short sip (you move at half speed) it restores
