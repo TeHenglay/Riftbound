@@ -1680,9 +1680,10 @@ end
 
 local function fusionRow(parent, option, order)
 	local a, b, r = Skills.Defs[option.A], Skills.Defs[option.B], Skills.Defs[option.Result]
+	-- Matches BuildService.Merge: the better level (owning it already adds a copy).
 	local level = Merge.ResultLevel(build.Skills[option.A], build.Skills[option.B])
 	if build.Skills[option.Result] then
-		level = math.min(math.max(build.Skills[option.Result], level) + 1, Skills.MaxLevel)
+		level = math.max(build.Skills[option.Result], level)
 	end
 	local color = Elements.ColorOf(r.Elements)
 
@@ -1894,6 +1895,7 @@ local ITEM_CELLS = 18 -- 6 x 3 grid: room for every material
 local inventory = {}
 local backpack
 local refreshBackpack
+local levelBusy = false -- a Level Up request is on its way
 
 local function showItemTooltip(id, count)
 	local def = Items.Defs[id]
@@ -2023,15 +2025,21 @@ local function buildBackpack()
 	})
 	local powersY = BP_TOP + 3 * 72 + 2 * 10 + 26
 	sectionHeader(backpack, "Powers", BP_RIGHT_X, powersY)
-	new("Frame", {
+	-- Scrolls: each skill shows its level, duplicate copies and Level Up.
+	new("ScrollingFrame", {
 		Name = "Powers",
 		Position = UDim2.fromOffset(BP_RIGHT_X, powersY + 42),
 		Size = UDim2.fromOffset(BP_RIGHT_W, BP_H - powersY - 42 - 20),
 		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 4,
+		ScrollBarImageColor3 = C.Rift,
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		CanvasSize = UDim2.new(),
 		ZIndex = 22,
 		Parent = backpack,
 	}, {
-		new("UIGridLayout", { CellSize = UDim2.fromOffset(64, 80), CellPadding = UDim2.fromOffset(8, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(76, 112), CellPadding = UDim2.fromOffset(6, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 end
 
@@ -2253,19 +2261,51 @@ refreshBackpack = function()
 	clearGui(powers)
 	local owned = sortedOwned()
 	for i, id in owned do
+		local level = build.Skills[id]
+		local copies = (build.Copies or {})[id] or 0
+		local need = Skills.CopiesToLevel(level)
 		local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i, ZIndex = 22, Parent = powers })
 		local s = shard(id, 62, cell, 23)
-		s.Position = UDim2.fromOffset(1, 0)
+		s.Position = UDim2.fromOffset(7, 0)
 		text({
 			Position = UDim2.fromOffset(0, 62),
 			Size = UDim2.new(1, 0, 0, 16),
-			Text = NUMERALS[build.Skills[id]],
+			Text = if need then `{NUMERALS[level]}   ·   {copies}/{need}` else `{NUMERALS[level]}   ·   MAX`,
 			FontFace = F.TitleBold,
-			TextSize = 14,
-			TextColor3 = C.Gold,
+			TextSize = 13,
+			TextColor3 = if need and copies >= need then C.Good else C.Gold,
 			ZIndex = 23,
 			Parent = cell,
 		})
+		-- Level Up: lights up once enough duplicate copies are collected.
+		if need then
+			local ready = copies >= need
+			local b = new("TextButton", {
+				Position = UDim2.fromOffset(2, 82),
+				Size = UDim2.new(1, -4, 0, 24),
+				Text = if ready then "LEVEL UP" else `{need - copies} MORE`,
+				FontFace = F.Label,
+				TextSize = 11,
+				TextColor3 = if ready then C.Parchment else C.Ash,
+				BackgroundColor3 = if ready then Color3.fromRGB(40, 110, 60) else Theme.C.Ink,
+				AutoButtonColor = ready,
+				ZIndex = 24,
+				Parent = cell,
+			}, { stroke(if ready then C.Good else C.Bronze, 1.5, if ready then 0 else 0.4) })
+			if ready then
+				b.Activated:Connect(function()
+					if levelBusy then
+						return
+					end
+					levelBusy = true
+					local ok, done, why = pcall(remotes.LevelSkill.InvokeServer, remotes.LevelSkill, id)
+					levelBusy = false
+					if not ok or not done then
+						HUD.Toast(if ok then (why or "Can't level up") else "Couldn't reach the server", C.Crimson)
+					end
+				end)
+			end
+		end
 		hoverable(cell, function()
 			return id, build.Skills[id]
 		end)

@@ -172,6 +172,16 @@ for id, def in Skills.Defs do
 	def.Id = id
 end
 
+-- Levelling up costs duplicate copies of the skill: getting a skill you
+-- already own adds a copy, and the player spends them in the Backpack.
+-- LevelCost[n] = copies used to go from level n - 1 to level n.
+Skills.LevelCost = { [2] = 3, [3] = 6, [4] = 12, [5] = 15 }
+
+-- Copies needed for the next level, or nil at max level.
+function Skills.CopiesToLevel(level)
+	return Skills.LevelCost[(level or 1) + 1]
+end
+
 function Skills.DamageMult(level)
 	return 1 + 0.25 * (level - 1)
 end

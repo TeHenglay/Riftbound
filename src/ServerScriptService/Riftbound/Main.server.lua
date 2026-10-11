@@ -40,6 +40,7 @@ local GetInventory = remote("RemoteFunction", "GetInventory")
 local InventoryChanged = remote("RemoteEvent", "InventoryChanged")
 local SpendStat = remote("RemoteFunction", "SpendStat")
 local RuneAction = remote("RemoteFunction", "Rune")
+local LevelSkill = remote("RemoteFunction", "LevelSkill")
 remote("RemoteEvent", "CooldownReset")
 local TestEquipSkill = remote("RemoteFunction", "TestEquipSkill")
 remotes.Parent = Shared
@@ -142,6 +143,11 @@ RuneAction.OnServerInvoke = function(player, action, a, b)
 		return BuildService.Unsocket(player, a, b)
 	end
 	return false, "Invalid request"
+end
+
+-- Spends duplicate copies to level a skill up (Backpack button).
+LevelSkill.OnServerInvoke = function(player, id)
+	return BuildService.LevelUp(player, id)
 end
 
 MergeSkills.OnServerInvoke = function(player, idA, idB)

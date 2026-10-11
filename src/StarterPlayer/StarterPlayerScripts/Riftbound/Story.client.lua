@@ -610,8 +610,8 @@ local function showResults(payload)
 	clearChildren(resRewards)
 	local order, delay = 1, 0.55
 	if payload.Skill and Skills.Defs[payload.Skill.Id] then
-		local level = payload.Skill.Level
-		rewardCell(0, UIAssets.Icons[payload.Skill.Id], if level <= 1 then "New!" else "Lv " .. level, Skills.Defs[payload.Skill.Id].Name, Theme.C.Coin, if level <= 1 then "NEW SKILL" else "SKILL UP", delay)
+		local copy = payload.Skill.Copy
+		rewardCell(0, UIAssets.Icons[payload.Skill.Id], if copy then "+1 Copy" else "New!", Skills.Defs[payload.Skill.Id].Name, Theme.C.Coin, if copy then "DUPLICATE" else "NEW SKILL", delay)
 		delay += 0.08
 	end
 	rewardCell(order, UIAssets.Coin, "+" .. commas(payload.Gold or 0), "Gold", Theme.C.Coin, nil, delay)

@@ -175,7 +175,25 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 
 - Five elements: Fire, Water, Earth, Air, Lightning. Each grants one base skill.
 - Fusing two base skills of different elements consumes both and gives the
-  fused skill at the higher of the two levels (+1 if you already own it).
+  fused skill at the higher of the two levels (a duplicate copy of it if you
+  already own it).
+
+## Skill levels (duplicates)
+
+- Getting a skill you already own (Story drops, fusing one you have) adds a
+  **copy** of it. Spend copies in the Backpack (B) with **Level Up**:
+
+  | Level | Copies used |
+  | --- | --- |
+  | 1 → 2 | 3 |
+  | 2 → 3 | 6 |
+  | 3 → 4 | 12 |
+  | 4 → 5 (max) | 15 |
+
+- Costs live in `Skills.LevelCost`. Copies are saved; spare copies carry over
+  when a skill is awakened and are lost when it's fused away.
+- Training shrines only teach skills you don't have yet, so they can't be
+  farmed for copies.
 - Every pair has a fusion (10 total), e.g. Fire + Water = Steam Cloud.
 - Elemental reactions: Lightning on a Soaked enemy deals x1.5 ("Conduct"),
   Fire on Soaked x1.25, Air on Burning x1.3, Earth on Stunned x1.4.

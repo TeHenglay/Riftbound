@@ -59,7 +59,7 @@ function BuildService.GrantHomeSkill(player, nationId)
 end
 
 function BuildService.Init(player)
-	builds[player] = { Skills = {}, Slots = {}, Cooldowns = {}, Sockets = {}, Pouch = {} }
+	builds[player] = { Skills = {}, Copies = {}, Slots = {}, Cooldowns = {}, Sockets = {}, Pouch = {} }
 
 	-- If the player already has a Nation attribute (rejoining player)
 	local currentNation = player:GetAttribute("Nation")
@@ -84,7 +84,7 @@ end
 -- the home skill was given. Runes and cooldowns are never saved.
 function BuildService.Export(player)
 	local b = builds[player]
-	return b and { Skills = table.clone(b.Skills), Slots = table.clone(b.Slots), HomeGranted = b.HomeGranted == true }
+	return b and { Skills = table.clone(b.Skills), Copies = table.clone(b.Copies), Slots = table.clone(b.Slots), HomeGranted = b.HomeGranted == true }
 end
 
 function BuildService.Import(player, saved)
@@ -93,11 +93,18 @@ function BuildService.Import(player, saved)
 		return
 	end
 	table.clear(b.Skills)
+	table.clear(b.Copies)
 	table.clear(b.Slots)
 	for id, level in type(saved.Skills) == "table" and saved.Skills or {} do
 		level = math.floor(tonumber(level) or 0)
 		if Skills.Defs[id] and id ~= BASIC_ATTACK and level >= 1 then
 			b.Skills[id] = math.min(level, Skills.MaxLevel)
+		end
+	end
+	for id, count in type(saved.Copies) == "table" and saved.Copies or {} do
+		count = math.floor(tonumber(count) or 0)
+		if b.Skills[id] and count > 0 then
+			b.Copies[id] = count
 		end
 	end
 	for _, slot in SLOTS do
@@ -113,14 +120,14 @@ end
 function BuildService.Snapshot(player)
 	local b = builds[player]
 	if not b then
-		return { Skills = {}, Slots = {}, Sockets = {}, Pouch = {} }
+		return { Skills = {}, Copies = {}, Slots = {}, Sockets = {}, Pouch = {} }
 	end
 	local sockets = {}
 	for skillId, list in b.Sockets do
 		sockets[skillId] = table.clone(list)
 	end
 	local offer = b.Offer and { Ids = table.clone(b.Offer.Ids), Ends = b.Offer.Ends }
-	return { Skills = table.clone(b.Skills), Slots = table.clone(b.Slots), Sockets = sockets, Pouch = table.clone(b.Pouch), Offer = offer }
+	return { Skills = table.clone(b.Skills), Copies = table.clone(b.Copies), Slots = table.clone(b.Slots), Sockets = sockets, Pouch = table.clone(b.Pouch), Offer = offer }
 end
 
 -------------------------------------------------------------------------------
@@ -277,7 +284,20 @@ local function firstFreeSlot(b)
 	return nil
 end
 
--- Gives a skill, or levels it up if already owned. Returns the new level.
+-- Adds one duplicate copy of an owned skill (spent on levels). Returns the
+-- new copy count.
+local function addCopy(player, b, id)
+	local def = Skills.Defs[id]
+	b.Copies[id] = (b.Copies[id] or 0) + 1
+	local need = Skills.CopiesToLevel(b.Skills[id])
+	local have = b.Copies[id]
+	local hint = if not need then "" elseif have >= need then "  ·  ready to level up (B)" else `  ·  {have}/{need} to level up`
+	BuildService.OnNotify(player, `+1 {def.Name} copy{hint}`, Elements.ColorOf(def.Elements))
+	return have
+end
+
+-- Gives a skill; a skill you already own adds a duplicate copy instead.
+-- Returns the skill's level, and whether it was a copy.
 function BuildService.Grant(player, id)
 	local b = builds[player]
 	local def = Skills.Defs[id]
@@ -286,19 +306,47 @@ function BuildService.Grant(player, id)
 	end
 	local level = b.Skills[id]
 	if level then
-		level = math.min(level + 1, Skills.MaxLevel)
-		BuildService.OnNotify(player, `{def.Name} is now level {level}`, Elements.ColorOf(def.Elements))
-	else
-		level = 1
-		local slot = firstFreeSlot(b)
-		if slot then
-			b.Slots[slot] = id
-		end
-		BuildService.OnNotify(player, `New skill: {def.Name}`, Elements.ColorOf(def.Elements))
+		addCopy(player, b, id)
+		BuildService.OnChanged(player)
+		return level, true
 	end
-	b.Skills[id] = level
+	b.Skills[id] = 1
+	local slot = firstFreeSlot(b)
+	if slot then
+		b.Slots[slot] = id
+	end
+	BuildService.OnNotify(player, `New skill: {def.Name}`, Elements.ColorOf(def.Elements))
 	BuildService.OnChanged(player)
-	return level
+	return 1, false
+end
+
+function BuildService.Owns(player, id)
+	local b = builds[player]
+	return b ~= nil and b.Skills[id] ~= nil
+end
+
+-- Spends duplicate copies to raise a skill one level (Skills.LevelCost).
+-- Returns ok, message.
+function BuildService.LevelUp(player, id)
+	local b = builds[player]
+	local def = typeof(id) == "string" and Skills.Defs[id]
+	if not b or not def or not b.Skills[id] then
+		return false, "You don't own that skill"
+	end
+	local level = b.Skills[id]
+	local need = Skills.CopiesToLevel(level)
+	if not need then
+		return false, "Already max level"
+	end
+	local have = b.Copies[id] or 0
+	if have < need then
+		return false, `Need {need} copies ({have}/{need})`
+	end
+	b.Copies[id] = if have - need > 0 then have - need else nil
+	b.Skills[id] = level + 1
+	BuildService.OnNotify(player, `{def.Name} is now level {level + 1}`, Elements.ColorOf(def.Elements))
+	BuildService.OnChanged(player)
+	return true, level + 1
 end
 
 function BuildService.Equip(player, slot, id)
@@ -330,10 +378,13 @@ function BuildService.Merge(player, idA, idB)
 		return false, "Those skills can't be fused"
 	end
 
+	-- The fusion keeps the higher level; fusing one you already own keeps the
+	-- better level and adds a duplicate copy of it.
 	local level = Merge.ResultLevel(b.Skills[idA], b.Skills[idB])
 	local existing = b.Skills[result]
 	if existing then
-		level = math.min(math.max(existing, level) + 1, Skills.MaxLevel)
+		level = math.max(existing, level)
+		b.Copies[result] = (b.Copies[result] or 0) + 1
 	end
 
 	local freed = nil
@@ -345,6 +396,8 @@ function BuildService.Merge(player, idA, idB)
 	end
 	b.Skills[idA] = nil
 	b.Skills[idB] = nil
+	b.Copies[idA] = nil -- spare copies go with the consumed skills
+	b.Copies[idB] = nil
 	-- Runes on the consumed skills go back to the pouch.
 	for _, gone in { idA, idB } do
 		for _, rune in b.Sockets[gone] or {} do
@@ -390,6 +443,12 @@ function BuildService.Awaken(player, baseSkillId, awakenedId)
 	local level = b.Skills[baseSkillId]
 	b.Skills[awakenedId] = level
 	b.Skills[baseSkillId] = nil
+	-- Spare copies carry over to the awakened skill.
+	b.Copies[awakenedId] = (b.Copies[awakenedId] or 0) + (b.Copies[baseSkillId] or 0)
+	if b.Copies[awakenedId] == 0 then
+		b.Copies[awakenedId] = nil
+	end
+	b.Copies[baseSkillId] = nil
 
 	-- Preserve equipped slot
 	for _, slot in SLOTS do

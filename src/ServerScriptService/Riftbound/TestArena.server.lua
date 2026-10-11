@@ -21,8 +21,14 @@ for _, prompt in arena:GetDescendants() do
 	if prompt:IsA("ProximityPrompt") then
 		local grant = prompt:GetAttribute("GrantSkill")
 		if grant then
+			-- Shrines teach a skill you don't have; duplicate copies (for
+			-- levelling) come from Story, so shrines can't be farmed.
 			prompt.Triggered:Connect(function(player)
-				BuildService.Grant(player, grant)
+				if BuildService.Owns(player, grant) then
+					BuildService.OnNotify(player, "You already know this skill. Copies to level it up drop in Story mode.", Color3.fromRGB(200, 160, 160))
+				else
+					BuildService.Grant(player, grant)
+				end
 			end)
 		end
 		if prompt:GetAttribute("FlaskRefill") then

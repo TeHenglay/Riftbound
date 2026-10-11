@@ -245,13 +245,13 @@ local function reward(run)
 			table.insert(items, { Id = id, Count = counts[id] })
 		end
 		ProgressionService.AddGold(player, gold)
-		-- Act 1 can drop the nation's home skill (new, or +1 level).
+		-- Act 1 can drop the nation's home skill (new, or a duplicate copy).
 		local skill
 		local skillId, chance = Story.SkillDropOf(run.Nation, run.Act)
 		if skillId and math.random() < chance then
-			local level = BuildService.Grant(player, skillId)
+			local level, copy = BuildService.Grant(player, skillId)
 			if level then
-				skill = { Id = skillId, Level = level }
+				skill = { Id = skillId, Level = level, Copy = copy }
 			end
 		end
 		StoryService.OnBanner(player, {
