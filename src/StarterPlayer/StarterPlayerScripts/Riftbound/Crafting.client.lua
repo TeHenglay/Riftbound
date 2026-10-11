@@ -1207,7 +1207,19 @@ local function renderDetails()
 		resultAura.ImageColor3 = getSkillColor(recipe.Result)
 
 		-- Material Requirements in Horizontal Scroll with Progress Bars
-		for mat, count in recipe.Materials do
+		-- Shards (Act 1), Cores (Act 2), Essences (Act 3), then Rift Shards.
+		local mats = {}
+		for mat in recipe.Materials do
+			table.insert(mats, mat)
+		end
+		local function rank(mat)
+			return if mat == "RiftShard" then 999 else (table.find(Items.Order, mat) or 500)
+		end
+		table.sort(mats, function(a, b)
+			return rank(a) < rank(b)
+		end)
+		for _, mat in mats do
+			local count = recipe.Materials[mat]
 			local mDef = Items.Defs[mat]
 			local mName = mDef and mDef.Name or mat
 			local owned = cachedInventory[mat] or 0
