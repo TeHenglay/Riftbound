@@ -18,6 +18,7 @@ local function remote(class, name)
 end
 local StartStory = remote("RemoteFunction", "StartStory")
 local StoryBanner = remote("RemoteEvent", "StoryBanner")
+local StoryAction = remote("RemoteFunction", "StoryAction")
 remote("BindableEvent", "OpenStoryLocal")
 
 StoryService.OnNotify = function(player, text, color)
@@ -39,6 +40,31 @@ StartStory.OnServerInvoke = function(player, nationId, act, difficulty)
 	return StoryService.Start(player, nationId, act, difficulty)
 end
 
+-- Leaving a story, by gate or by the results screen's Lobby button.
+local function exitStory(player, target)
+	StoryService.Leave(player)
+	-- Leaving a story counts as coming home from the Rift.
+	player:SetAttribute("InRift", false)
+	player:SetAttribute("Area", "Story")
+	NationService.GoTo(player, target or "Crossroads")
+end
+
+-- Results screen buttons: "Retry", "Next" or "Lobby". Returns ok, message.
+StoryAction.OnServerInvoke = function(player, action)
+	if not player:GetAttribute("StoryRun") then
+		return false, "You're not in a story"
+	end
+	if action == "Retry" then
+		return StoryService.Retry(player)
+	elseif action == "Next" then
+		return StoryService.Next(player)
+	elseif action == "Lobby" then
+		exitStory(player)
+		return true
+	end
+	return false, "Bad request"
+end
+
 -- Exit gates (shown when an act is cleared) lead back to the Crossroads.
 local lastTouch = {}
 for _, gate in arenas:GetDescendants() do
@@ -49,11 +75,7 @@ for _, gate in arenas:GetDescendants() do
 				return
 			end
 			lastTouch[player] = os.clock()
-			StoryService.Leave(player)
-			-- Leaving a story counts as coming home from the Rift.
-			player:SetAttribute("InRift", false)
-			player:SetAttribute("Area", "Story")
-			NationService.GoTo(player, gate:GetAttribute("Travel"))
+			exitStory(player, gate:GetAttribute("Travel"))
 		end)
 	end
 end

@@ -35,6 +35,27 @@ EnterRift.OnServerEvent:Connect(function(player, mode)
 	end
 end)
 
+-- The in-match settings menu's Leave Match: straight home to the nation lobby.
+-- Story.server.lua drops the player from their story run when Area changes.
+local LeaveMatch = remotes:FindFirstChild("LeaveMatch") or Instance.new("RemoteEvent")
+LeaveMatch.Name = "LeaveMatch"
+LeaveMatch.Parent = remotes
+
+local lastLeave = {}
+LeaveMatch.OnServerEvent:Connect(function(player)
+	if os.clock() - (lastLeave[player] or 0) < 2 or not player:GetAttribute("InRift") then
+		return
+	end
+	lastLeave[player] = os.clock()
+	player:SetAttribute("MatchMode", nil)
+	NationService.ReturnToLobby(player)
+	local notify = remotes:FindFirstChild("Notify")
+	if notify then
+		notify:FireClient(player, "You left the match")
+	end
+end)
+
 game:GetService("Players").PlayerRemoving:Connect(function(player)
 	lastFire[player] = nil
+	lastLeave[player] = nil
 end)

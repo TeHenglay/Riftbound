@@ -149,7 +149,7 @@ local function showNumber(model, amount, color, label)
 	local text = Instance.new("TextLabel")
 	text.Size = UDim2.fromScale(1, 1)
 	text.BackgroundTransparency = 1
-	text.Font = Enum.Font.GothamBlack
+	text.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.ExtraBold)
 	text.TextSize = if label then 24 else 20
 	text.TextColor3 = color
 	text.TextStrokeTransparency = 0.3
@@ -236,7 +236,7 @@ local function makeHealthGui(model, hum)
 	name.Name = "EnemyName"
 	name.Size = UDim2.new(1, 0, 0, 14)
 	name.BackgroundTransparency = 1
-	name.Font = Enum.Font.GothamBold
+	name.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.Bold)
 	name.TextSize = 12
 	name.TextColor3 = Color3.fromRGB(235, 225, 255)
 	name.TextStrokeTransparency = 0.4
@@ -266,7 +266,7 @@ local function makeHealthGui(model, hum)
 	status.Position = UDim2.fromOffset(0, 25)
 	status.Size = UDim2.new(1, 0, 0, 14)
 	status.BackgroundTransparency = 1
-	status.Font = Enum.Font.GothamBlack
+	status.FontFace = Font.new(Font.fromEnum(Enum.Font.BuilderSans).Family, Enum.FontWeight.ExtraBold)
 	status.TextSize = 11
 	status.RichText = true
 	status.TextStrokeTransparency = 0.4
@@ -321,8 +321,8 @@ end)
 
 -------------------------------------------------------------------------------
 -- Test dummies. opts: Name, Health, Speed, Chase (bool), Damage, Color, Regen,
--- Xp (number), Gold (number or {min, max}) and Loot ({ { Id, Chance, Min, Max } })
--- dropped on death
+-- Xp (number) and Gold (number or {min, max}) dropped on death. Mobs never drop
+-- materials; those come from act-clear bundles so the arena floor stays clean.
 -------------------------------------------------------------------------------
 
 local function nearestPlayerRoot(pos, maxDist)
@@ -623,14 +623,12 @@ function Enemies.SpawnDummy(cframe, opts)
 		if type(gold) == "table" then
 			gold = math.random(gold[1], gold[2])
 		end
-		local items = {}
-		for _, entry in opts.Loot or {} do
-			if math.random() < entry.Chance then
-				items[entry.Id] = (items[entry.Id] or 0) + math.random(entry.Min or 1, entry.Max or 1)
-			end
-		end
-		if (opts.Xp or 0) > 0 or (gold or 0) > 0 or next(items) then
-			Drops.Spawn(root.Position, opts.Xp, gold, root.Position.Y - 2, items)
+		-- Rune of the Prospector marks enemies it hits for extra loot.
+		local bonus = 1 + (model:GetAttribute("LootBonus") or 0)
+		local xp = math.floor((opts.Xp or 0) * bonus + 0.5)
+		gold = math.floor((gold or 0) * bonus + 0.5)
+		if xp > 0 or gold > 0 then
+			Drops.Spawn(root.Position, xp, gold, root.Position.Y - 2)
 		end
 		for _, p in model:GetDescendants() do
 			if p:IsA("BasePart") and p ~= root then

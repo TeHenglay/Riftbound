@@ -7,9 +7,11 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
+local Theme = require(Shared:WaitForChild("Theme"))
 local Story = require(Shared:WaitForChild("Story"))
 local Nations = require(Shared:WaitForChild("Nations"))
 local Items = require(Shared:WaitForChild("Items"))
+local Skills = require(Shared:WaitForChild("Skills"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
 local remotes = Shared:WaitForChild("NationRemotes")
 
@@ -26,33 +28,10 @@ end)
 
 local player = Players.LocalPlayer
 
-local C = {
-	Ink = Color3.fromRGB(7, 5, 10),
-	Bronze = Color3.fromRGB(168, 119, 63),
-	Gold = Color3.fromRGB(233, 194, 122),
-	Rift = Color3.fromRGB(178, 108, 255),
-	Parchment = Color3.fromRGB(241, 227, 198),
-	Ash = Color3.fromRGB(156, 138, 123),
-	Good = Color3.fromRGB(143, 227, 107),
-	Bad = Color3.fromRGB(232, 84, 84),
-}
-local function face(enum, weight, style)
-	return Font.new(Font.fromEnum(enum).Family, weight or Enum.FontWeight.Regular, style or Enum.FontStyle.Normal)
-end
-local F = {
-	TitleBold = face(Enum.Font.Bodoni, Enum.FontWeight.Bold),
-	Body = face(Enum.Font.Merriweather),
-	BodyBold = face(Enum.Font.Merriweather, Enum.FontWeight.Bold),
-	Label = face(Enum.Font.Oswald, Enum.FontWeight.Bold),
-	Italic = face(Enum.Font.Garamond, Enum.FontWeight.Regular, Enum.FontStyle.Italic),
-}
-local EMBLEM = {
-	Fire = UIAssets.Icons.Fireball,
-	Earth = UIAssets.Icons.StoneSpike,
-	Water = UIAssets.Icons.TidalWave,
-	Wind = UIAssets.Icons.Gust,
-	Lightning = UIAssets.Icons.ChainShock,
-}
+-- Colours and fonts come from the shared modern theme (Theme.lua).
+local C = Theme.Palette()
+local F = Theme.F
+local EMBLEM = UIAssets.Nations
 -- Acts with arenas so far; the rest show as coming soon.
 local BUILT = { [1] = true }
 
@@ -168,7 +147,7 @@ local status = text({ Position = UDim2.fromOffset(456, 652), Size = UDim2.fromOf
 local leaveBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -28, 0, 652), Size = UDim2.fromOffset(150, 46), BackgroundColor3 = Color3.fromRGB(40, 20, 26), Text = "LEAVE", TextColor3 = C.Parchment, TextSize = 18, FontFace = F.Label, Parent = content }, { corner(3), stroke(C.Bad, 1.5, 0.2) })
 local startBtn = new("TextButton", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -190, 0, 652), Size = UDim2.fromOffset(190, 46), BackgroundColor3 = Color3.fromRGB(28, 54, 30), Text = "START", TextColor3 = C.Gold, TextSize = 20, FontFace = F.Label, Parent = content }, { corner(3), stroke(C.Good, 2, 0) })
 
-local selected, selectedAct, selectedDiff = nil, 1, "Easy"
+local selected, selectedAct, selectedDiff = nil, 1, Story.DefaultDifficulty
 local busy = false
 
 local function progress()
@@ -196,6 +175,20 @@ local function tile(parent, order, w, icon, title, sub, color, on, locked)
 	text({ Position = UDim2.fromOffset(x, 14), Size = UDim2.new(1, -x - 6, 0, 24), Text = title, FontFace = F.TitleBold, TextSize = 20, TextColor3 = if locked then C.Ash else color, TextXAlignment = Enum.TextXAlignment.Left, Parent = b })
 	text({ Position = UDim2.fromOffset(x, 40), Size = UDim2.new(1, -x - 6, 0, 22), Text = sub, FontFace = F.Body, TextSize = 13, TextColor3 = C.Ash, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, Parent = b })
 	return b
+end
+
+-- Gold frame and a corner tag: marks the rare skill drop wherever it shows.
+local function rareStyle(b, label)
+	b.BackgroundColor3 = Color3.fromRGB(40, 32, 14)
+	local edge = b:FindFirstChildOfClass("UIStroke")
+	edge.Color = Theme.C.Coin
+	edge.Thickness = 3
+	edge.Transparency = 0
+	local tag = new("Frame", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -6, 0, -9), Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = Theme.C.Coin, ZIndex = (b.ZIndex or 1) + 2, Parent = b }, {
+		new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6) }),
+		Theme.Edged(2),
+	})
+	text({ Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Text = label, FontFace = F.BodyBold, TextSize = 11, TextColor3 = Color3.fromRGB(20, 16, 6), ZIndex = (b.ZIndex or 1) + 3, Parent = tag })
 end
 
 local render
@@ -235,7 +228,7 @@ function render()
 		card.Activated:Connect(function()
 			selected = id
 			selectedAct = 1
-			selectedDiff = "Easy"
+			selectedDiff = Story.DefaultDifficulty
 			render()
 		end)
 	end
@@ -265,7 +258,8 @@ function render()
 		local d = Story.Difficulties[name]
 		local locked = d.Needs and not done[Story.Key(selected, selectedAct, d.Needs)]
 		local sub = if locked then "Clear on " .. d.Needs else `HP ×{d.Health} · loot ×{d.Reward}`
-		local b = tile(diffRow, i, (RW - 30) / 4, nil, name, sub, d.Color, name == selectedDiff, locked)
+		local count = #Story.DifficultyOrder
+		local b = tile(diffRow, i, (RW - 10 * (count - 1)) / count, nil, name, sub, d.Color, name == selectedDiff, locked)
 		b.Activated:Connect(function()
 			selectedDiff = name
 			render()
@@ -275,14 +269,23 @@ function render()
 	clear(rewardRow)
 	local first = not done[Story.Key(selected, selectedAct, selectedDiff)]
 	local gold = math.floor(Story.ClearGold[selectedAct] * diff.Reward) * (if first then 2 else 1)
-	local essence = Story.EssenceReward[selectedAct] * diff.Reward * (if home == selected then Story.HomeBonus else 1)
-	local essenceId = Story.EssenceId(selected)
-	local w = (RW - 30) / 4
-	tile(rewardRow, 1, w, UIAssets.Coin, tostring(gold), if first then "Gold · first clear ×2" else "Gold", C.Gold, false, false)
-	tile(rewardRow, 2, w, UIAssets.Items[essenceId], tostring(math.floor(essence)), Items.Defs[essenceId].Name, def.Color, false, false)
-	for i, drop in Story.ShownDrops do
-		local item = Items.Defs[drop.Id]
-		tile(rewardRow, 2 + i, w, UIAssets.Items[drop.Id], math.floor(drop.Chance * 100) .. "%", item.Name, Items.Rarity[item.Rarity].Color, false, false)
+	-- The act-clear bundle: gold plus the guaranteed materials (mobs drop none).
+	local bundle = Story.Bundle(selected, selectedAct, selectedDiff, home == selected)
+	local dropSkill, dropChance = Story.SkillDropOf(selected, selectedAct)
+	local n = 1 + #bundle + (if dropSkill then 1 else 0)
+	local w = (RW - 10 * (n - 1)) / n
+	local roomy = w >= 150 -- narrow tiles drop the icon so the text fits
+	tile(rewardRow, 1, w, if roomy then UIAssets.Coin else nil, tostring(gold), if first then "Gold · first clear ×2" else "Gold", C.Gold, false, false)
+	for i, entry in bundle do
+		local item = Items.Defs[entry.Id]
+		tile(rewardRow, 1 + i, w, if roomy then UIAssets.Items[entry.Id] else nil, "×" .. entry.Count, item.Name, Items.Rarity[item.Rarity].Color, false, false)
+	end
+	-- The skill drop leads the row (LayoutOrder 0) in a gold frame with a tag,
+	-- so the chance at a new skill stands out from the guaranteed loot.
+	if dropSkill then
+		local skill = Skills.Defs[dropSkill]
+		local b = tile(rewardRow, 0, w, if roomy then UIAssets.Icons[dropSkill] else nil, math.floor(dropChance * 100) .. "%", skill.Name .. " · skill", Theme.C.Coin, false, false)
+		rareStyle(b, "RARE DROP")
 	end
 
 	local ok, why = canStart()
@@ -348,7 +351,7 @@ end
 local banner = new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 120), Size = UDim2.fromOffset(640, 110), BackgroundTransparency = 1, Visible = false, Parent = gui })
 local bannerKicker = text({ Size = UDim2.new(1, 0, 0, 18), FontFace = F.Label, TextSize = 14, Parent = banner })
 local bannerTitle = text({ Position = UDim2.fromOffset(0, 18), Size = UDim2.new(1, 0, 0, 50), FontFace = F.TitleBold, TextSize = 42, TextColor3 = C.Gold, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.3, Parent = banner })
-local bannerSub = text({ Position = UDim2.fromOffset(0, 70), Size = UDim2.new(1, 0, 0, 40), FontFace = F.Italic, TextSize = 19, TextColor3 = C.Parchment, TextWrapped = true, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.5, Parent = banner })
+local bannerSub = text({ Position = UDim2.fromOffset(0, 70), Size = UDim2.new(1, 0, 0, 64), FontFace = F.Italic, TextSize = 19, TextColor3 = C.Parchment, TextWrapped = true, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.5, Parent = banner })
 local bannerToken = 0
 
 local function showBanner(payload, duration)
@@ -376,11 +379,251 @@ local function showBanner(payload, duration)
 	end)
 end
 
+
+-------------------------------------------------------------------------------
+-- Results: the act-cleared screen. A header showing the story's map art, the
+-- run's stats (clear time, damage, kills), the rewards, and Retry / Next /
+-- Lobby. Everything animates in.
+-------------------------------------------------------------------------------
+
+local RES_W, RES_H = 800, 648
+local BAND_H = 200 -- map art header
+local RES_PAD = 32
+local BTN = {
+	Retry = Color3.fromRGB(255, 172, 64),
+	Next = Color3.fromRGB(96, 214, 128),
+	Lobby = Color3.fromRGB(236, 78, 78),
+}
+
+local results = new("Frame", { Name = "Results", Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.Ink, BackgroundTransparency = 0.3, Visible = false, Active = true, ZIndex = 30, Parent = gui })
+local resCard = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(RES_W, RES_H), BackgroundColor3 = Theme.C.Panel, ZIndex = 31, Parent = results }, { Theme.Edged(4) })
+local resScale = new("UIScale", { Parent = resCard })
+
+-- Header: the story's map art (as on the Story screen), darkened toward the
+-- bottom-left so the emblem and title stay readable.
+local resMap = new("ImageLabel", { Size = UDim2.new(1, 0, 0, BAND_H), BackgroundColor3 = Theme.C.Ink, BorderSizePixel = 0, ScaleType = Enum.ScaleType.Crop, ZIndex = 31, Parent = resCard })
+new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 31, Parent = resMap }, {
+	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.85), NumberSequenceKeypoint.new(0.5, 0.55), NumberSequenceKeypoint.new(1, 0.15) }) }),
+})
+new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 31, Parent = resMap }, {
+	new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(0.6, 0.9), NumberSequenceKeypoint.new(1, 1) }) }),
+})
+new("Frame", { Position = UDim2.fromOffset(0, BAND_H), Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 32, Parent = resCard })
+local DIA = 78
+local DIA_Y = BAND_H - 66 -- emblem and title sit low on the art
+new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(RES_PAD + 52, DIA_Y), Size = UDim2.fromOffset(DIA, DIA), Rotation = 45, BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, ZIndex = 32, Parent = resCard })
+local resDiamond = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(RES_PAD + 52, DIA_Y), Size = UDim2.fromOffset(DIA - 10, DIA - 10), Rotation = 45, BackgroundColor3 = Theme.C.Raised, BorderSizePixel = 0, ZIndex = 33, Parent = resCard })
+local resEmblem = new("ImageLabel", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(RES_PAD + 52, DIA_Y), Size = UDim2.fromOffset(86, 86), BackgroundTransparency = 1, ZIndex = 34, Parent = resCard })
+local TX = RES_PAD + 124
+local TY = BAND_H - 106
+local resKicker = text({ Position = UDim2.fromOffset(TX, TY), Size = UDim2.new(1, -TX - RES_PAD, 0, 16), Text = spaced("Victory"), FontFace = F.Label, TextSize = 13, TextColor3 = Color3.new(1, 1, 1), TextTransparency = 0.15, TextStrokeColor3 = Color3.new(0, 0, 0), TextStrokeTransparency = 0.5, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34, Parent = resCard })
+local resTitle = text({ Position = UDim2.fromOffset(TX, TY + 16), Size = UDim2.new(1, -TX - RES_PAD, 0, 46), FontFace = F.TitleBold, TextSize = 42, TextStrokeColor3 = Color3.new(0, 0, 0), TextStrokeTransparency = 0.4, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34, Parent = resCard })
+local resTags = new("Frame", { Position = UDim2.fromOffset(TX, TY + 66), Size = UDim2.new(1, -TX - RES_PAD, 0, 24), BackgroundTransparency = 1, ZIndex = 34, Parent = resCard }, {
+	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+
+-- Stats row.
+local STAT_Y = BAND_H + 26
+local resStats = new("Frame", { Position = UDim2.fromOffset(RES_PAD, STAT_Y), Size = UDim2.new(1, -RES_PAD * 2, 0, 84), BackgroundTransparency = 1, ZIndex = 32, Parent = resCard }, {
+	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 14), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local statValue = {}
+for i, info in {
+	{ Key = "Time", Label = "Clear time", Color = Color3.fromRGB(110, 200, 255) },
+	{ Key = "Damage", Label = "Damage dealt", Color = Color3.fromRGB(255, 96, 88) },
+	{ Key = "Kills", Label = "Enemies defeated", Color = Color3.fromRGB(255, 196, 80) },
+} do
+	local box = new("Frame", { Size = UDim2.new(1 / 3, -10, 1, 0), BackgroundColor3 = Theme.C.Raised, LayoutOrder = i, ZIndex = 33, Parent = resStats }, { Theme.Edged(2) })
+	new("Frame", { Size = UDim2.new(1, 0, 0, 4), BackgroundColor3 = info.Color, BorderSizePixel = 0, ZIndex = 34, Parent = box })
+	text({ Position = UDim2.fromOffset(16, 16), Size = UDim2.new(1, -32, 0, 14), Text = spaced(info.Label), FontFace = F.Label, TextSize = 10, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34, Parent = box })
+	statValue[info.Key] = text({ Position = UDim2.fromOffset(16, 34), Size = UDim2.new(1, -32, 0, 38), FontFace = F.TitleBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 34, Parent = box })
+end
+
+-- Rewards.
+local REW_Y = STAT_Y + 84 + 26
+text({ Position = UDim2.fromOffset(RES_PAD, REW_Y), Size = UDim2.fromOffset(200, 14), Text = spaced("Rewards"), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 32, Parent = resCard })
+local resRewards = new("Frame", { Position = UDim2.fromOffset(RES_PAD, REW_Y + 26), Size = UDim2.new(1, -RES_PAD * 2, 0, 120), BackgroundTransparency = 1, ZIndex = 32, Parent = resCard }, {
+	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 14), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+
+-- Buttons and status line.
+local resButtons = new("Frame", { Position = UDim2.fromOffset(RES_PAD, RES_H - 104), Size = UDim2.new(1, -RES_PAD * 2, 0, 62), BackgroundTransparency = 1, ZIndex = 32, Parent = resCard }, {
+	new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 14), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+local resStatus = text({ Position = UDim2.fromOffset(RES_PAD, RES_H - 34), Size = UDim2.new(1, -RES_PAD * 2, 0, 18), FontFace = F.Body, TextSize = 13, TextColor3 = C.Bad, ZIndex = 32, Parent = resCard })
+
+local function commas(n)
+	local s = tostring(math.floor(n))
+	local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
+	return (out:gsub("^,", ""))
+end
+
+local function clock(seconds)
+	seconds = math.max(0, math.floor(seconds))
+	return string.format("%d:%02d", seconds // 60, seconds % 60)
+end
+
+-- Counts a stat up from zero.
+local function countUp(label, target, format, delay)
+	label.Text = format(0)
+	task.delay(delay, function()
+		local t0 = os.clock()
+		while os.clock() - t0 < 0.8 do
+			local a = (os.clock() - t0) / 0.8
+			label.Text = format(target * (1 - (1 - a) ^ 3))
+			task.wait()
+		end
+		label.Text = format(target)
+	end)
+end
+
+local function chip(order, label, bg, fg)
+	local f = new("Frame", { Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = bg, LayoutOrder = order, ZIndex = 35, Parent = resTags }, {
+		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
+		Theme.Edged(2),
+	})
+	text({ Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Text = label, FontFace = F.BodyBold, TextSize = 12, TextColor3 = fg, ZIndex = 36, Parent = f })
+end
+
+-- A reward cell: icon on top, amount and name underneath. Pops in after `delay`.
+local function rewardCell(order, icon, amount, name, color, rare, delay)
+	local holder = new("Frame", { Size = UDim2.fromOffset(104, 120), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 33, Parent = resRewards })
+	local b = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(1, 1), BackgroundColor3 = Theme.C.Raised, ZIndex = 33, Parent = holder }, { stroke(C.Bronze, 2) })
+	local pop = new("UIScale", { Scale = 0, Parent = b })
+	if icon then
+		new("ImageLabel", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 10), Size = UDim2.fromOffset(60, 60), BackgroundTransparency = 1, Image = icon, ZIndex = 34, Parent = b })
+	end
+	text({ Position = UDim2.fromOffset(4, 72), Size = UDim2.new(1, -8, 0, 22), Text = amount, FontFace = F.TitleBold, TextSize = 20, TextColor3 = color, ZIndex = 34, Parent = b })
+	text({ Position = UDim2.fromOffset(4, 94), Size = UDim2.new(1, -8, 0, 16), Text = name, FontFace = F.Body, TextSize = 12, TextColor3 = C.Ash, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 34, Parent = b })
+	if rare then
+		rareStyle(b, rare)
+	end
+	task.delay(delay, function()
+		TweenService:Create(pop, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	end)
+end
+
+local resBusy = false
+local function resAction(action)
+	if resBusy then
+		return
+	end
+	resBusy = true
+	resStatus.Text = ""
+	local ok, done, msg = pcall(function()
+		local r = remotes:WaitForChild("StoryAction", 5)
+		return r:InvokeServer(action)
+	end)
+	resBusy = false
+	if ok and done then
+		results.Visible = false
+	else
+		resStatus.Text = if ok then (msg or "Can't do that right now") else "The Rift is closed"
+	end
+end
+
+local function resButton(order, label, color, enabled, action)
+	local b = new("TextButton", {
+		Size = UDim2.new(1 / 3, -10, 1, 0),
+		Text = label,
+		FontFace = F.TitleBold,
+		TextSize = 20,
+		TextColor3 = if enabled then Theme.C.Ink else C.Ash,
+		BackgroundColor3 = if enabled then color else Theme.C.Raised,
+		AutoButtonColor = false,
+		LayoutOrder = order,
+		ZIndex = 33,
+		Parent = resButtons,
+	}, { Theme.Edged(3) })
+	if enabled then
+		local base = color
+		b.MouseEnter:Connect(function()
+			tween(b, 0.12, { BackgroundColor3 = base:Lerp(Color3.new(1, 1, 1), 0.18) })
+		end)
+		b.MouseLeave:Connect(function()
+			tween(b, 0.12, { BackgroundColor3 = base })
+		end)
+		b.Activated:Connect(function()
+			resAction(action)
+		end)
+	end
+	return b
+end
+
+local function clearChildren(frame)
+	for _, child in frame:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+local function showResults(payload)
+	local story = Story.Defs[payload.Nation]
+	local color = payload.Color or C.Rift
+	resMap.Image = (story and story.Image) or ""
+	resDiamond.BackgroundColor3 = color:Lerp(Theme.C.Raised, 0.7)
+	resEmblem.Image = EMBLEM[payload.Nation] or ""
+	resTitle.Text = (payload.Title or "Act Cleared"):upper()
+	resKicker.Text = spaced("Victory") .. "   ·   " .. (payload.Subtitle or "")
+	resStatus.Text = ""
+
+	clearChildren(resTags)
+	local diff = Story.Difficulties[payload.Difficulty]
+	if diff then
+		chip(1, payload.Difficulty:upper(), diff.Color, Theme.C.Ink)
+	end
+	if payload.First then
+		chip(2, "FIRST CLEAR  ·  GOLD ×2", Theme.C.Coin, Theme.C.Ink)
+	end
+
+	countUp(statValue.Time, payload.Time or 0, clock, 0.25)
+	countUp(statValue.Damage, payload.Damage or 0, commas, 0.35)
+	countUp(statValue.Kills, payload.Kills or 0, commas, 0.45)
+
+	clearChildren(resRewards)
+	local order, delay = 1, 0.55
+	if payload.Skill and Skills.Defs[payload.Skill.Id] then
+		local level = payload.Skill.Level
+		rewardCell(0, UIAssets.Icons[payload.Skill.Id], if level <= 1 then "New!" else "Lv " .. level, Skills.Defs[payload.Skill.Id].Name, Theme.C.Coin, if level <= 1 then "NEW SKILL" else "SKILL UP", delay)
+		delay += 0.08
+	end
+	rewardCell(order, UIAssets.Coin, "+" .. commas(payload.Gold or 0), "Gold", Theme.C.Coin, nil, delay)
+	for _, entry in payload.Items or {} do
+		order += 1
+		delay += 0.08
+		local item = Items.Defs[entry.Id]
+		rewardCell(order, UIAssets.Items[entry.Id], "×" .. entry.Count, if item then item.Name else entry.Id, if item then Items.Rarity[item.Rarity].Color else C.Parchment, nil, delay)
+	end
+
+	clearChildren(resButtons)
+	local nextAct = payload.Act and payload.Act + 1
+	local hasNext = story ~= nil and story.Acts[nextAct] ~= nil
+	local nextBuilt = hasNext and BUILT[nextAct] == true
+	resButton(1, "Retry", BTN.Retry, true, "Retry")
+	resButton(2, if nextBuilt then "Next Act" elseif hasNext then "Next Act · Soon" else "Last Act", BTN.Next, nextBuilt, "Next")
+	resButton(3, "Lobby", BTN.Lobby, true, "Lobby")
+
+	-- Entrance: the shade fades in and the card scales up.
+	local view = workspace.CurrentCamera.ViewportSize
+	local fit = math.min(1, (view.X - 24) / RES_W, (view.Y - 24) / RES_H)
+	results.BackgroundTransparency = 1
+	results.Visible = true
+	tween(results, 0.3, { BackgroundTransparency = 0.3 })
+	resScale.Scale = fit * 0.88
+	TweenService:Create(resScale, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = fit }):Play()
+end
+
+-- Dying or leaving the run closes it.
+player:GetAttributeChangedSignal("StoryRun"):Connect(function()
+	if not player:GetAttribute("StoryRun") then
+		results.Visible = false
+	end
+end)
+
 remotes:WaitForChild("StoryBanner").OnClientEvent:Connect(function(payload)
 	if payload.Kind == "Cleared" then
-		local essenceName = Items.Defs[payload.EssenceId] and Items.Defs[payload.EssenceId].Name or "Essence"
-		payload.Subtitle = `{payload.Subtitle}   ·   +{payload.Gold} gold{if payload.First then " (first clear)" else ""}   ·   +{payload.Essence} {essenceName}\nWalk through the gate to return.`
-		showBanner(payload, 7)
+		showResults(payload)
 	elseif payload.Kind == "Act" then
 		showBanner(payload, 5)
 	else

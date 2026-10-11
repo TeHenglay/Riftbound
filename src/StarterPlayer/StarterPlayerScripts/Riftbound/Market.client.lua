@@ -8,6 +8,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Riftbound")
+local Theme = require(Shared:WaitForChild("Theme"))
 local Market = require(Shared:WaitForChild("Market"))
 local Items = require(Shared:WaitForChild("Items"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
@@ -16,28 +17,10 @@ local mainRemotes = Shared:WaitForChild("Remotes")
 
 local player = Players.LocalPlayer
 
-local C = {
-	Ink = Color3.fromRGB(7, 5, 10),
-	Bronze = Color3.fromRGB(168, 119, 63),
-	Gold = Color3.fromRGB(233, 194, 122),
-	Rift = Color3.fromRGB(178, 108, 255),
-	RiftDeep = Color3.fromRGB(64, 26, 128),
-	Parchment = Color3.fromRGB(241, 227, 198),
-	Ash = Color3.fromRGB(156, 138, 123),
-	Good = Color3.fromRGB(143, 227, 107),
-	Bad = Color3.fromRGB(232, 84, 84),
-}
+-- Colours and fonts come from the shared modern theme (Theme.lua).
+local C = Theme.Palette()
 
-local function face(enum, weight, style)
-	return Font.new(Font.fromEnum(enum).Family, weight or Enum.FontWeight.Regular, style or Enum.FontStyle.Normal)
-end
-local F = {
-	TitleBold = face(Enum.Font.Bodoni, Enum.FontWeight.Bold),
-	Body = face(Enum.Font.Merriweather),
-	BodyBold = face(Enum.Font.Merriweather, Enum.FontWeight.Bold),
-	Label = face(Enum.Font.Oswald, Enum.FontWeight.Bold),
-	Italic = face(Enum.Font.Garamond, Enum.FontWeight.Regular, Enum.FontStyle.Italic),
-}
+local F = Theme.F
 
 local function new(class, props, children)
 	local inst = Instance.new(class)

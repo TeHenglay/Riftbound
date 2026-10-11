@@ -1,6 +1,6 @@
--- Riftbound HUD in the "Shattered Obsidian" style: textured obsidian slabs held
--- by bronze clamps, glowing rift cracks, crystal-shard skill icons with inked
--- glyphs, crimson vitals and classical serif type. The art is drawn by
+-- Riftbound HUD in the shared modern theme (Theme.lua): flat dark panels with
+-- hard black edges and square corners, diamond skill icons, crimson vitals,
+-- lettered in BuilderSans. The art is drawn by
 -- tools/art/build.js and referenced through ReplicatedStorage.Riftbound.UIAssets.
 -- Contains the vitals (level/HP/XP), gold, ability shards, the Arsenal list,
 -- tooltips, toasts and the Forge ("choose one fusion").
@@ -20,34 +20,14 @@ local Progression = require(Shared:WaitForChild("Progression"))
 local Skills = require(Shared:WaitForChild("Skills"))
 local Stats = require(Shared:WaitForChild("Stats"))
 local Nations = require(Shared:WaitForChild("Nations"))
+local Runes = require(Shared:WaitForChild("Runes"))
 local UIAssets = require(Shared:WaitForChild("UIAssets"))
+local Theme = require(Shared:WaitForChild("Theme"))
 
-local C = {
-	Ink = Color3.fromRGB(7, 5, 10),
-	Bronze = Color3.fromRGB(168, 119, 63),
-	Gold = Color3.fromRGB(233, 194, 122),
-	Crimson = Color3.fromRGB(200, 34, 46),
-	Blood = Color3.fromRGB(96, 10, 20),
-	Rift = Color3.fromRGB(178, 108, 255),
-	RiftHot = Color3.fromRGB(231, 200, 255),
-	RiftDeep = Color3.fromRGB(64, 26, 128),
-	Parchment = Color3.fromRGB(241, 227, 198),
-	Ash = Color3.fromRGB(156, 138, 123),
-	Good = Color3.fromRGB(143, 227, 107),
-}
+-- Colours and fonts come from the shared modern theme (Theme.lua).
+local C = Theme.Palette()
 
-local function face(enum, weight, style)
-	return Font.new(Font.fromEnum(enum).Family, weight or Enum.FontWeight.Regular, style or Enum.FontStyle.Normal)
-end
-
-local F = {
-	Title = face(Enum.Font.Bodoni),
-	TitleBold = face(Enum.Font.Bodoni, Enum.FontWeight.Bold),
-	Body = face(Enum.Font.Merriweather),
-	BodyBold = face(Enum.Font.Merriweather, Enum.FontWeight.Bold),
-	Label = face(Enum.Font.Oswald, Enum.FontWeight.Bold),
-	Italic = face(Enum.Font.Garamond, Enum.FontWeight.Regular, Enum.FontStyle.Italic),
-}
+local F = Theme.F
 
 local NUMERALS = { "I", "II", "III", "IV", "V" }
 local KEYWORDS = {}
@@ -58,13 +38,17 @@ end
 
 -- Fixed slots always hold the same ability (Fixed = its id).
 local SLOTS = {
-	{ Slot = "M1", Key = "LMB", Lift = 10 },
-	{ Slot = "M2", Key = "RMB", Lift = 10, Fixed = "Block" },
-	{ Slot = "Q", Key = "Q", Lift = 0 },
-	{ Slot = "E", Key = "E", Lift = 0 },
-	{ Slot = "Dash", Key = "SHIFT", Lift = 10, Fixed = "Dash" },
+	{ Slot = "M1", Key = "LMB" },
+	{ Slot = "M2", Key = "RMB", Fixed = "Block" },
+	{ Slot = "Q", Key = "Q" },
+	{ Slot = "E", Key = "E" },
+	{ Slot = "Dash", Key = "SHIFT", Fixed = "Dash" },
 }
 local ICON = 84
+-- Skill slots are diamond icons (black border baked into the art), drawn a
+-- little larger than ICON since a diamond fills less of its box.
+local DIAMOND = ICON + 8
+local SKILL_ART = 512 -- source pixel size of the skill icons (for cropping)
 local FIXED_INFO = {
 	Dash = { Name = "Dash", Meta = "MOVEMENT  ·  SHIFT", Subtitle = "M O V E M E N T", Description = "A swift dash through danger. Use it to reposition and escape." },
 	Block = { Name = "Block", Meta = "DEFENSE  ·  HOLD RMB", Subtitle = "D E F E N S E", Description = "Hold to raise a rift shield that stops enemy attacks. You move at half speed and it breaks after 3 seconds. Block right as a hit lands to parry: the attacker is stunned and knocked back." },
@@ -74,7 +58,7 @@ local HUD = {}
 
 local player = Players.LocalPlayer
 local remotes
-local build = { Skills = {}, Slots = {} }
+local build = { Skills = {}, Slots = {}, Sockets = {}, Pouch = {} }
 local discovered = {}
 local cooldownEnds = {} -- [skillId] = { Ends, Length }
 local dash = { Ends = 0, Length = 1 }
@@ -109,6 +93,7 @@ local function stroke(color, thickness, transparency)
 		Color = color,
 		Thickness = thickness or 1.5,
 		Transparency = transparency or 0,
+		LineJoinMode = Enum.LineJoinMode.Miter,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	})
 end
@@ -150,50 +135,17 @@ local function emphasize(desc, extra)
 	return out
 end
 
--- Tiled film grain + stretched smoke on top of a textured surface.
-local function texture(parent, z, grainAlpha, smokeAlpha)
-	new("ImageLabel", {
-		Name = "Smoke",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Smoke,
-		ImageTransparency = smokeAlpha or 0.55,
-		ScaleType = Enum.ScaleType.Stretch,
-		ZIndex = z,
-		Parent = parent,
-	})
-	new("ImageLabel", {
-		Name = "Grain",
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Grain,
-		ImageTransparency = grainAlpha or 0.55,
-		ScaleType = Enum.ScaleType.Tile,
-		TileSize = UDim2.fromOffset(256, 256),
-		ZIndex = z,
-		Parent = parent,
-	})
-end
-
--- Obsidian slab panel (9-slice art) with grain inside the rim.
-local function slab(props, image, slice)
-	props.BackgroundTransparency = 1
-	props.Image = image or UIAssets.Slab
-	props.ScaleType = Enum.ScaleType.Slice
-	props.SliceCenter = slice or UIAssets.SlabSlice
-	props.SliceScale = props.SliceScale or 0.5
-	local z = props.ZIndex or 1
+-- A flat dark panel with a hard black edge (the old obsidian slab art is gone).
+local function slab(props)
+	props.Image = ""
+	props.BackgroundColor3 = props.BackgroundColor3 or Theme.C.Panel
+	props.BackgroundTransparency = props.BackgroundTransparency or 0.06
+	props.BorderSizePixel = 0
+	props.ScaleType = nil
+	props.SliceCenter = nil
+	props.SliceScale = nil
 	local panel = new("ImageLabel", props)
-	local inner = new("Frame", {
-		Name = "Texture",
-		Position = UDim2.fromOffset(10, 10),
-		Size = UDim2.new(1, -20, 1, -20),
-		BackgroundTransparency = 1,
-		ClipsDescendants = true,
-		ZIndex = z,
-		Parent = panel,
-	})
-	texture(inner, z, 0.6, 0.7)
+	Theme.Edged().Parent = panel
 	return panel
 end
 
@@ -230,6 +182,8 @@ local function headlineStat(def, level)
 		return "Damage per tick", string.format("%d  ·  %d sec", math.floor(def.TickDamage * mult + 0.5), def.Duration)
 	elseif def.Kind == "Chain" then
 		return "Damage", string.format("%d  ·  %d jumps", math.floor(def.Damage * mult + 0.5), def.Jumps)
+	elseif def.Kind == "Serpent" then
+		return "Damage", string.format("%d  ·  up to %d bites", math.floor(def.Damage * mult + 0.5), def.Jumps)
 	end
 	return "Damage", tostring(math.floor(def.Damage * mult + 0.5))
 end
@@ -377,36 +331,80 @@ local function buildVitals()
 		Parent = gui,
 	})
 
-	local medal = new("ImageLabel", {
+	local medal = new("Frame", {
 		Name = "Medallion",
-		Size = UDim2.fromOffset(86, 86),
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.fromOffset(92, 92),
 		BackgroundTransparency = 1,
-		Image = UIAssets.Medallion,
-		ZIndex = 5,
+		ZIndex = 8,
 		Parent = root,
 	})
-	text({ Position = UDim2.fromOffset(0, 24), Size = UDim2.new(1, 0, 0, 12), Text = "L V", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 6, Parent = medal })
-	local levelText = text({ Position = UDim2.fromOffset(0, 34), Size = UDim2.new(1, 0, 0, 34), Text = "1", FontFace = F.TitleBold, TextSize = 32, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.3, ZIndex = 6, Parent = medal })
+	-- The diamond is three squares turned 45 degrees: a black edge, a gold ring
+	-- and a dark core. Sides are 1/sqrt(2) of the box so the tips touch its edges,
+	-- and they scale with it for the level-up bounce.
+	local SIDE = 1 / math.sqrt(2)
+	local function diamond(name, inset, color, z)
+		return new("Frame", {
+			Name = name,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.new(SIDE, -inset, SIDE, -inset),
+			Rotation = 45,
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			ZIndex = z,
+			Parent = medal,
+		})
+	end
+	diamond("Edge", 0, Color3.fromRGB(0, 0, 0), 8)
+	local gold = diamond("Gold", 6, Color3.new(1, 1, 1), 8)
+	new("UIGradient", {
+		Color = ColorSequence.new(Color3.fromRGB(255, 222, 120), Color3.fromRGB(196, 140, 40)),
+		Rotation = 45,
+		Parent = gold,
+	})
+	diamond("Core", 16, Color3.fromRGB(12, 12, 18), 9)
+	text({
+		Position = UDim2.fromOffset(0, 20),
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "LV",
+		FontFace = F.Label,
+		TextSize = 12,
+		TextColor3 = Color3.fromRGB(240, 195, 65),
+		ZIndex = 10,
+		Parent = medal,
+	})
+	local levelText = text({
+		Position = UDim2.fromOffset(0, 33),
+		Size = UDim2.new(1, 0, 0, 36),
+		Text = "1",
+		FontFace = F.TitleBold,
+		TextSize = 34,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+		TextStrokeTransparency = 0.2,
+		ZIndex = 10,
+		Parent = medal,
+	})
 
-	local bar = new("ImageLabel", {
+	-- Health Bar: 100% sharp 90-degree rectangle with crisp black border (zero UIStroke/UICorner)
+	local bar = new("Frame", {
 		Name = "HealthBar",
-		Position = UDim2.fromOffset(70, 20),
-		Size = UDim2.fromOffset(276, 34),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Bar,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = UIAssets.BarSlice,
-		SliceScale = 0.7,
-		ZIndex = 3,
+		Position = UDim2.fromOffset(62, 22),
+		Size = UDim2.fromOffset(260, 24),
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		ZIndex = 4,
 		Parent = root,
 	})
 	local track = new("Frame", {
 		Name = "Track",
-		Position = UDim2.fromOffset(16, 7),
-		Size = UDim2.new(1, -36, 1, -14),
-		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(3, 3),
+		Size = UDim2.new(1, -6, 1, -6),
+		BackgroundColor3 = Color3.fromRGB(15, 10, 18),
+		BorderSizePixel = 0,
 		ClipsDescendants = true,
-		ZIndex = 3,
+		ZIndex = 4,
 		Parent = bar,
 	})
 	local lag = new("Frame", {
@@ -414,57 +412,74 @@ local function buildVitals()
 		BackgroundColor3 = Color3.fromRGB(255, 214, 180),
 		BackgroundTransparency = 0.2,
 		BorderSizePixel = 0,
-		ZIndex = 3,
+		ZIndex = 5,
 		Parent = track,
 	})
 	local fill = new("Frame", {
 		Size = UDim2.fromScale(1, 1),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 		BorderSizePixel = 0,
-		ZIndex = 4,
+		ZIndex = 6,
 		Parent = track,
-	}, { new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 92, 78), Color3.fromRGB(110, 9, 20)), Rotation = 90 }) })
-	new("ImageLabel", {
-		Size = UDim2.fromScale(1, 1),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Grain,
-		ImageTransparency = 0.35,
-		ScaleType = Enum.ScaleType.Tile,
-		TileSize = UDim2.fromOffset(128, 128),
-		ZIndex = 5,
-		Parent = track,
+	}, {
+		new("UIGradient", {
+			Color = ColorSequence.new(Color3.fromRGB(235, 48, 56), Color3.fromRGB(130, 12, 22)),
+			Rotation = 90,
+		}),
 	})
 	local hpText = text({
 		Size = UDim2.fromScale(1, 1),
-		FontFace = F.Label,
-		TextSize = 14,
-		TextStrokeColor3 = C.Ink,
-		TextStrokeTransparency = 0.2,
-		ZIndex = 6,
+		FontFace = F.BodyBold,
+		TextSize = 13,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+		TextStrokeTransparency = 0.1,
+		ZIndex = 7,
 		Parent = track,
 	})
 
-	local xpTrack = new("Frame", {
-		Position = UDim2.fromOffset(86, 58),
-		Size = UDim2.fromOffset(230, 6),
-		BackgroundColor3 = C.Ink,
+	-- Shorter EXP bar directly underneath the health bar, matching the user sketch
+	local xpBar = new("Frame", {
+		Name = "EXPBar",
+		Position = UDim2.fromOffset(62, 48),
+		Size = UDim2.fromOffset(180, 10),
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 		BorderSizePixel = 0,
+		ZIndex = 4,
 		Parent = root,
-	}, { stroke(C.Bronze, 1, 0.35) })
+	})
+	local xpTrack = new("Frame", {
+		Name = "Track",
+		Position = UDim2.fromOffset(2, 2),
+		Size = UDim2.new(1, -4, 1, -4),
+		BackgroundColor3 = Color3.fromRGB(15, 10, 18),
+		BorderSizePixel = 0,
+		ClipsDescendants = true,
+		ZIndex = 4,
+		Parent = xpBar,
+	})
 	local xpFill = new("Frame", {
 		Size = UDim2.fromScale(0, 1),
 		BackgroundColor3 = Color3.new(1, 1, 1),
 		BorderSizePixel = 0,
+		ZIndex = 5,
 		Parent = xpTrack,
-	}, { new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(90, 34, 176), C.RiftHot) }) })
+	}, {
+		new("UIGradient", {
+			Color = ColorSequence.new(Color3.fromRGB(165, 80, 255), Color3.fromRGB(110, 40, 220)),
+		}),
+	})
+	-- Compact XP text tucked in the notch directly to the right of the EXP bar
 	local xpText = text({
-		Position = UDim2.fromOffset(86, 68),
-		Size = UDim2.fromOffset(260, 14),
+		Position = UDim2.fromOffset(248, 46),
+		Size = UDim2.fromOffset(80, 14),
 		FontFace = F.Label,
-		TextSize = 11,
-		TextColor3 = C.Ash,
+		TextSize = 10,
+		TextColor3 = Color3.fromRGB(190, 175, 215),
 		TextXAlignment = Enum.TextXAlignment.Left,
-		TextStrokeTransparency = 0.5,
+		TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+		TextStrokeTransparency = 0.3,
+		ZIndex = 4,
 		Parent = root,
 	})
 
@@ -484,10 +499,10 @@ local function buildVitals()
 		local toNext = player:GetAttribute("XpToNext") or Progression.XpToNext(level)
 		levelText.Text = tostring(level)
 		if toNext > 0 then
-			xpText.Text = `{xp} / {toNext}   ·   R I F T   E S S E N C E`
+			xpText.Text = `{xp}/{toNext} XP`
 			tween(xpFill, 0.3, { Size = UDim2.fromScale(math.clamp(xp / toNext, 0, 1), 1) })
 		else
-			xpText.Text = "M A S T E R Y   A T T A I N E D"
+			xpText.Text = "MAX"
 			xpFill.Size = UDim2.fromScale(1, 1)
 		end
 	end
@@ -498,9 +513,9 @@ local function buildVitals()
 	player:GetAttributeChangedSignal("Level"):Connect(function()
 		local level = player:GetAttribute("Level") or 1
 		if level > lastLevel then
-			medal.Size = UDim2.fromOffset(104, 104)
-			medal.Position = UDim2.fromOffset(-9, -9)
-			tween(medal, 0.5, { Size = UDim2.fromOffset(86, 86), Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back)
+			medal.Size = UDim2.fromOffset(106, 106)
+			medal.Position = UDim2.fromOffset(-7, -7)
+			tween(medal, 0.5, { Size = UDim2.fromOffset(92, 92), Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Back)
 		end
 		lastLevel = level
 	end)
@@ -540,45 +555,54 @@ local function buildVitals()
 end
 
 -------------------------------------------------------------------------------
--- Gold (top-right)
+-- Gold (top-left, below the level diamond)
 -------------------------------------------------------------------------------
 
+local GOLD_X, GOLD_Y = 22, 112 -- home spot: under the level diamond
+local GOLD_W, GOLD_H = 140, 30
+local goldBox
+
 local function buildGold()
-	-- Compact strip tucked under the HP and essence bars (top-left).
+	-- Sharp flat plate with a hard black edge, matching the bars above it.
 	local box = new("Frame", {
 		Name = "Gold",
-		Position = UDim2.fromOffset(98, 94),
-		Size = UDim2.fromOffset(124, 32),
-		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(GOLD_X, GOLD_Y),
+		Size = UDim2.fromOffset(GOLD_W, GOLD_H),
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		ZIndex = 4,
 		Parent = gui,
 	})
-	local plate = slab({
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, 0, 0.5, 0),
-		Size = UDim2.fromOffset(106, 28),
-		SliceScale = 0.28,
+	goldBox = box
+	local plate = new("Frame", {
+		Name = "Plate",
+		Position = UDim2.fromOffset(3, 3),
+		Size = UDim2.new(1, -6, 1, -6),
+		BackgroundColor3 = Theme.C.Panel,
+		BorderSizePixel = 0,
+		ZIndex = 6,
 		Parent = box,
 	})
 	local coin = new("ImageLabel", {
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, 0, 0.5, 0),
-		Size = UDim2.fromOffset(32, 32),
+		Position = UDim2.new(0, 4, 0.5, 0),
+		Size = UDim2.fromOffset(22, 22),
 		BackgroundTransparency = 1,
 		Image = UIAssets.Coin,
-		ZIndex = 5,
-		Parent = box,
+		ZIndex = 7,
+		Parent = plate,
 	})
 	local amount = text({
-		Position = UDim2.fromOffset(18, 0),
-		Size = UDim2.new(1, -28, 1, 0),
+		Position = UDim2.fromOffset(32, 0),
+		Size = UDim2.new(1, -36, 1, 0),
 		Text = "0",
 		FontFace = F.TitleBold,
-		TextSize = 18,
-		TextColor3 = C.Gold,
-		TextStrokeColor3 = C.Ink,
-		TextStrokeTransparency = 0.3,
+		TextSize = 16,
+		TextColor3 = Color3.fromRGB(255, 215, 90),
+		TextStrokeColor3 = Color3.fromRGB(0, 0, 0),
+		TextStrokeTransparency = 0.2,
 		TextXAlignment = Enum.TextXAlignment.Left,
-		ZIndex = 4,
+		ZIndex = 7,
 		Parent = plate,
 	})
 
@@ -590,7 +614,7 @@ local function buildGold()
 			coin.Rotation = -25
 			tween(coin, 0.45, { Rotation = 0 }, Enum.EasingStyle.Back)
 			local pop = text({
-				Position = UDim2.fromOffset(228, 100),
+				Position = UDim2.new(1, 8, 0, 4),
 				Size = UDim2.fromOffset(80, 20),
 				Text = `+{gold - last}`,
 				FontFace = F.TitleBold,
@@ -599,9 +623,10 @@ local function buildGold()
 				TextStrokeColor3 = C.Ink,
 				TextStrokeTransparency = 0.2,
 				TextXAlignment = Enum.TextXAlignment.Left,
-				Parent = gui,
+				ZIndex = 8,
+				Parent = box,
 			})
-			tween(pop, 0.9, { Position = UDim2.fromOffset(228, 86), TextTransparency = 1, TextStrokeTransparency = 1 })
+			tween(pop, 0.9, { Position = UDim2.new(1, 8, 0, -10), TextTransparency = 1, TextStrokeTransparency = 1 })
 			task.delay(0.9, function()
 				pop:Destroy()
 			end)
@@ -613,43 +638,376 @@ local function buildGold()
 end
 
 -------------------------------------------------------------------------------
+-- Runes (this run only): socket pips over the LMB / Q / E shards, socket cells
+-- in the Backpack, and the "Rune found" card that sockets the oldest pouch
+-- rune (buttons or keys 1 / 2 / 3). Everything hides outside a story run.
+-------------------------------------------------------------------------------
+
+local runeCard
+local runePips = {} -- [slot] = { pip frames }
+local runeDismissed = 0 -- pouch size when "Later" was pressed
+local runeBusy = false
+
+local function inRun()
+	return player:GetAttribute("StoryRun") ~= nil
+end
+
+-- The runes socketed into the skill equipped in `slot` (runes follow skills).
+local function socketsOf(slot)
+	local skillId = skillInSlot(slot)
+	return skillId and (build.Sockets or {})[skillId] or {}
+end
+
+local function runeColor(id)
+	local def = Runes.Defs[id]
+	return if def then Runes.Rarity[def.Rarity].Color else C.Ash
+end
+
+local function showRuneTooltip(id)
+	local def = Runes.Defs[id]
+	if not def then
+		return
+	end
+	local content = tooltip.Content
+	content.Title.Text = def.Name
+	content.Title.TextColor3 = runeColor(id)
+	content.Meta.Text = `{spaced(def.Rarity)}   ·   R U N E   ·   T H I S   R U N`
+	content.Body.Text = emphasize(def.Effect)
+	tooltip.Visible = true
+end
+
+local function socketRune(slot)
+	local pouch = build.Pouch or {}
+	if runeBusy or not pouch[1] or not runeCard or not runeCard.Visible then
+		return
+	end
+	runeBusy = true
+	local ok, done, why = pcall(remotes.Rune.InvokeServer, remotes.Rune, "Socket", 1, slot)
+	runeBusy = false
+	if not ok or not done then
+		HUD.Toast(if ok then (why or "Can't socket that") else "Couldn't reach the server", C.Crimson)
+	end
+end
+
+local function buildRuneCard()
+	runeCard = slab({
+		Name = "RuneCard",
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -24, 0.5, 0),
+		Size = UDim2.fromOffset(310, 236),
+		Visible = false,
+		ZIndex = 30,
+		Parent = gui,
+	})
+	text({ Name = "Kicker", Position = UDim2.fromOffset(22, 18), Size = UDim2.new(1, -44, 0, 14), FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 31, Parent = runeCard })
+	text({ Name = "Title", Position = UDim2.fromOffset(22, 34), Size = UDim2.new(1, -44, 0, 26), FontFace = F.TitleBold, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 31, Parent = runeCard })
+	text({ Name = "Rarity", Position = UDim2.fromOffset(22, 60), Size = UDim2.new(1, -44, 0, 14), FontFace = F.Label, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 31, Parent = runeCard })
+	text({ Name = "Effect", Position = UDim2.fromOffset(22, 78), Size = UDim2.new(1, -44, 0, 38), FontFace = F.Body, TextSize = 15, TextWrapped = true, RichText = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 31, Parent = runeCard })
+	local row = new("Frame", {
+		Name = "Slots",
+		Position = UDim2.fromOffset(22, 122),
+		Size = UDim2.new(1, -44, 0, 62),
+		BackgroundTransparency = 1,
+		ZIndex = 31,
+		Parent = runeCard,
+	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	for i, slot in Runes.Slots do
+		local b = new("TextButton", {
+			Name = slot,
+			Size = UDim2.new(1 / #Runes.Slots, -4, 1, 0),
+			Text = "",
+			AutoButtonColor = true,
+			BackgroundColor3 = C.Ink,
+			LayoutOrder = i,
+			ZIndex = 32,
+			Parent = row,
+		}, { corner(3), stroke(C.Bronze, 1.2, 0.3) })
+		text({ Name = "Key", Position = UDim2.fromOffset(0, 5), Size = UDim2.new(1, 0, 0, 14), Text = `{i}  ·  {Runes.SlotKeys[slot]}`, FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 33, Parent = b })
+		text({ Name = "Skill", Position = UDim2.fromOffset(4, 20), Size = UDim2.new(1, -8, 0, 18), FontFace = F.BodyBold, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 33, Parent = b })
+		text({ Name = "Count", Position = UDim2.fromOffset(0, 40), Size = UDim2.new(1, 0, 0, 14), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, ZIndex = 33, Parent = b })
+		b.Activated:Connect(function()
+			socketRune(slot)
+		end)
+	end
+	local later = new("TextButton", {
+		Name = "Later",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 194),
+		Size = UDim2.fromOffset(150, 24),
+		Text = "L A T E R   ( B )",
+		FontFace = F.Label,
+		TextSize = 11,
+		TextColor3 = C.Ash,
+		BackgroundTransparency = 1,
+		ZIndex = 32,
+		Parent = runeCard,
+	})
+	later.Activated:Connect(function()
+		runeDismissed = #(build.Pouch or {})
+		runeCard.Visible = false
+	end)
+	runeCard.MouseEnter:Connect(hideTooltip)
+end
+
+local function refreshRunes()
+	local shown = inRun()
+	for slot, pips in runePips do
+		local list = socketsOf(slot)
+		for i, pip in pips do
+			local id = list[i]
+			pip.Visible = shown
+			pip.BackgroundColor3 = if id then runeColor(id) else C.Ink
+			pip.BackgroundTransparency = if id then 0 else 0.3
+		end
+	end
+	if not runeCard then
+		return
+	end
+	local pouch = build.Pouch or {}
+	runeDismissed = math.min(runeDismissed, #pouch)
+	local id = pouch[1]
+	local def = id and Runes.Defs[id]
+	if not shown or not def or #pouch <= runeDismissed or build.Offer then
+		runeCard.Visible = false
+		return
+	end
+	local color = runeColor(id)
+	runeCard.Kicker.Text = "R U N E   F O U N D" .. (if #pouch > 1 then `   ·   +{#pouch - 1}   M O R E` else "")
+	runeCard.Title.Text = def.Name
+	runeCard.Title.TextColor3 = color
+	runeCard.Rarity.Text = spaced(def.Rarity)
+	runeCard.Rarity.TextColor3 = color
+	runeCard.Effect.Text = emphasize(def.Effect)
+	for _, slot in Runes.Slots do
+		local b = runeCard.Slots[slot]
+		local list = socketsOf(slot)
+		local skill = Skills.Defs[(skillInSlot(slot))]
+		local ok, why = Runes.CanSocket(list, id)
+		if not skill then
+			ok, why = false, "No skill"
+		end
+		b.Skill.Text = if skill then skill.Name else "Empty"
+		b.Skill.TextColor3 = if ok then C.Parchment else C.Ash
+		b.Count.Text = if ok then `{#list} / {Runes.Sockets}` else why:upper()
+		b.UIStroke.Color = if ok then color else C.Bronze
+		b.AutoButtonColor = ok
+	end
+	runeCard.Visible = true
+end
+
+-------------------------------------------------------------------------------
+-- Rune pick: after each cleared wave the run pauses (Runes.PickTime) and three
+-- rune cards come up. Click a key under a card to socket it into that skill,
+-- or keep it in the pouch. When time runs out the server picks one for you.
+-------------------------------------------------------------------------------
+
+local offerScreen
+local offerShown -- the offer table currently drawn
+
+local function chooseRune(index, slot)
+	if runeBusy then
+		return
+	end
+	runeBusy = true
+	local ok, done, why = pcall(remotes.Rune.InvokeServer, remotes.Rune, "Choose", index, slot)
+	runeBusy = false
+	if not ok or not done then
+		HUD.Toast(if ok then (why or "Can't take that rune") else "Couldn't reach the server", C.Crimson)
+	end
+end
+
+local function buildOfferScreen()
+	offerScreen = new("Frame", {
+		Name = "RuneOffer",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = C.Ink,
+		BackgroundTransparency = 0.4,
+		Visible = false,
+		ZIndex = 40,
+		-- Its own screen that ignores the top-bar inset, so the dim covers the
+		-- whole display (the inset isn't known yet when the HUD is built).
+		Parent = new("ScreenGui", {
+			Name = "RiftboundRuneOffer",
+			ResetOnSpawn = false,
+			IgnoreGuiInset = true,
+			ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+			DisplayOrder = 5,
+			Parent = gui.Parent,
+		}),
+	})
+	local holder = new("Frame", {
+		Name = "Holder",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(820, 440),
+		BackgroundTransparency = 1,
+		ZIndex = 40,
+		Parent = offerScreen,
+	}, { new("UIScale", {}) })
+	text({ Position = UDim2.fromOffset(0, 0), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Choose a Rune"), FontFace = F.Title, TextSize = 34, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 41, Parent = holder })
+	text({ Name = "Timer", Position = UDim2.fromOffset(0, 42), Size = UDim2.new(1, 0, 0, 18), FontFace = F.Label, TextSize = 13, TextColor3 = C.Gold, ZIndex = 41, Parent = holder })
+	local row = new("Frame", {
+		Name = "Cards",
+		Position = UDim2.fromOffset(0, 76),
+		Size = UDim2.new(1, 0, 0, 350),
+		BackgroundTransparency = 1,
+		ZIndex = 40,
+		Parent = holder,
+	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 20), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	for i = 1, Runes.Choices do
+		local card = slab({ Name = "Card" .. i, Size = UDim2.fromOffset(255, 350), LayoutOrder = i, ZIndex = 41, Parent = row })
+		new("Frame", { Name = "Glow", Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 0, 4), BorderSizePixel = 0, ZIndex = 42, Parent = card })
+		text({ Name = "Title", Position = UDim2.fromOffset(20, 28), Size = UDim2.new(1, -40, 0, 52), FontFace = F.TitleBold, TextSize = 21, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		text({ Name = "Rarity", Position = UDim2.fromOffset(20, 82), Size = UDim2.new(1, -40, 0, 14), FontFace = F.Label, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		text({ Name = "Effect", Position = UDim2.fromOffset(20, 104), Size = UDim2.new(1, -40, 0, 74), FontFace = F.Body, TextSize = 15, TextWrapped = true, RichText = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		text({ Position = UDim2.fromOffset(20, 186), Size = UDim2.new(1, -40, 0, 14), Text = "S O C K E T   I N T O", FontFace = F.Label, TextSize = 10, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		local keys = new("Frame", {
+			Name = "Slots",
+			Position = UDim2.fromOffset(18, 204),
+			Size = UDim2.new(1, -36, 0, 66),
+			BackgroundTransparency = 1,
+			ZIndex = 42,
+			Parent = card,
+		}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
+		for j, slot in Runes.Slots do
+			local b = new("TextButton", {
+				Name = slot,
+				Size = UDim2.new(1 / #Runes.Slots, -4, 1, 0),
+				Text = "",
+				AutoButtonColor = true,
+				BackgroundColor3 = C.Ink,
+				LayoutOrder = j,
+				ZIndex = 43,
+				Parent = keys,
+			}, { corner(3), stroke(C.Bronze, 1.2, 0.3) })
+			text({ Name = "Key", Position = UDim2.fromOffset(0, 6), Size = UDim2.new(1, 0, 0, 14), Text = Runes.SlotKeys[slot], FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 44, Parent = b })
+			text({ Name = "Skill", Position = UDim2.fromOffset(3, 22), Size = UDim2.new(1, -6, 0, 18), FontFace = F.BodyBold, TextSize = 12, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 44, Parent = b })
+			text({ Name = "Count", Position = UDim2.fromOffset(0, 44), Size = UDim2.new(1, 0, 0, 14), FontFace = F.Label, TextSize = 10, TextColor3 = C.Ash, ZIndex = 44, Parent = b })
+			b.Activated:Connect(function()
+				chooseRune(i, slot)
+			end)
+		end
+		local keep = new("TextButton", {
+			Name = "Keep",
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 284),
+			Size = UDim2.new(1, -36, 0, 30),
+			Text = "K E E P   I N   P O U C H",
+			FontFace = F.Label,
+			TextSize = 11,
+			TextColor3 = C.Ash,
+			AutoButtonColor = true,
+			BackgroundColor3 = C.Ink,
+			BackgroundTransparency = 0.4,
+			ZIndex = 43,
+			Parent = card,
+		}, { corner(3), stroke(C.Bronze, 1, 0.6) })
+		keep.Activated:Connect(function()
+			chooseRune(i, nil)
+		end)
+	end
+	RunService.RenderStepped:Connect(function()
+		if offerScreen.Visible and offerShown then
+			local left = math.max(0, math.ceil(offerShown.Ends - workspace:GetServerTimeNow()))
+			holder.Timer.Text = `T H E   R I F T   H O L D S   ·   {left}s`
+			local view = workspace.CurrentCamera.ViewportSize
+			holder.UIScale.Scale = math.min(1, (view.X - 24) / 820, (view.Y - 24) / 440)
+		end
+	end)
+end
+
+local function refreshOffer()
+	if not offerScreen then
+		return
+	end
+	local offer = build.Offer
+	if not offer or not inRun() then
+		offerShown = nil
+		offerScreen.Visible = false
+		return
+	end
+	offerShown = offer
+	hideTooltip()
+	for i = 1, Runes.Choices do
+		local card = offerScreen.Holder.Cards["Card" .. i]
+		local id = offer.Ids[i]
+		local def = id and Runes.Defs[id]
+		card.Visible = def ~= nil
+		if def then
+			local color = runeColor(id)
+			card.Glow.BackgroundColor3 = color
+			card.Title.Text = def.Name
+			card.Title.TextColor3 = color
+			card.Rarity.Text = spaced(def.Rarity)
+			card.Rarity.TextColor3 = color
+			card.Effect.Text = emphasize(def.Effect)
+			for _, slot in Runes.Slots do
+				local b = card.Slots[slot]
+				local skillId = skillInSlot(slot)
+				local list = socketsOf(slot)
+				local ok, why = Runes.CanSocket(list, id)
+				if not skillId then
+					ok, why = false, "No skill"
+				end
+				b.Skill.Text = if skillId then Skills.Defs[skillId].Name else "Empty"
+				b.Skill.TextColor3 = if ok then C.Parchment else C.Ash
+				b.Count.Text = if ok then `{#list} / {Runes.Sockets}` else why:upper()
+				b.UIStroke.Color = if ok then color else C.Bronze
+				b.AutoButtonColor = ok
+			end
+		end
+	end
+	offerScreen.Visible = true
+end
+
+-- Keys 1 / 2 / 3 socket the shown rune into LMB / Q / E (see Controls).
+function HUD.RuneHotkey(n)
+	local slot = Runes.Slots[n]
+	if slot then
+		socketRune(slot)
+	end
+end
+
+-------------------------------------------------------------------------------
 -- Ability shards (bottom-left)
 -------------------------------------------------------------------------------
 
 local function makeSlot(parent, entry, index)
 	local holder = new("Frame", {
 		Name = entry.Slot,
-		Position = UDim2.new(0, (index - 1) * 96, 1, -(ICON + 46) - entry.Lift),
+		Position = UDim2.new(0, (index - 1) * 96, 1, -(ICON + 46)),
 		Size = UDim2.fromOffset(ICON + 12, ICON + 46),
 		BackgroundTransparency = 1,
 		Parent = parent,
 	})
-	-- Soft element-coloured glow behind the shard.
+	-- Soft element-coloured diamond glow behind the icon.
 	local halo = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0, ICON / 2),
-		Size = UDim2.fromOffset(ICON * 0.95, ICON * 0.95),
+		Size = UDim2.fromOffset(DIAMOND * 0.74, DIAMOND * 0.74),
+		Rotation = 45,
 		BackgroundColor3 = C.Rift,
 		BackgroundTransparency = 0.8,
 		BorderSizePixel = 0,
 		Parent = holder,
-	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
+	})
 	local iconHolder = new("Frame", {
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.fromScale(0.5, 0),
-		Size = UDim2.fromOffset(ICON, ICON),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, ICON / 2),
+		Size = UDim2.fromOffset(DIAMOND, DIAMOND),
 		BackgroundTransparency = 1,
 		ZIndex = 2,
 		Parent = holder,
 	})
-	-- Cooldown: the shard image darkened from the top down.
-	local shade = new("Frame", {
+	-- Cooldown: the icon itself tinted dark and cropped from the top down, so
+	-- the shade keeps the diamond shape.
+	local shade = new("ImageLabel", {
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 8),
-		Size = UDim2.fromOffset(ICON * 0.74, 0),
-		BackgroundColor3 = C.Ink,
-		BackgroundTransparency = 0.35,
-		BorderSizePixel = 0,
+		Position = UDim2.new(0.5, 0, 0, ICON / 2 - DIAMOND / 2),
+		Size = UDim2.fromOffset(DIAMOND, 0),
+		BackgroundTransparency = 1,
+		ImageColor3 = C.Ink,
+		ImageTransparency = 0.3,
 		ZIndex = 4,
 		Parent = holder,
 	})
@@ -684,6 +1042,24 @@ local function makeSlot(parent, entry, index)
 		Parent = holder,
 	})
 	slotCards[entry.Slot] = { Halo = halo, IconHolder = iconHolder, Shade = shade, Timer = timer, Name = name, Shown = false, Cooling = false }
+	-- Rune socket pips above the shard (only skill slots have sockets).
+	if Runes.SlotKeys[entry.Slot] then
+		local pips = {}
+		for i = 1, Runes.Sockets do
+			pips[i] = new("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0.5, (i - (Runes.Sockets + 1) / 2) * 16, 0, -12),
+				Size = UDim2.fromOffset(9, 9),
+				Rotation = 45,
+				BackgroundColor3 = C.Ink,
+				BackgroundTransparency = 0.3,
+				Visible = false,
+				ZIndex = 6,
+				Parent = holder,
+			}, { stroke(C.Bronze, 1, 0.3) })
+		end
+		runePips[entry.Slot] = pips
+	end
 	hoverable(holder, function()
 		if entry.Fixed then
 			return entry.Fixed
@@ -705,7 +1081,7 @@ local function refreshSlots()
 		if card.Shown ~= key then
 			card.Shown = key
 			card.IconHolder:ClearAllChildren()
-			shard(id, ICON, card.IconHolder, 2)
+			card.Shade.Image = shard(id, DIAMOND, card.IconHolder, 2).Image
 			local def = id and Skills.Defs[id]
 			if FIXED_INFO[id] then
 				card.Name.Text = FIXED_INFO[id].Name
@@ -735,15 +1111,17 @@ local function updateCooldowns()
 		local remaining = if cd then cd.Ends - now else 0
 		if remaining > 0 then
 			card.Cooling = true
-			card.Shade.Size = UDim2.fromOffset(ICON * 0.74, (ICON - 16) * math.clamp(remaining / cd.Length, 0, 1))
+			local frac = math.clamp(remaining / cd.Length, 0, 1)
+			card.Shade.Size = UDim2.fromOffset(DIAMOND, DIAMOND * frac)
+			card.Shade.ImageRectSize = Vector2.new(SKILL_ART, SKILL_ART * frac)
 			card.Timer.Text = if remaining >= 1 then tostring(math.ceil(remaining)) else ""
 		elseif card.Cooling then
 			card.Cooling = false
-			card.Shade.Size = UDim2.fromOffset(ICON * 0.74, 0)
+			card.Shade.Size = UDim2.fromOffset(DIAMOND, 0)
 			card.Timer.Text = ""
 			card.Halo.BackgroundTransparency = 0.3
-			card.Halo.Size = UDim2.fromOffset(ICON * 1.25, ICON * 1.25)
-			tween(card.Halo, 0.4, { BackgroundTransparency = 0.78, Size = UDim2.fromOffset(ICON * 0.95, ICON * 0.95) })
+			card.Halo.Size = UDim2.fromOffset(DIAMOND, DIAMOND)
+			tween(card.Halo, 0.4, { BackgroundTransparency = 0.78, Size = UDim2.fromOffset(DIAMOND * 0.74, DIAMOND * 0.74) })
 		end
 	end
 end
@@ -754,27 +1132,64 @@ end
 
 local FLASK_RED = Color3.fromRGB(255, 74, 94)
 
+-- The flask is the last slot of the skill bar, right after SHIFT.
 local function buildFlask()
 	local holder = new("Frame", {
 		Name = "Flask",
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -22, 1, -14),
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 18 + #SLOTS * 96, 1, -6),
 		Size = UDim2.fromOffset(ICON + 12, ICON + 50),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
+	-- Diamond slot like the skill shards: a soft red glow, a black-edged
+	-- diamond with a dark red core, and the potion art standing upright on top.
 	local halo = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0.5, 0, 0, ICON / 2),
-		Size = UDim2.fromOffset(ICON * 0.95, ICON * 0.95),
+		Size = UDim2.fromOffset(DIAMOND * 0.74, DIAMOND * 0.74),
+		Rotation = 45,
 		BackgroundColor3 = FLASK_RED,
 		BackgroundTransparency = 0.8,
 		BorderSizePixel = 0,
 		Parent = holder,
-	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }) })
-	local icon = shard("Flask", ICON, holder, 2)
-	icon.AnchorPoint = Vector2.new(0.5, 0)
-	icon.Position = UDim2.fromScale(0.5, 0)
+	})
+	local side = DIAMOND / math.sqrt(2)
+	new("Frame", {
+		Name = "Edge",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, ICON / 2),
+		Size = UDim2.fromOffset(side, side),
+		Rotation = 45,
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BorderSizePixel = 0,
+		ZIndex = 2,
+		Parent = holder,
+	})
+	new("Frame", {
+		Name = "Core",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, ICON / 2),
+		Size = UDim2.fromOffset(side - 10, side - 10),
+		Rotation = 45,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		ZIndex = 2,
+		Parent = holder,
+	}, {
+		new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(92, 24, 36), Color3.fromRGB(28, 8, 14)), Rotation = 90 }),
+	})
+	local ART = math.floor(DIAMOND * 0.62)
+	local icon = new("ImageLabel", {
+		Name = "Shard",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, ICON / 2),
+		Size = UDim2.fromOffset(ART, ART),
+		BackgroundTransparency = 1,
+		Image = UIAssets.Icons.Flask,
+		ZIndex = 3,
+		Parent = holder,
+	})
 	local keyPlate = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, ICON - 8),
@@ -832,8 +1247,8 @@ local function buildFlask()
 		halo.BackgroundTransparency = if charges > 0 then 0.8 else 0.95
 		if charges < last then
 			-- Drank: the shard pulses and the halo flares.
-			icon.Size = UDim2.fromOffset(ICON * 1.15, ICON * 1.15)
-			tween(icon, 0.35, { Size = UDim2.fromOffset(ICON, ICON) }, Enum.EasingStyle.Back)
+			icon.Size = UDim2.fromOffset(ART * 1.2, ART * 1.2)
+			tween(icon, 0.35, { Size = UDim2.fromOffset(ART, ART) }, Enum.EasingStyle.Back)
 			halo.BackgroundTransparency = 0.2
 			tween(halo, 0.5, { BackgroundTransparency = if charges > 0 then 0.8 else 0.95 })
 		end
@@ -866,57 +1281,114 @@ local function sortedOwned()
 	return ids
 end
 
+local ARSENAL_W, ARSENAL_H = 300, 440
+
+-- One Q / E equip button: filled with the skill's colour when equipped there.
+local function equipChip(parent, slot, id, color, x)
+	local equipped = build.Slots[slot] == id
+	local chip = new("TextButton", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, x, 0.5, 0),
+		Size = UDim2.fromOffset(30, 30),
+		Text = slot,
+		FontFace = F.BodyBold,
+		TextSize = 14,
+		AutoButtonColor = true,
+		BackgroundColor3 = if equipped then color else Theme.C.Panel,
+		TextColor3 = if equipped then Theme.C.Ink else C.Ash,
+		ZIndex = 4,
+		Parent = parent,
+	}, { Theme.Edged(2) })
+	chip.Activated:Connect(function()
+		remotes.Equip:FireServer(slot, id)
+	end)
+	return chip
+end
+
 local function buildArsenal()
 	arsenal = slab({
 		Name = "Arsenal",
 		AnchorPoint = Vector2.new(0, 0.5),
 		Position = UDim2.new(0, 14, 0.47, 0),
-		Size = UDim2.fromOffset(280, 310),
+		Size = UDim2.fromOffset(ARSENAL_W, ARSENAL_H),
 		Parent = gui,
 	})
-	text({ Position = UDim2.fromOffset(0, 16), Size = UDim2.new(1, 0, 0, 24), Text = spaced("Arsenal"), FontFace = F.Title, TextSize = 20, TextColor3 = C.Parchment, Parent = arsenal })
-	new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 44), Size = UDim2.fromOffset(150, 2), BackgroundColor3 = C.Rift, BorderSizePixel = 0, Parent = arsenal }, {
-		new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0), NumberSequenceKeypoint.new(1, 1) }) }),
+	-- Header: title and how many skills you own.
+	text({ Position = UDim2.fromOffset(16, 14), Size = UDim2.new(1, -32, 0, 26), Text = "Skill Set", FontFace = F.TitleBold, TextSize = 22, TextXAlignment = Enum.TextXAlignment.Left, Parent = arsenal })
+	text({ Name = "Count", Position = UDim2.fromOffset(16, 18), Size = UDim2.new(1, -32, 0, 20), FontFace = F.Body, TextSize = 13, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Right, Parent = arsenal })
+
+	-- Equipped strip: what is on Q and E right now.
+	local strip = new("Frame", { Name = "Equipped", Position = UDim2.fromOffset(12, 50), Size = UDim2.new(1, -24, 0, 96), BackgroundTransparency = 1, Parent = arsenal }, {
+		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
-	text({
-		Position = UDim2.fromOffset(0, 50),
-		Size = UDim2.new(1, 0, 0, 14),
-		Text = "F  INTERACT   ·   R  FLASK   ·   B  BAG   ·   C  STATS",
-		FontFace = F.Label,
-		TextSize = 10,
-		TextColor3 = C.Ash,
-		Parent = arsenal,
-	})
+	for i, slot in { "Q", "E" } do
+		local box = new("Frame", { Name = slot, Size = UDim2.new(0.5, -4, 1, 0), BackgroundColor3 = Theme.C.Raised, LayoutOrder = i, Parent = strip }, { Theme.Edged(2) })
+		new("Frame", { Name = "Icon", AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 6), Size = UDim2.fromOffset(50, 50), BackgroundTransparency = 1, ZIndex = 2, Parent = box })
+		local key = new("Frame", { Position = UDim2.fromOffset(-2, -2), Size = UDim2.fromOffset(18, 18), BackgroundColor3 = Theme.C.Ink, ZIndex = 4, Parent = box }, { Theme.Edged(1.5) })
+		text({ Size = UDim2.fromScale(1, 1), Text = slot, FontFace = F.BodyBold, TextSize = 11, ZIndex = 5, Parent = key })
+		-- ("Title", not "Name": box.Name is the Instance's own name property.)
+		text({ Name = "Title", Position = UDim2.fromOffset(4, 58), Size = UDim2.new(1, -8, 0, 18), FontFace = F.BodyBold, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 2, Parent = box })
+		text({ Name = "Detail", Position = UDim2.fromOffset(4, 76), Size = UDim2.new(1, -8, 0, 14), FontFace = F.Body, TextSize = 11, TextColor3 = C.Ash, ZIndex = 2, Parent = box })
+		hoverable(box, function()
+			return skillInSlot(slot)
+		end)
+	end
+	new("Frame", { Position = UDim2.fromOffset(12, 156), Size = UDim2.new(1, -24, 0, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.9, BorderSizePixel = 0, Parent = arsenal })
+
 	text({
 		Name = "Empty",
-		Position = UDim2.fromOffset(24, 84),
-		Size = UDim2.new(1, -48, 0, 70),
-		Text = "No powers yet.\nSeek the elemental shrines and press F.",
-		FontFace = F.Italic,
-		TextSize = 17,
+		Position = UDim2.fromOffset(20, 176),
+		Size = UDim2.new(1, -40, 0, 60),
+		Text = "No skills yet.\nFind an elemental shrine and press F.",
+		FontFace = F.Body,
+		TextSize = 15,
 		TextWrapped = true,
 		TextColor3 = C.Ash,
 		Parent = arsenal,
 	})
 	new("ScrollingFrame", {
 		Name = "List",
-		Position = UDim2.fromOffset(14, 72),
-		Size = UDim2.new(1, -28, 1, -88),
+		Position = UDim2.fromOffset(12, 166),
+		Size = UDim2.new(1, -24, 1, -204),
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = C.Bronze,
+		ScrollBarImageColor3 = C.Ash,
 		AutomaticCanvasSize = Enum.AutomaticSize.Y,
 		CanvasSize = UDim2.new(),
 		ZIndex = 2,
 		Parent = arsenal,
 	}, {
-		new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }),
-		new("UIPadding", { PaddingRight = UDim.new(0, 4) }),
+		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingRight = UDim.new(0, 6), PaddingLeft = UDim.new(0, 2) }),
+	})
+
+	-- Key hints along the bottom.
+	text({
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, -10),
+		Size = UDim2.new(1, 0, 0, 16),
+		Text = "F  Interact     R  Flask     B  Bag     C  Stats",
+		FontFace = F.Body,
+		TextSize = 11,
+		TextColor3 = C.Ash,
+		Parent = arsenal,
 	})
 end
 
 local function refreshArsenal()
+	-- Equipped strip.
+	for _, slot in { "Q", "E" } do
+		local box = arsenal.Equipped[slot]
+		local id, level = skillInSlot(slot)
+		local def = id and Skills.Defs[id]
+		box.Icon:ClearAllChildren()
+		shard(id, 50, box.Icon, 3)
+		box.Title.Text = if def then def.Name else "Empty"
+		box.Title.TextColor3 = if def then C.Parchment else C.Ash
+		box.Detail.Text = if def then `Lv {level}  ·  {if #def.Elements == 2 then "Fusion" else def.Elements[1]}` else "Equip a skill below"
+	end
+
 	local list = arsenal.List
 	for _, child in list:GetChildren() do
 		if child:IsA("GuiObject") then
@@ -925,69 +1397,59 @@ local function refreshArsenal()
 	end
 	local owned = sortedOwned()
 	arsenal.Empty.Visible = #owned == 0
+	arsenal.Count.Text = if #owned == 1 then "1 skill" else `{#owned} skills`
 	for i, id in owned do
 		local def = Skills.Defs[id]
 		local level = build.Skills[id]
 		local color = skillColor(id)
+		local equipped = build.Slots.Q == id or build.Slots.E == id
 		local row = new("Frame", {
-			Size = UDim2.new(1, 0, 0, 46),
-			BackgroundColor3 = Color3.new(1, 1, 1),
+			Size = UDim2.new(1, 0, 0, 54),
+			BackgroundColor3 = if equipped then color:Lerp(Theme.C.Raised, 0.82) else Theme.C.Raised,
 			LayoutOrder = i,
 			ZIndex = 2,
 			Parent = list,
-		}, {
-			new("UIGradient", {
-				Color = ColorSequence.new(color, C.Ink),
-				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(0.6, 0.6), NumberSequenceKeypoint.new(1, 0.5) }),
-			}),
-			stroke(C.Bronze, 1, 0.55),
-		})
-		local s = shard(id, 44, row, 3)
-		s.Position = UDim2.fromOffset(2, 1)
+		}, { Theme.Edged(2) })
+		-- Element accent down the left edge.
+		new("Frame", { Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 3, Parent = row })
+		local s = shard(id, 46, row, 3)
+		s.Position = UDim2.fromOffset(8, 4)
 		text({
-			Position = UDim2.fromOffset(50, 5),
-			Size = UDim2.new(1, -124, 0, 18),
+			Position = UDim2.fromOffset(60, 7),
+			Size = UDim2.new(1, -136, 0, 20),
 			Text = def.Name,
-			FontFace = F.TitleBold,
+			FontFace = F.BodyBold,
 			TextSize = 16,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			TextTruncate = Enum.TextTruncate.AtEnd,
-			TextStrokeColor3 = C.Ink,
-			TextStrokeTransparency = 0.4,
 			ZIndex = 3,
 			Parent = row,
 		})
+		-- Level pips (filled up to the skill's level) and the element.
+		for pip = 1, Skills.MaxLevel do
+			new("Frame", {
+				Position = UDim2.fromOffset(62 + (pip - 1) * 11, 35),
+				Size = UDim2.fromOffset(6, 6),
+				Rotation = 45,
+				BackgroundColor3 = if pip <= level then color else Theme.C.Ink,
+				BorderSizePixel = 0,
+				ZIndex = 3,
+				Parent = row,
+			})
+		end
 		text({
-			Position = UDim2.fromOffset(50, 25),
-			Size = UDim2.new(1, -124, 0, 14),
-			Text = `<font color="{hex(C.Gold)}">{NUMERALS[level]}</font>   {if #def.Elements == 2 then "F U S I O N" else spaced(def.Elements[1])}`,
-			RichText = true,
-			FontFace = F.Label,
-			TextSize = 10,
+			Position = UDim2.fromOffset(62 + Skills.MaxLevel * 11 + 4, 29),
+			Size = UDim2.new(1, -200, 0, 16),
+			Text = if #def.Elements == 2 then "Fusion" else (def.Elements[1] or "Rift"),
+			FontFace = F.Body,
+			TextSize = 11,
 			TextColor3 = C.Ash,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			ZIndex = 3,
 			Parent = row,
 		})
-		for j, slot in { "Q", "E" } do
-			local equipped = build.Slots[slot] == id
-			local chip = new("TextButton", {
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -6 - (2 - j) * 32, 0.5, 0),
-				Size = UDim2.fromOffset(28, 26),
-				Text = slot,
-				FontFace = F.Label,
-				TextSize = 13,
-				AutoButtonColor = true,
-				BackgroundColor3 = if equipped then C.Gold else C.Ink,
-				TextColor3 = if equipped then C.Ink else C.Ash,
-				ZIndex = 3,
-				Parent = row,
-			}, { stroke(if equipped then C.Gold else C.Bronze, 1.5) })
-			chip.Activated:Connect(function()
-				remotes.Equip:FireServer(slot, id)
-			end)
-		end
+		equipChip(row, "Q", id, color, -44)
+		equipChip(row, "E", id, color, -8)
 		hoverable(row, function()
 			return id, build.Skills[id]
 		end)
@@ -1321,29 +1783,27 @@ end
 -------------------------------------------------------------------------------
 
 local ARSENAL_OPEN = UDim2.new(0, 14, 0.47, 0)
-local ARSENAL_CLOSED = UDim2.new(0, -270, 0.47, 0)
+local ARSENAL_CLOSED = UDim2.new(0, -ARSENAL_W - 8, 0.47, 0) -- only the tab peeks out
 local arsenalCollapsed = false
 
 local function buildArsenalToggle()
-	local tab = new("ImageButton", {
+	local tab = new("TextButton", {
 		Name = "Toggle",
 		AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(1, -6, 0.5, 0),
-		Size = UDim2.fromOffset(30, 74),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Slab,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = UIAssets.SlabSlice,
-		SliceScale = 0.18,
+		Position = UDim2.new(1, 3, 0.5, 0),
+		Size = UDim2.fromOffset(24, 64),
+		Text = "",
+		AutoButtonColor = false,
+		BackgroundColor3 = Theme.C.Panel,
 		ZIndex = 4,
 		Parent = arsenal,
-	})
+	}, { Theme.Edged(3) })
 	local arrow = text({
 		Size = UDim2.fromScale(1, 1),
 		Text = "<",
 		FontFace = F.TitleBold,
-		TextSize = 24,
-		TextColor3 = C.Gold,
+		TextSize = 20,
+		TextColor3 = C.Parchment,
 		ZIndex = 5,
 		Parent = tab,
 	})
@@ -1354,10 +1814,10 @@ local function buildArsenalToggle()
 		tween(arsenal, 0.3, { Position = if arsenalCollapsed then ARSENAL_CLOSED else ARSENAL_OPEN }, Enum.EasingStyle.Quint)
 	end)
 	tab.MouseEnter:Connect(function()
-		arrow.TextColor3 = C.RiftHot
+		tab.BackgroundColor3 = Theme.C.Raised
 	end)
 	tab.MouseLeave:Connect(function()
-		arrow.TextColor3 = C.Gold
+		tab.BackgroundColor3 = Theme.C.Panel
 	end)
 end
 
@@ -1365,7 +1825,7 @@ end
 -- Backpack: equipment, stats, collected items and powers (B)
 -------------------------------------------------------------------------------
 
-local ITEM_CELLS = 10
+local ITEM_CELLS = 18 -- 6 x 3 grid: room for every material
 local inventory = {}
 local backpack
 local refreshBackpack
@@ -1394,90 +1854,91 @@ local function sectionHeader(parent, title, x, y)
 	new("Frame", { Position = UDim2.fromOffset(x, y + 30), Size = UDim2.fromOffset(46, 2), BackgroundColor3 = C.Crimson, BorderSizePixel = 0, ZIndex = 22, Parent = parent })
 end
 
+-- Layout (pixels inside the panel). Left: equipment + stats. Right: an
+-- inventory grid big enough for every material, then powers.
+local BP_W, BP_H = 1000, 620
+local BP_PAD = 32
+local BP_LEFT_W = 420
+local BP_RIGHT_X = BP_PAD + BP_LEFT_W + 24
+local BP_RIGHT_W = BP_W - BP_RIGHT_X - BP_PAD
+local BP_HEAD_Y = 84 -- section headers
+local BP_TOP = 126 -- section content
+
 local function buildBackpack()
 	backpack = new("Frame", {
 		Name = "Backpack",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.52),
-		Size = UDim2.fromOffset(780, 570),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(BP_W, BP_H),
 		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 20,
 		Parent = gui,
 	})
 	new("UIScale", { Parent = backpack })
-	slab({ Name = "Body", Position = UDim2.fromOffset(10, 92), Size = UDim2.new(1, -20, 1, -92), ZIndex = 20, Parent = backpack })
+	slab({ Name = "Body", Size = UDim2.fromScale(1, 1), ZIndex = 20, Parent = backpack })
 
-	local banner = new("ImageLabel", {
-		Name = "Banner",
-		Position = UDim2.fromOffset(-30, 0),
-		Size = UDim2.new(1, 60, 0, 104),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Banner,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = UIAssets.BannerSlice,
-		SliceScale = 0.8,
-		ZIndex = 22,
-		Parent = backpack,
-	})
-	text({ Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Backpack"), FontFace = F.Title, TextSize = 38, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 23, Parent = banner })
-	text({ Position = UDim2.fromOffset(0, 62), Size = UDim2.new(1, 0, 0, 16), Text = "W H A T   Y O U   C A R R Y   T H R O U G H   T H E   R I F T", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 23, Parent = banner })
+	-- Title inside the panel, top-left; close button top-right.
+	text({ Position = UDim2.fromOffset(BP_PAD, 20), Size = UDim2.fromOffset(400, 34), Text = "Backpack", FontFace = F.TitleBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = backpack })
+	text({ Position = UDim2.fromOffset(BP_PAD, 54), Size = UDim2.fromOffset(400, 16), Text = "What you carry through the Rift", FontFace = F.Body, TextSize = 14, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = backpack })
+	new("Frame", { Position = UDim2.fromOffset(BP_PAD, 76), Size = UDim2.new(1, -BP_PAD * 2, 0, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.9, BorderSizePixel = 0, ZIndex = 22, Parent = backpack })
 
 	local close = new("TextButton", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -4, 0, 112),
-		Size = UDim2.fromOffset(34, 34),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -20, 0, 20),
+		Size = UDim2.fromOffset(36, 36),
 		Text = "X",
 		FontFace = F.TitleBold,
 		TextSize = 18,
-		TextColor3 = C.Gold,
+		TextColor3 = C.Parchment,
 		AutoButtonColor = true,
-		BackgroundColor3 = C.Ink,
+		BackgroundColor3 = Theme.C.Raised,
 		ZIndex = 24,
 		Parent = backpack,
-	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Bronze, 2) })
+	}, { stroke(C.Bronze, 2) })
 	close.Activated:Connect(function()
 		HUD.SetBackpack(false)
 	end)
 
 	-- Left column: equipment + stats
-	sectionHeader(backpack, "Equipment", 40, 112)
+	sectionHeader(backpack, "Equipment", BP_PAD, BP_HEAD_Y)
 	new("Frame", {
 		Name = "Equipment",
-		Position = UDim2.fromOffset(34, 152),
-		Size = UDim2.fromOffset(310, 270),
+		Position = UDim2.fromOffset(BP_PAD, BP_TOP),
+		Size = UDim2.fromOffset(BP_LEFT_W, 6 * 53),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
 		Parent = backpack,
 	}, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
 	new("Frame", {
 		Name = "Stats",
-		Position = UDim2.fromOffset(40, 432),
-		Size = UDim2.fromOffset(300, 110),
+		Position = UDim2.fromOffset(BP_PAD, BP_TOP + 6 * 53 + 18),
+		Size = UDim2.fromOffset(BP_LEFT_W, 100),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
 		Parent = backpack,
 	}, {
-		new("UIGridLayout", { CellSize = UDim2.fromOffset(148, 34), CellPadding = UDim2.fromOffset(4, 2), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(136, 44), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 
 	-- Divider between the columns.
 	new("Frame", {
-		Position = UDim2.fromOffset(362, 120),
-		Size = UDim2.fromOffset(2, 420),
-		BackgroundColor3 = C.Bronze,
+		Position = UDim2.fromOffset(BP_RIGHT_X - 13, BP_HEAD_Y),
+		Size = UDim2.new(0, 1, 1, -BP_HEAD_Y - 24),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.9,
 		BorderSizePixel = 0,
 		ZIndex = 22,
 		Parent = backpack,
-	}, { new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.3), NumberSequenceKeypoint.new(1, 1) }) }) })
+	})
 
 	-- Right column: inventory + powers
-	sectionHeader(backpack, "Inventory", 390, 112)
+	sectionHeader(backpack, "Inventory", BP_RIGHT_X, BP_HEAD_Y)
 	text({
 		Name = "ItemCount",
 		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -50, 0, 120),
-		Size = UDim2.fromOffset(240, 16),
+		Position = UDim2.new(1, -BP_PAD, 0, BP_HEAD_Y + 6),
+		Size = UDim2.fromOffset(260, 16),
 		FontFace = F.Label,
 		TextSize = 11,
 		TextColor3 = C.Ash,
@@ -1487,24 +1948,25 @@ local function buildBackpack()
 	})
 	new("Frame", {
 		Name = "Items",
-		Position = UDim2.fromOffset(386, 154),
-		Size = UDim2.fromOffset(360, 150),
+		Position = UDim2.fromOffset(BP_RIGHT_X, BP_TOP),
+		Size = UDim2.fromOffset(BP_RIGHT_W, 3 * 72 + 2 * 10),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
 		Parent = backpack,
 	}, {
-		new("UIGridLayout", { CellSize = UDim2.fromOffset(64, 64), CellPadding = UDim2.fromOffset(9, 9), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(72, 72), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
-	sectionHeader(backpack, "Powers", 390, 318)
+	local powersY = BP_TOP + 3 * 72 + 2 * 10 + 26
+	sectionHeader(backpack, "Powers", BP_RIGHT_X, powersY)
 	new("Frame", {
 		Name = "Powers",
-		Position = UDim2.fromOffset(386, 358),
-		Size = UDim2.fromOffset(360, 180),
+		Position = UDim2.fromOffset(BP_RIGHT_X, powersY + 42),
+		Size = UDim2.fromOffset(BP_RIGHT_W, BP_H - powersY - 42 - 20),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
 		Parent = backpack,
 	}, {
-		new("UIGridLayout", { CellSize = UDim2.fromOffset(56, 70), CellPadding = UDim2.fromOffset(4, 4), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(64, 80), CellPadding = UDim2.fromOffset(8, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 end
 
@@ -1516,7 +1978,8 @@ local function clearGui(parent)
 	end
 end
 
-local function equipmentRow(parent, order, iconId, key, title, subtitle, color, hover)
+local function equipmentRow(parent, order, iconId, key, title, subtitle, color, hover, rightPad)
+	rightPad = rightPad or 0
 	local row = new("Frame", {
 		Size = UDim2.new(1, 0, 0, 48),
 		BackgroundColor3 = Color3.new(1, 1, 1),
@@ -1542,7 +2005,7 @@ local function equipmentRow(parent, order, iconId, key, title, subtitle, color, 
 	text({ Size = UDim2.fromScale(1, 1), Text = key, FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 24, Parent = plate })
 	text({
 		Position = UDim2.fromOffset(108, 5),
-		Size = UDim2.new(1, -116, 0, 20),
+		Size = UDim2.new(1, -116 - rightPad, 0, 20),
 		Text = title,
 		FontFace = F.TitleBold,
 		TextSize = 17,
@@ -1553,7 +2016,7 @@ local function equipmentRow(parent, order, iconId, key, title, subtitle, color, 
 	})
 	text({
 		Position = UDim2.fromOffset(108, 26),
-		Size = UDim2.new(1, -116, 0, 14),
+		Size = UDim2.new(1, -116 - rightPad, 0, 14),
 		Text = subtitle,
 		RichText = true,
 		FontFace = F.Label,
@@ -1564,6 +2027,38 @@ local function equipmentRow(parent, order, iconId, key, title, subtitle, color, 
 		Parent = row,
 	})
 	hoverable(row, hover)
+	return row
+end
+
+-- This run's rune sockets on an equipment row; click a rune to unsocket it
+-- back to the pouch (the Rune found card then offers it again).
+local function socketCells(row, slot)
+	local list = socketsOf(slot)
+	for i = 1, Runes.Sockets do
+		local id = list[i]
+		local cell = new("TextButton", {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10 - (Runes.Sockets - i) * 24, 0.5, 0),
+			Size = UDim2.fromOffset(15, 15),
+			Rotation = 45,
+			Text = "",
+			AutoButtonColor = id ~= nil,
+			BackgroundColor3 = if id then runeColor(id) else C.Ink,
+			BackgroundTransparency = if id then 0 else 0.35,
+			ZIndex = 25,
+			Parent = row,
+		}, { stroke(C.Bronze, 1, 0.3) })
+		if id then
+			cell.MouseEnter:Connect(function()
+				showRuneTooltip(id)
+			end)
+			cell.MouseLeave:Connect(hideTooltip)
+			cell.Activated:Connect(function()
+				hideTooltip()
+				pcall(remotes.Rune.InvokeServer, remotes.Rune, "Unsocket", skillInSlot(slot), i)
+			end)
+		end
+	end
 end
 
 local function stat(parent, order, label, value)
@@ -1597,9 +2092,13 @@ refreshBackpack = function()
 			else
 				subtitle = `<font color="{hex(C.Gold)}">{NUMERALS[level]}</font>   {if #def.Elements == 2 then "F U S I O N" else spaced(def.Elements[1])}`
 			end
-			equipmentRow(equipment, i, id, entry.Key, if def then def.Name else "Nothing equipped", subtitle, skillColor(id), function()
+			local sockets = inRun() and Runes.SlotKeys[entry.Slot] ~= nil
+			local row = equipmentRow(equipment, i, id, entry.Key, if def then def.Name else "Nothing equipped", subtitle, skillColor(id), function()
 				return skillInSlot(entry.Slot)
-			end)
+			end, if sockets then 72 else 0)
+			if sockets then
+				socketCells(row, entry.Slot)
+			end
 		end
 	end
 	local charges, max = player:GetAttribute("FlaskCharges") or 0, player:GetAttribute("FlaskMax") or 0
@@ -1648,7 +2147,7 @@ refreshBackpack = function()
 			new("ImageLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
 				Position = UDim2.fromScale(0.5, 0.5),
-				Size = UDim2.fromOffset(58, 58),
+				Size = UDim2.fromOffset(64, 64),
 				BackgroundTransparency = 1,
 				Image = UIAssets.Items[id],
 				ZIndex = 23,
@@ -1682,7 +2181,7 @@ refreshBackpack = function()
 			Parent = grid,
 		}, { corner(4), stroke(C.Bronze, 1, 0.65) })
 	end
-	backpack.ItemCount.Text = if pieces > 0 then `{pieces}   I T E M S` else "D E F E A T   H U S K S   T O   C O L L E C T"
+	backpack.ItemCount.Text = if pieces > 0 then `{pieces}   I T E M S` else "C L E A R   S T O R Y   A C T S   T O   C O L L E C T"
 
 	-- Powers (owned skills)
 	local powers = backpack.Powers
@@ -1690,10 +2189,10 @@ refreshBackpack = function()
 	local owned = sortedOwned()
 	for i, id in owned do
 		local cell = new("Frame", { BackgroundTransparency = 1, LayoutOrder = i, ZIndex = 22, Parent = powers })
-		local s = shard(id, 54, cell, 23)
+		local s = shard(id, 62, cell, 23)
 		s.Position = UDim2.fromOffset(1, 0)
 		text({
-			Position = UDim2.fromOffset(0, 52),
+			Position = UDim2.fromOffset(0, 62),
 			Size = UDim2.new(1, 0, 0, 16),
 			Text = NUMERALS[build.Skills[id]],
 			FontFace = F.TitleBold,
@@ -1915,33 +2414,132 @@ local function buildPointsBadge()
 	hit.Activated:Connect(function()
 		HUD.ToggleStats()
 	end)
+	-- Unspent stat points: a small gold diamond (matching the level diamond's
+	-- ring) with an upright "+1" that gently pulses until you spend them.
 	local badge = new("Frame", {
 		Name = "PointsBadge",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -8, 0, 14),
-		Size = UDim2.fromOffset(30, 30),
-		BackgroundColor3 = C.Gold,
+		Position = UDim2.new(1, -6, 0, 16),
+		Size = UDim2.fromOffset(34, 34),
+		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 8,
 		Parent = medal,
-	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Ink, 2) })
-	local label = text({ Size = UDim2.fromScale(1, 1), FontFace = F.TitleBold, TextSize = 15, TextColor3 = C.Ink, ZIndex = 9, Parent = badge })
-	local pulse
+	})
+	local badgeScale = new("UIScale", { Parent = badge })
+	local glow = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(30, 30), Rotation = 45, BackgroundColor3 = Color3.fromRGB(255, 210, 90), BackgroundTransparency = 0.6, BorderSizePixel = 0, ZIndex = 8, Parent = badge })
+	local gem = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(22, 22), Rotation = 45, BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 9, Parent = badge }, {
+		new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 226, 130), Color3.fromRGB(200, 140, 36)), Rotation = 45 }),
+		Theme.Edged(2),
+	})
+	local label = text({ Size = UDim2.fromScale(1, 1), FontFace = F.TitleBold, TextSize = 13, TextColor3 = Color3.fromRGB(28, 18, 4), ZIndex = 10, Parent = badge })
+	local pulse, glowPulse
 	local function refresh()
 		local points = player:GetAttribute("StatPoints") or 0
 		badge.Visible = points > 0
 		label.Text = "+" .. points
 		if points > 0 and not pulse then
-			pulse = TweenService:Create(badge, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), { Size = UDim2.fromOffset(36, 36) })
+			local info = TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+			pulse = TweenService:Create(badgeScale, info, { Scale = 1.12 })
+			glowPulse = TweenService:Create(glow, info, { BackgroundTransparency = 0.25, Size = UDim2.fromOffset(36, 36) })
 			pulse:Play()
+			glowPulse:Play()
 		elseif points == 0 and pulse then
 			pulse:Cancel()
-			pulse = nil
-			badge.Size = UDim2.fromOffset(30, 30)
+			glowPulse:Cancel()
+			pulse, glowPulse = nil, nil
+			badgeScale.Scale = 1
 		end
 	end
 	player:GetAttributeChangedSignal("StatPoints"):Connect(refresh)
 	refresh()
+end
+
+-------------------------------------------------------------------------------
+-- Boss bar: the nearest living boss's name and health, pinned to the top of
+-- the screen while you fight it.
+-------------------------------------------------------------------------------
+
+local BOSS_RANGE = 300 -- studs; bosses in other players' arenas stay hidden
+local BOSS_W = 560
+
+local function buildBossBar()
+	local root = new("Frame", {
+		Name = "BossBar",
+		AnchorPoint = Vector2.new(0.5, 0),
+		-- Up in the top bar's row (Roblox's buttons only use the top-left).
+		Position = UDim2.new(0.5, 0, 0, -44),
+		Size = UDim2.fromOffset(BOSS_W, 68),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = gui,
+	})
+	text({ Size = UDim2.new(1, 0, 0, 14), Text = spaced("Boss"), FontFace = F.Label, TextSize = 11, TextColor3 = C.Crimson, TextStrokeColor3 = Color3.new(0, 0, 0), TextStrokeTransparency = 0.4, Parent = root })
+	local name = text({ Position = UDim2.fromOffset(0, 14), Size = UDim2.new(1, 0, 0, 26), FontFace = F.TitleBold, TextSize = 24, TextStrokeColor3 = Color3.new(0, 0, 0), TextStrokeTransparency = 0.2, Parent = root })
+	local bar = new("Frame", { Position = UDim2.fromOffset(0, 44), Size = UDim2.new(1, 0, 0, 22), BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, Parent = root })
+	local track = new("Frame", { Position = UDim2.fromOffset(3, 3), Size = UDim2.new(1, -6, 1, -6), BackgroundColor3 = Color3.fromRGB(15, 10, 18), BorderSizePixel = 0, ClipsDescendants = true, Parent = bar })
+	local lag = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.fromRGB(255, 214, 180), BackgroundTransparency = 0.2, BorderSizePixel = 0, ZIndex = 2, Parent = track })
+	local fill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 3, Parent = track }, {
+		new("UIGradient", { Color = ColorSequence.new(Color3.fromRGB(255, 92, 60), Color3.fromRGB(150, 16, 28)), Rotation = 90 }),
+	})
+	local hp = text({ Size = UDim2.fromScale(1, 1), FontFace = F.BodyBold, TextSize = 13, TextStrokeColor3 = Color3.new(0, 0, 0), TextStrokeTransparency = 0.1, ZIndex = 4, Parent = track })
+
+	local current, last, nextScan = nil, nil, 0
+	local function findBoss()
+		local char = player.Character
+		local me = char and char:FindFirstChild("HumanoidRootPart")
+		local folder = workspace:FindFirstChild("RiftEnemies")
+		if not me or not folder then
+			return nil
+		end
+		local best, bestDist = nil, BOSS_RANGE
+		for _, model in folder:GetChildren() do
+			if model:GetAttribute("Boss") then
+				local hum = model:FindFirstChildOfClass("Humanoid")
+				local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
+				if hum and hum.Health > 0 and part then
+					local d = (part.Position - me.Position).Magnitude
+					if d < bestDist then
+						best, bestDist = model, d
+					end
+				end
+			end
+		end
+		return best
+	end
+
+	RunService.Heartbeat:Connect(function()
+		local now = os.clock()
+		if now >= nextScan then
+			nextScan = now + 0.25
+			local boss = findBoss()
+			if boss ~= current then
+				current, last = boss, nil
+				root.Visible = boss ~= nil
+				if boss then
+					name.Text = boss:GetAttribute("BossName") or boss.Name
+					lag.Size = UDim2.fromScale(1, 1)
+				end
+			end
+		end
+		local hum = current and current:FindFirstChildOfClass("Humanoid")
+		if not hum then
+			return
+		end
+		local frac = math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1)
+		fill.Size = UDim2.fromScale(frac, 1)
+		hp.Text = `{math.ceil(hum.Health)} / {math.floor(hum.MaxHealth)}`
+		if last and hum.Health < last then
+			task.delay(0.3, function()
+				if current and current:FindFirstChildOfClass("Humanoid") == hum then
+					tween(lag, 0.4, { Size = UDim2.fromScale(math.clamp(hum.Health / math.max(hum.MaxHealth, 1), 0, 1), 1) })
+				end
+			end)
+		elseif not last or hum.Health > last then
+			lag.Size = UDim2.fromScale(frac, 1)
+		end
+		last = hum.Health
+	end)
 end
 
 -------------------------------------------------------------------------------
@@ -1972,7 +2570,10 @@ end
 
 -- True while any full-screen menu (Forge, Backpack) is open; Controls uses it to block casting.
 function HUD.MenuOpen()
-	return lobbyMenuOpen or (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible)
+	local playerGui = player:FindFirstChild("PlayerGui")
+	local craftingGui = playerGui and playerGui:FindFirstChild("RiftboundCrafting")
+	local craftingOpen = craftingGui and craftingGui.Enabled
+	return lobbyMenuOpen or craftingOpen or (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible) or (offerScreen ~= nil and offerScreen.Visible)
 end
 
 -- Shared look for other screens (the lobby menu) so they match the HUD.
@@ -1987,6 +2588,26 @@ HUD.Style = {
 	slab = slab,
 	popIn = popIn,
 }
+
+-- Docks the gold bar into another frame (the lobby menu puts it above the
+-- Store button) at `position` and `width`; with no parent it goes home, under
+-- the level diamond.
+function HUD.DockGold(parent, position, width)
+	if not goldBox then
+		return
+	end
+	if parent then
+		goldBox.Parent = parent
+		goldBox.Position = position
+		goldBox.Size = UDim2.fromOffset(width or GOLD_W, GOLD_H)
+	else
+		goldBox.Parent = gui
+		goldBox.Position = UDim2.fromOffset(GOLD_X, GOLD_Y)
+		goldBox.Size = UDim2.fromOffset(GOLD_W, GOLD_H)
+	end
+end
+
+HUD.GoldHeight = GOLD_H
 
 -- In the lobby the Arsenal steps aside for the lobby menu buttons.
 function HUD.SetLobby(on)
@@ -2024,30 +2645,21 @@ function HUD.SkillInSlot(slot)
 end
 
 function HUD.ForgeOpen()
-	return forge ~= nil and forge.Visible
+	local playerGui = player:FindFirstChild("PlayerGui")
+	local craftingGui = playerGui and playerGui:FindFirstChild("RiftboundCrafting")
+	return craftingGui ~= nil and craftingGui.Enabled
 end
 
 function HUD.SetForge(open)
-	if open == forge.Visible then
-		return
-	end
-	hideTooltip()
-	if open then
-		closeLobbyPanel()
-		backpack.Visible = false
-		attributes.Visible = false
-		refreshForge()
-		forge.Visible = true
-		menuShade(true)
-		popIn(forge)
-	else
+	-- Deprecated: The Forge modal is managed by Crafting.client.lua
+	if forge then
 		forge.Visible = false
-		menuShade(false)
 	end
+	menuShade(false)
 end
 
 function HUD.ToggleForge()
-	HUD.SetForge(not forge.Visible)
+	-- Deprecated: The Forge modal is managed by Crafting.client.lua
 end
 
 function HUD.SetBackpack(open)
@@ -2061,6 +2673,9 @@ function HUD.SetBackpack(open)
 		attributes.Visible = false
 		backpack.Visible = true
 		refreshBackpack()
+		-- Opening the backpack brings back runes waiting to be socketed.
+		runeDismissed = 0
+		refreshRunes()
 		menuShade(true)
 		popIn(backpack)
 	else
@@ -2107,7 +2722,7 @@ function HUD.TryStartCooldown(slot)
 	if cd and now < cd.Ends then
 		return false
 	end
-	local length = Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")) * Nations.CooldownMult(player)
+	local length = Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")) * Nations.CooldownMult(player) * Runes.CooldownMult(socketsOf(slot))
 	cooldownEnds[id] = { Ends = now + length, Length = length }
 	return true
 end
@@ -2126,10 +2741,14 @@ local function applyBuild(snapshot)
 	for id in build.Skills do
 		discovered[id] = true
 	end
+	build.Sockets = build.Sockets or {}
+	build.Pouch = build.Pouch or {}
 	refreshSlots()
 	refreshArsenal()
 	refreshForge()
 	refreshBackpack()
+	refreshRunes()
+	refreshOffer()
 end
 
 function HUD.Init(remoteFolder)
@@ -2193,12 +2812,22 @@ function HUD.Init(remoteFolder)
 	buildBackpack()
 	buildAttributes()
 	buildPointsBadge()
+	buildBossBar()
 	buildTooltip()
+	buildRuneCard()
+	buildOfferScreen()
 
 	remotes.BuildChanged.OnClientEvent:Connect(applyBuild)
 	remotes.Notify.OnClientEvent:Connect(HUD.Toast)
-	remotes.OpenForge.OnClientEvent:Connect(function()
-		HUD.SetForge(true)
+	-- Rune of the Endless Cascade: a kill made the skill ready again.
+	remotes.CooldownReset.OnClientEvent:Connect(function(id)
+		cooldownEnds[id] = nil
+	end)
+	player:GetAttributeChangedSignal("StoryRun"):Connect(function()
+		runeDismissed = 0
+		refreshRunes()
+		refreshOffer()
+		refreshBackpack()
 	end)
 	applyBuild(remotes.GetBuild:InvokeServer())
 

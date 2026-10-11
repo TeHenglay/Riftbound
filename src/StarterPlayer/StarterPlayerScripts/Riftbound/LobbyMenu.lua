@@ -1,4 +1,4 @@
--- Lobby menu: Shattered Obsidian tiles down the left (Store, Items, Quests,
+-- Lobby menu: "Bold Vanguard" tiles (dark faces, coloured rims, painted icons) down the left (Store, Items, Quests,
 -- Areas, Play) and right (Profile, Calendar) edges of the screen.
 -- Shown only while the player is in their nation's lobby; slides away in the Rift.
 -- Items opens the Backpack, Play opens the full-screen mode select
@@ -24,18 +24,21 @@ local gui, left, right, holder, panel
 local shown = false
 local openId
 
-local TILE = 112
-local GAP = 8
+local TILE = 80
+-- Space between buttons. Each outline reaches 4px out (12px at the bottom,
+-- with its drop shadow), so this leaves a clear ~8px gap between them.
+local GAP = 16
+local STORE_H = 54 -- height of the wide Store bar
 local EDGE = 16
 
 local BUTTONS = {
-	Store = { Title = "Store", Tint = Color3.fromRGB(233, 194, 122), Subtitle = "THE RIFT MERCHANT" },
-	Items = { Title = "Items", Tint = Color3.fromRGB(192, 132, 70), Key = "B" },
-	Quests = { Title = "Quests", Tint = Color3.fromRGB(255, 106, 43), Subtitle = "BOUNTIES OF THE RIFT" },
-	Areas = { Title = "Areas", Tint = Color3.fromRGB(159, 240, 216), Subtitle = "TRAVEL THE SHATTERED LANDS" },
-	Play = { Title = "Play", Tint = Color3.fromRGB(178, 108, 255) },
-	Profile = { Title = "Profile", Tint = Color3.fromRGB(60, 156, 255), Subtitle = "YOUR RIFTWALKER" },
-	Calendar = { Title = "Calendar", Tint = Color3.fromRGB(250, 225, 60), Subtitle = "DAILY REWARDS" },
+	Store = { Title = "Store", Tint = Color3.fromRGB(255, 77, 109), Subtitle = "THE RIFT MERCHANT" },
+	Items = { Title = "Items", Tint = Color3.fromRGB(56, 163, 255), Key = "B" },
+	Quests = { Title = "Quests", Tint = Color3.fromRGB(255, 159, 28), Subtitle = "BOUNTIES OF THE RIFT" },
+	Areas = { Title = "Areas", Tint = Color3.fromRGB(47, 211, 122), Subtitle = "TRAVEL THE SHATTERED LANDS" },
+	Play = { Title = "Play", Tint = Color3.fromRGB(168, 85, 247) },
+	Profile = { Title = "Profile", Tint = Color3.fromRGB(79, 125, 255), Subtitle = "YOUR RIFTWALKER" },
+	Calendar = { Title = "Calendar", Tint = Color3.fromRGB(255, 200, 61), Subtitle = "DAILY REWARDS" },
 }
 
 local PLACEHOLDER = {
@@ -547,19 +550,20 @@ local function activate(id)
 	end
 end
 
-local function hover(button, scale, label, tint)
+local OUTLINE = Color3.fromRGB(13, 10, 20)
+local FACE = Color3.fromRGB(18, 10, 30)
+
+local function hover(button, scale, rim, tint)
 	button.MouseEnter:Connect(function()
 		tween(scale, 0.12, { Scale = 1.07 })
-		label.TextColor3 = C.RiftHot
-		tint.Transparency = 0
+		rim.Color = tint:Lerp(Color3.new(1, 1, 1), 0.4)
 	end)
 	button.MouseLeave:Connect(function()
 		tween(scale, 0.12, { Scale = 1 })
-		label.TextColor3 = C.Parchment
-		tint.Transparency = 0.6
+		rim.Color = tint
 	end)
 	button.MouseButton1Down:Connect(function()
-		tween(scale, 0.06, { Scale = 0.95 })
+		tween(scale, 0.06, { Scale = 0.94 })
 	end)
 	button.MouseButton1Up:Connect(function()
 		tween(scale, 0.1, { Scale = 1.07 })
@@ -568,68 +572,116 @@ end
 
 local function keyBadge(parent, key)
 	local plate = new("Frame", {
-		Position = UDim2.fromOffset(-4, -4),
-		Size = UDim2.fromOffset(24, 24),
-		BackgroundColor3 = C.Ink,
-		ZIndex = 5,
+		Position = UDim2.fromOffset(-6, -6),
+		Size = UDim2.fromOffset(20, 20),
+		BackgroundColor3 = OUTLINE,
+		ZIndex = 6,
 		Parent = parent,
-	}, { stroke(C.Bronze, 1.5) })
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 6) }) })
 	text({
 		Size = UDim2.fromScale(1, 1),
 		Text = key,
-		FontFace = F.Label,
+		FontFace = F.TitleBold,
 		TextSize = 13,
-		TextColor3 = C.Gold,
-		ZIndex = 6,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 7,
 		Parent = plate,
 	})
+end
+
+-- "Bold Vanguard" button: a dark face shaded with the button's colour, a thick
+-- coloured rim, a black outline with a drop shadow below, and a faint inner
+-- shine. Returns the rim stroke so hover can brighten it.
+local function framed(button, tint)
+	new("Frame", {
+		Name = "Outline",
+		Position = UDim2.fromOffset(-4, -4),
+		Size = UDim2.new(1, 8, 1, 12),
+		BackgroundColor3 = OUTLINE,
+		ZIndex = 1,
+		Parent = button,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 14) }) })
+	local rim = new("UIStroke", {
+		Color = tint,
+		Thickness = 2.5,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	})
+	new("Frame", {
+		Name = "Face",
+		Position = UDim2.fromOffset(-1, -1),
+		Size = UDim2.new(1, 2, 1, 2),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ZIndex = 2,
+		Parent = button,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 10) }),
+		new("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, tint:Lerp(FACE, 0.42)),
+				ColorSequenceKeypoint.new(0.55, tint:Lerp(FACE, 0.78)),
+				ColorSequenceKeypoint.new(1, FACE),
+			}),
+		}),
+		rim,
+	})
+	new("Frame", {
+		Name = "Shine",
+		Position = UDim2.fromOffset(3, 3),
+		Size = UDim2.new(1, -6, 1, -6),
+		BackgroundTransparency = 1,
+		ZIndex = 3,
+		Parent = button,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1.5, Transparency = 0.8 }),
+	})
+	return rim
+end
+
+-- Thick black outline around button lettering.
+local function outlined(props)
+	local label = text(props)
+	new("UIStroke", { Color = OUTLINE, Thickness = 2.5, Parent = label })
+	return label
 end
 
 -- Square tile: icon art with the name along the bottom.
 local function tile(parent, id, x, y)
 	local info = BUTTONS[id]
-	local button = new("ImageButton", {
+	local button = new("TextButton", {
 		Name = id,
 		Position = UDim2.fromOffset(x, y),
 		Size = UDim2.fromOffset(TILE, TILE),
 		BackgroundTransparency = 1,
-		Image = (UIAssets.Menu and UIAssets.Menu[id]) or UIAssets.Slab,
-		ScaleType = if UIAssets.Menu and UIAssets.Menu[id]
-			then Enum.ScaleType.Stretch
-			else Enum.ScaleType.Slice,
-		SliceCenter = UIAssets.SlabSlice,
-		SliceScale = 0.35,
+		Text = "",
+		AutoButtonColor = false,
 		Parent = parent,
 	})
 	local scale = new("UIScale", { Parent = button })
-	local glow = new(
-		"UIStroke",
-		{ Color = info.Tint, Thickness = 2, Transparency = 0.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }
-	)
-	new("Frame", {
-		Name = "Glow",
-		Position = UDim2.fromOffset(6, 6),
-		Size = UDim2.new(1, -12, 1, -12),
-		BackgroundTransparency = 1,
-		ZIndex = 2,
+	local rim = framed(button, info.Tint)
+	icon(id, {
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 2),
+		Size = UDim2.fromOffset(54, 54),
+		ZIndex = 4,
 		Parent = button,
-	}, { glow })
-	local label = text({
+	})
+	outlined({
 		Name = "Label",
-		Position = UDim2.new(0, 0, 1, -32),
-		Size = UDim2.new(1, 0, 0, 24),
+		Position = UDim2.new(0, 0, 1, -22),
+		Size = UDim2.new(1, 0, 0, 18),
 		Text = info.Title,
 		FontFace = F.TitleBold,
-		TextSize = 20,
-		TextStrokeColor3 = C.Ink,
-		TextStrokeTransparency = 0,
-		ZIndex = 4,
+		TextSize = 15,
+		TextColor3 = Color3.new(1, 1, 1),
+		ZIndex = 5,
 		Parent = button,
 	})
 	if info.Key then
 		keyBadge(button, info.Key)
 	end
-	hover(button, scale, label, glow)
+	hover(button, scale, rim, info.Tint)
 	button.Activated:Connect(function()
 		activate(id)
 	end)
@@ -640,56 +692,42 @@ end
 local function storeBar(parent)
 	local info = BUTTONS.Store
 	local width = TILE * 2 + GAP
-	local button = new("ImageButton", {
+	local button = new("TextButton", {
 		Name = "Store",
-		Size = UDim2.fromOffset(width, 76),
+		Size = UDim2.fromOffset(width, STORE_H),
 		BackgroundTransparency = 1,
-		Image = UIAssets.Row,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = UIAssets.RowSlice,
-		SliceScale = 0.5,
+		Text = "",
+		AutoButtonColor = false,
 		Parent = parent,
 	})
 	local scale = new("UIScale", { Parent = button })
-	local glow = new(
-		"UIStroke",
-		{ Color = info.Tint, Thickness = 2, Transparency = 0.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }
-	)
-	new(
-		"Frame",
-		{
-			Position = UDim2.fromOffset(6, 6),
-			Size = UDim2.new(1, -12, 1, -12),
-			BackgroundTransparency = 1,
-			ZIndex = 2,
-			Parent = button,
-		},
-		{ glow }
-	)
-	icon(
-		"Store",
-		{ Position = UDim2.fromOffset(2, 2), Size = UDim2.fromOffset(72, 72), ZIndex = 3, Parent = button }
-	)
-	local label = text({
-		Position = UDim2.fromOffset(84, 0),
-		Size = UDim2.new(1, -96, 1, 0),
-		Text = info.Title,
-		FontFace = F.TitleBold,
-		TextSize = 28,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextStrokeColor3 = C.Ink,
-		TextStrokeTransparency = 0,
+	local rim = framed(button, info.Tint)
+	icon("Store", {
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 4, 0.5, -1),
+		Size = UDim2.fromOffset(52, 52),
 		ZIndex = 4,
 		Parent = button,
 	})
-	hover(button, scale, label, glow)
+	outlined({
+		Position = UDim2.fromOffset(62, 0),
+		Size = UDim2.new(1, -70, 1, 0),
+		Text = info.Title,
+		FontFace = F.TitleBold,
+		TextSize = 22,
+		TextColor3 = Color3.new(1, 1, 1),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		ZIndex = 5,
+		Parent = button,
+	})
+	hover(button, scale, rim, info.Tint)
 	button.Activated:Connect(function()
 		activate("Store")
 	end)
 end
 
 local LEFT_W = TILE * 2 + GAP
-local LEFT_H = 76 + GAP + TILE * 2 + GAP
+local LEFT_H = STORE_H + GAP + TILE * 2 + GAP
 local RIGHT_H = TILE * 2 + GAP
 local LEFT_IN, LEFT_OUT = UDim2.new(0, EDGE, 0.56, 0), UDim2.new(0, -LEFT_W - 40, 0.56, 0)
 local RIGHT_IN, RIGHT_OUT = UDim2.new(1, -EDGE, 0.56, 0), UDim2.new(1, TILE + 40, 0.56, 0)
@@ -705,7 +743,7 @@ local function buildColumns()
 		Parent = holder,
 	})
 	storeBar(left)
-	local top = 76 + GAP
+	local top = STORE_H + GAP
 	tile(left, "Items", 0, top)
 	tile(left, "Quests", TILE + GAP, top)
 	tile(left, "Areas", 0, top + TILE + GAP)
@@ -731,6 +769,12 @@ local function setShown(on)
 	end
 	shown = on
 	HUD.SetLobby(on)
+	-- In the lobby the gold bar sits above the Store button and slides with it.
+	if on then
+		HUD.DockGold(left, UDim2.fromOffset(0, -(HUD.GoldHeight + GAP)), LEFT_W)
+	else
+		HUD.DockGold(nil)
+	end
 	if on then
 		left.Visible = true
 		right.Visible = true

@@ -354,13 +354,13 @@ local function lightning(from, to, color, opts)
 		atts[i] = a
 	end
 	local beams = {}
-	local function layer(texture, w, col, alpha)
+	local function layer(texture, w, col, alpha, emission)
 		for i = 1, segments do
 			local b = Instance.new("Beam")
 			b.Attachment0 = atts[i - 1]
 			b.Attachment1 = atts[i]
 			b.FaceCamera = true
-			b.LightEmission = 1
+			b.LightEmission = emission or 1
 			b.LightInfluence = 0
 			b.Segments = 1
 			if texture then
@@ -372,9 +372,14 @@ local function lightning(from, to, color, opts)
 			table.insert(beams, { Beam = b, Alpha = alpha })
 		end
 	end
-	layer(TEX.Glow, width * 5, halo, 0.55)
-	layer(TEX.Glow, width * 2.2, color, 0.2)
-	layer(nil, width * 0.45, Color3.new(1, 1, 1), 0)
+	if opts.Ink then
+		-- Anime shade: a solid black bolt on its own jagged path, no glow.
+		layer(nil, width, Color3.new(0, 0, 0), 0.05, 0)
+	else
+		layer(TEX.Glow, width * 5, halo, 0.55)
+		layer(TEX.Glow, width * 2.2, color, 0.2)
+		layer(nil, width * 0.45, Color3.new(1, 1, 1), 0)
+	end
 
 	local jag = math.min(dist * 0.12, 2.6)
 	local function rejitter()
@@ -394,7 +399,7 @@ local function lightning(from, to, color, opts)
 			local origin = atts[math.random(1, segments - 1)].WorldPosition
 			local reach = dist * (0.15 + math.random() * 0.15)
 			local tip = origin + along * reach + (side * (math.random() - 0.5) * 2 + Vector3.new(0, math.random() - 0.6, 0)) * reach
-			lightning(origin, tip, color, { Width = width * 0.5, Life = life * 0.7, NoBranch = true, Halo = halo })
+			lightning(origin, tip, color, { Width = width * 0.5, Life = life * 0.7, NoBranch = true, Halo = halo, Ink = opts.Ink })
 		end
 	end
 
@@ -425,7 +430,8 @@ local function debrisBurst(at, color, count, opts)
 	opts = opts or {}
 	local floorY = opts.Floor or at.Y - 2
 	for _ = 1, count do
-		local chunk = Instance.new("Part")
+		-- opts.Wedge: angular rock chips instead of cubes.
+		local chunk = Instance.new(if opts.Wedge then "WedgePart" else "Part")
 		local s = (opts.Size or 0.6) * (0.6 + math.random() * 0.8)
 		chunk.Size = Vector3.new(s, s * (0.7 + math.random() * 0.6), s)
 		chunk.Material = opts.Material or Enum.Material.Slate
@@ -470,9 +476,15 @@ local function spikes(at, radius, color, floorY, opts)
 			height = (opts.Height or 6) * (0.7 + math.random() * 0.4)
 		end
 		local w = (opts.Width or 1.6) * (0.8 + math.random() * 0.4)
-		-- The AI-generated rock spike mesh, or a plain wedge if it is missing.
-		local spike = meshTemplate("RockSpike")
-		if spike then
+		-- opts.Mesh (e.g. the Blender StoneSpikeMesh), else the AI-generated
+		-- rock spike mesh, else a plain wedge.
+		local custom = opts.Mesh and meshTemplate(opts.Mesh)
+		local spike = custom or meshTemplate("RockSpike")
+		if custom then
+			-- Blender spike is 1.1 x 3 studs (tall and slim); keep it chunky.
+			spike.Size = Vector3.new(w * 1.5, height * 1.15, w * 1.5)
+			height = spike.Size.Y
+		elseif spike then
 			spike.Size = Vector3.new(w * 1.4, height, w * 1.4)
 		else
 			spike = Instance.new("WedgePart")
@@ -488,13 +500,48 @@ local function spikes(at, radius, color, floorY, opts)
 		local base = CFrame.new(at.X + offset.X, floorY, at.Z + offset.Z) * lean
 		spike.CFrame = base * CFrame.new(0, -height / 2, 0)
 		spike.Parent = folder
-		tween(spike, 0.12, { CFrame = base * CFrame.new(0, height / 2 - 0.3, 0) }, Enum.EasingStyle.Back)
-		task.delay(opts.Hold or 0.65, function()
-			if spike.Parent then
-				tween(spike, 0.35, { CFrame = base * CFrame.new(0, -height / 2, 0), Transparency = 0.6 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-			end
-		end)
-		Debris:AddItem(spike, (opts.Hold or 0.65) + 0.4)
+		if custom then
+			-- Staggered burst: each spike punches up with a twist, overshoots,
+			-- then settles; a puff of dust and grit kicks out at its base.
+			local delay = if i == 0 then 0 else math.random() * 0.12
+			local up = base * CFrame.new(0, height / 2 - 0.3, 0)
+			task.delay(delay, function()
+				if not spike.Parent then
+					return
+				end
+				spike.CFrame = base * CFrame.new(0, -height / 2, 0) * CFrame.Angles(0, -0.6, 0)
+				tween(spike, 0.14, { CFrame = up * CFrame.new(0, height * 0.12, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+				task.delay(0.14, function()
+					if spike.Parent then
+						tween(spike, 0.12, { CFrame = up }, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+					end
+				end)
+				burst(Vector3.new(at.X + offset.X, floorY + 0.4, at.Z + offset.Z), {
+					{ Texture = TEX.Dust, Count = 2, Light = 0, Size = ns(0, 1.5, 1, 3.5), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(3, 6), Spread = Vector2.new(180, 20), Color = cs(color) },
+					{ Texture = TEX.Rocks, Count = 3, Light = 0, Size = ns(0, 0.6, 1, 0.4), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(10, 16), Spread = Vector2.new(50, 50), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(Color3.new(1, 1, 1)) },
+				}, 1)
+			end)
+			task.delay((opts.Hold or 0.65) + delay, function()
+				if spike.Parent then
+					-- Crumble: shudder, then sink and break into chunks.
+					tween(spike, 0.06, { CFrame = up * CFrame.Angles(0.05, 0, -0.05) })
+					task.delay(0.06, function()
+						if spike.Parent then
+							debrisBurst(spike.Position, rgb(48, 38, 32), 3, { Floor = floorY, Size = w * 0.35, Height = 2.5, Reach = 2, Material = Enum.Material.Basalt, Wedge = true })
+							tween(spike, 0.3, { CFrame = base * CFrame.new(0, -height / 2, 0), Size = spike.Size * Vector3.new(0.7, 1, 0.7) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+						end
+					end)
+				end
+			end)
+		else
+			tween(spike, 0.12, { CFrame = base * CFrame.new(0, height / 2 - 0.3, 0) }, Enum.EasingStyle.Back)
+			task.delay(opts.Hold or 0.65, function()
+				if spike.Parent then
+					tween(spike, 0.35, { CFrame = base * CFrame.new(0, -height / 2, 0), Transparency = 0.6 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				end
+			end)
+		end
+		Debris:AddItem(spike, (opts.Hold or 0.65) + 0.6)
 		if opts.Glow then
 			local light = Instance.new("PointLight")
 			light.Color = opts.Glow
@@ -647,6 +694,23 @@ local function launchPlasmaLance(e)
 	trail.FaceCamera = true
 	trail.WidthScale = ns(0, 1, 1, 0)
 	trail.Parent = root
+	-- Black ink shade: a wider black trail and black smoke under the plasma glow.
+	local ink0, ink1 = Instance.new("Attachment"), Instance.new("Attachment")
+	ink0.Position, ink1.Position = Vector3.new(0, 0.8, 0.6), Vector3.new(0, -0.8, 0.6)
+	ink0.Parent, ink1.Parent = root, root
+	local inkTrail = Instance.new("Trail")
+	inkTrail.Attachment0, inkTrail.Attachment1 = ink0, ink1
+	inkTrail.Lifetime = 0.16
+	inkTrail.Color = cs(Color3.new(0, 0, 0))
+	inkTrail.Transparency = ns(0, 0.2, 1, 1)
+	inkTrail.LightEmission = 0
+	inkTrail.LightInfluence = 0
+	inkTrail.FaceCamera = true
+	inkTrail.WidthScale = ns(0, 1, 1, 0)
+	inkTrail.Parent = root
+	table.insert(emitters, emitter(root, { Enabled = true, Texture = TEX.Smoke, Rate = 25, Light = 0, Size = ns(0, 1.2, 1, 0.3), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.15, 0.25), Speed = NumberRange.new(1, 3), Dir = Enum.NormalId.Back, Color = cs(Color3.new(0, 0, 0)), ZOffset = -1 }))
+	-- Ember rings shed off the spear as it flies.
+	table.insert(emitters, emitter(root, { Enabled = true, Texture = TEX.Shockwave, Rate = 14, Size = ns(0, 1, 1, 3.5), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.18), Color = cs(PLASMA.Yellow, PLASMA.Red), Light = 1, Dir = Enum.NormalId.Back, Speed = NumberRange.new(0.5) }))
 
 	-- Release flash at the hand.
 	playTemplate("Fire-01", CFrame.new(e.From), { Scale = 0.6, Color = PLASMA_FIRE })
@@ -670,6 +734,10 @@ local function launchPlasmaLance(e)
 				return Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 1.6
 			end
 			lightning(pos + e.Dir * 2 + jitter(), pos - e.Dir * 3 + jitter(), PLASMA.Yellow, { Width = 0.22, Life = 0.08, NoBranch = true, Halo = PLASMA.Red })
+			-- Every other arc gets a black ink twin on its own path.
+			if math.random() < 0.5 then
+				lightning(pos + e.Dir * 1.5 + jitter(), pos - e.Dir * 3.5 + jitter(), Color3.new(0, 0, 0), { Width = 0.28, Life = 0.08, NoBranch = true, Ink = true })
+			end
 		end
 	end)
 	local function cleanup()
@@ -715,6 +783,47 @@ local function plasmaExplosion(at, r, floorY)
 	task.delay(0.06, function()
 		ring(at, PLASMA.Red, 2, r * 2.1, 0.45, floorY)
 	end)
+	-- Black ink shade: ink shards, black arcs between the plasma arcs, a black
+	-- shock ring on the ground and a red-black smoke column.
+	burst(at, {
+		{ Texture = TEX.Spark, Count = 20, Parallel = true, Light = 0, Size = ns(0, 1.3, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(30, 48), Spread = Vector2.new(180, 180), Drag = 4, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Smoke, Count = 6, Light = 0, Size = ns(0, 3, 1, 7), Transparency = ns(0, 0.25, 1, 1), Lifetime = NumberRange.new(0.7, 1.1), Speed = NumberRange.new(10, 16), Spread = Vector2.new(15, 15), Drag = 2, Color = cs(PLASMA.Red, Color3.new(0, 0, 0)), ZOffset = -1 },
+		{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, r * 0.4, 1, r * 3), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.3), Color = cs(PLASMA.White, PLASMA.Yellow), Light = 1, ZOffset = 2 },
+	}, 2)
+	for i = 1, 5 do
+		local angle = (i + 0.5) / 5 * math.pi * 2 + math.random() * 0.4
+		local reach = r * (0.6 + math.random() * 0.5)
+		lightning(at, Vector3.new(at.X + math.cos(angle) * reach, floorY + 0.5, at.Z + math.sin(angle) * reach), Color3.new(0, 0, 0), { Width = 0.5, Life = 0.3, Ink = true })
+	end
+	groundDecal(at, TEX.Ring, Color3.new(0, 0, 0), r * 0.6, r * 2.4, 0.6, { Floor = floorY, Lift = 0.03, StartAlpha = 0.1, GrowTime = 0.3 })
+	-- A plasma dome swells and pops, then an aftershock of arcs crackles out.
+	local dome = Instance.new("Part")
+	dome.Shape = Enum.PartType.Ball
+	dome.Material = Enum.Material.ForceField
+	dome.Color = PLASMA.Orange
+	dome.Anchored = true
+	dome.CanCollide = false
+	dome.CanQuery = false
+	dome.CanTouch = false
+	dome.CastShadow = false
+	dome.Size = Vector3.one * 2
+	dome.CFrame = CFrame.new(at)
+	dome.Transparency = 0
+	dome.Parent = folder
+	tween(dome, 0.3, { Size = Vector3.one * r * 2.2, Transparency = 1 })
+	Debris:AddItem(dome, 0.35)
+	task.delay(0.25, function()
+		for i = 1, 4 do
+			local angle = math.random() * math.pi * 2
+			local reach = r * (0.4 + math.random() * 0.4)
+			lightning(at + Vector3.new(0, 1, 0), Vector3.new(at.X + math.cos(angle) * reach, floorY + 0.4, at.Z + math.sin(angle) * reach), PLASMA.Yellow, { Width = 0.3, Life = 0.2, Halo = PLASMA.Red })
+		end
+		burst(at, {
+			{ Texture = TEX.Electric, Count = 3, Size = ns(0, r * 0.5, 1, r * 0.8), Lifetime = NumberRange.new(0.25), Spread = Vector2.new(180, 180), Color = cs(PLASMA.White, PLASMA.Yellow), Light = 1 },
+			{ Texture = TEX.Spark, Count = 30, Parallel = true, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.6, 1), Speed = NumberRange.new(25, 40), Spread = Vector2.new(25, 25), Accel = Vector3.new(0, -40, 0), Color = cs(PLASMA.White, PLASMA.Yellow, PLASMA.Red), Light = 1 },
+		}, 1.5)
+		shake(0.15, at)
+	end)
 	-- Scorched crater with plasma flames that keep burning for a moment.
 	groundDecal(at, TEX.Crack, rgb(40, 14, 8), r * 1.2, r * 1.6, 3, { Floor = floorY, Hold = 2.2, GrowTime = 0.1, StartAlpha = 0.1 })
 	groundDecal(at, TEX.Glow, PLASMA.Orange, r * 2, r * 1.6, 2.8, { Floor = floorY, Lift = 0.02, Hold = 1.8, StartAlpha = 0.45 })
@@ -739,6 +848,9 @@ local FROST = {
 	Blue = rgb(90, 170, 245),
 	Deep = rgb(40, 90, 190),
 }
+-- Anime ice strip in the house 4-layer style (tools/art/anime_layer_textures.py,
+-- strip("ice")): white core, pale blue body, highlights and navy ink streaks.
+local ANIME_ICE_TRAIL = "rbxassetid://108063404350996"
 
 -- An ice crystal cluster bursting out of the floor (the AI-generated mesh, or
 -- a glassy wedge if it is missing). It shatters after `hold` seconds.
@@ -746,6 +858,9 @@ local function iceCrystal(at, floorY, height, hold)
 	local crystal = meshTemplate("IceCrystal")
 	if crystal then
 		crystal.Size *= height / crystal.Size.Y
+		-- Opaque, so the frost crack decals underneath don't draw through it
+		-- (a see-through crystal is sorted with the decals and the cracks win).
+		crystal.Transparency = 0
 	else
 		crystal = Instance.new("WedgePart")
 		crystal.Anchored = true
@@ -755,7 +870,7 @@ local function iceCrystal(at, floorY, height, hold)
 		crystal.CastShadow = false
 		crystal.Material = Enum.Material.Glass
 		crystal.Color = FROST.Ice
-		crystal.Transparency = 0.2
+		crystal.Transparency = 0
 		crystal.Size = Vector3.new(height * 0.5, height, height * 0.5)
 	end
 	local h = crystal.Size.Y
@@ -771,6 +886,8 @@ local function iceCrystal(at, floorY, height, hold)
 		if crystal.Parent then
 			burst(crystal.Position, {
 				{ Texture = TEX.Shard, Count = 10, Size = ns(0, 0.7, 1, 0.1), Lifetime = NumberRange.new(0.35, 0.6), Speed = NumberRange.new(8, 16), Spread = Vector2.new(180, 180), Accel = Vector3.new(0, -35, 0), RotSpeed = NumberRange.new(-400, 400), Drag = 1, Color = cs(FROST.White, FROST.Ice), Light = 0.5 },
+				-- Black ink shards in with the ice.
+				{ Texture = TEX.Shard, Count = 5, Light = 0, Size = ns(0, 0.8, 1, 0.1), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(8, 14), Spread = Vector2.new(180, 180), Accel = Vector3.new(0, -35, 0), RotSpeed = NumberRange.new(-400, 400), Drag = 1, Color = cs(Color3.new(0, 0, 0)) },
 			}, 1)
 			tween(crystal, 0.25, { Transparency = 1, Size = crystal.Size * 0.6, CFrame = base * CFrame.new(0, h * 0.2, 0) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		end
@@ -816,7 +933,59 @@ local function onCone(e)
 			add({ Texture = TEX.Sparkles, Rate = 30, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(e.Sweep * 0.8, e.Sweep * 1.1), Speed = NumberRange.new(speed * 0.7, speed * 1.1), Spread = Vector2.new(12, 12), Color = cs(FROST.White, FROST.Ice), Light = 1 })
 			add({ Texture = TEX.Shard, Rate = 14, Size = ns(0, 0.8, 1, 0.3), Lifetime = NumberRange.new(e.Sweep * 0.8, e.Sweep), Speed = NumberRange.new(speed * 0.9, speed * 1.1), Spread = Vector2.new(8, 8), RotSpeed = NumberRange.new(-300, 300), Color = cs(FROST.White, FROST.Blue), Light = 0.6 })
 			add({ Texture = TEX.Spark, Parallel = true, Rate = 18, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.25, 0.32), Speed = NumberRange.new(speed * 1.2, speed * 1.4), Spread = Vector2.new(6, 6), Color = cs(FROST.White), Light = 1 })
+			-- Black ink shade: dark shards and ink streaks riding the gale.
+			add({ Texture = TEX.Shard, Rate = 6, Light = 0, Size = ns(0, 0.9, 1, 0.3), Lifetime = NumberRange.new(e.Sweep * 0.7, e.Sweep * 0.9), Speed = NumberRange.new(speed * 0.9, speed * 1.1), Spread = Vector2.new(8, 8), RotSpeed = NumberRange.new(-300, 300), Color = cs(Color3.new(0, 0, 0)) })
+			add({ Texture = TEX.Spark, Parallel = true, Rate = 8, Light = 0, Size = ns(0, 0.7, 1, 0), Lifetime = NumberRange.new(0.25, 0.32), Speed = NumberRange.new(speed * 1.1, speed * 1.3), Spread = Vector2.new(8, 8), Color = cs(Color3.new(0, 0, 0)) })
 		end
+		-- Anime ice ribbons whipping down the cone, each with a navy ink twin.
+		local ribbons = {}
+		for i = 1, 6 do
+			local p = anchor(CFrame.new(mouth), Vector3.new(0.2, 0.2, 0.2), e.Sweep + 1.5)
+			local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+			local width = if i % 3 == 0 then 0.9 else 1.8
+			a0.Position, a1.Position = Vector3.new(0, width / 2, 0), Vector3.new(0, -width / 2, 0)
+			a0.Parent, a1.Parent = p, p
+			local trail = Instance.new("Trail")
+			trail.Attachment0, trail.Attachment1 = a0, a1
+			trail.Texture = ANIME_ICE_TRAIL
+			trail.TextureMode = Enum.TextureMode.Wrap
+			trail.TextureLength = 7
+			trail.Lifetime = 0.4
+			trail.MinLength = 0.05
+			-- Every third ribbon is a thin ink streak (the strip tinted black).
+			trail.Color = cs(if i % 3 == 0 then Color3.new(0, 0, 0) else Color3.new(1, 1, 1))
+			trail.Transparency = ns(0, 0, 0.6, 0.3, 1, 1)
+			trail.WidthScale = ns(0, 1, 1, 0.3)
+			trail.LightEmission = if i % 3 == 0 then 0 else 0.4
+			trail.LightInfluence = 0
+			trail.FaceCamera = true
+			trail.Parent = p
+			table.insert(ribbons, { Part = p, Angle = (math.random() * 2 - 1) * half * 0.8, Phase = math.random() * 6, Delay = (i - 1) * 0.06 })
+		end
+		local rStart = os.clock()
+		local rConn
+		rConn = RunService.RenderStepped:Connect(function()
+			local t = os.clock() - rStart
+			if t > e.Sweep + 0.4 then
+				rConn:Disconnect()
+				return
+			end
+			for _, rb in ribbons do
+				local k = math.clamp((t - rb.Delay) / (e.Sweep * 0.9), 0, 1)
+				local d = 2 + (e.Length - 2) * (1 - (1 - k) ^ 1.6)
+				local wobble = math.sin(t * 9 + rb.Phase) * (0.6 + d * 0.06)
+				local heading = CFrame.Angles(0, rb.Angle, 0) * dir
+				local sideV = heading:Cross(Vector3.yAxis)
+				local y = 1.2 + math.sin(t * 6 + rb.Phase) * 0.8
+				rb.Part.CFrame = CFrame.new(startPos + heading * d + sideV * wobble + Vector3.new(0, y, 0))
+			end
+		end)
+		-- Release: a frost shockwave bursts from the hands.
+		burst(mouth, {
+			{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, 1, 1, 9), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.3), Color = cs(FROST.White, FROST.Ice), Light = 1, ZOffset = 1 },
+			{ Texture = TEX.Shard, Count = 14, Size = ns(0, 0.9, 1, 0.2), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(16, 26), Spread = Vector2.new(40, 40), RotSpeed = NumberRange.new(-400, 400), Color = cs(FROST.White, FROST.Ice), Light = 0.6 },
+		}, 1)
+		ring(startPos, FROST.White, 2, 12, 0.35, floorY)
 		task.delay(e.Sweep, function()
 			for _, em in breath do
 				em.Enabled = false
@@ -831,6 +1000,8 @@ local function onCone(e)
 			task.delay(e.Sweep * i / rows, function()
 				local mid = startPos + dir * d
 				groundDecal(mid, TEX.Crack, FROST.Ice, 2, math.max(width * 0.8, 4), 2.6, { Floor = floorY, Hold = 1.8, GrowTime = 0.15, StartAlpha = 0.15 })
+				-- Black ink cracks running through the frost.
+				groundDecal(mid, TEX.Crack, Color3.new(0, 0, 0), 2, math.max(width * 0.6, 3), 2.6, { Floor = floorY, Lift = 0.03, Hold = 1.8, GrowTime = 0.15, StartAlpha = 0.3 })
 				groundDecal(mid, TEX.Glow, FROST.Blue, width * 0.6, math.max(width, 4), 2.6, { Floor = floorY, Lift = 0.02, Hold = 1.8, GrowTime = 0.2, StartAlpha = 0.55 })
 				for _ = 1, 1 + math.floor(width / 7) do
 					local ang = (math.random() * 2 - 1) * half * 0.9
@@ -865,6 +1036,34 @@ local MUD = {
 	Water = rgb(120, 150, 170),
 }
 local rollers = {} -- [Skill .. From] = { Stop = function(at) }
+-- Anime water strip in the house 4-layer style (tools/art/anime_layer_textures.py,
+-- strip("water")): core, body, white highlights and dark ink streaks.
+local ANIME_WATER_TRAIL = "rbxassetid://97688629579971"
+
+-- A Trail between two attachment positions on `parent`, textured with the
+-- anime water strip. Starts disabled; the caller turns it on.
+local function waterTrail(parent, p0, p1, life, opts)
+	opts = opts or {}
+	local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+	a0.Position, a1.Position = p0, p1
+	a0.Parent, a1.Parent = parent, parent
+	local t = Instance.new("Trail")
+	t.Attachment0, t.Attachment1 = a0, a1
+	t.Texture = ANIME_WATER_TRAIL
+	t.TextureMode = Enum.TextureMode.Wrap
+	t.TextureLength = opts.Length or 9
+	t.Lifetime = life
+	t.MinLength = 0.05
+	t.Color = cs(Color3.new(1, 1, 1))
+	t.Transparency = opts.Transparency or ns(0, 0, 0.6, 0.25, 1, 1)
+	t.WidthScale = opts.WidthScale or ns(0, 1, 1, 0.35)
+	t.LightEmission = opts.Light or 0.25
+	t.LightInfluence = 0
+	t.FaceCamera = opts.FaceCamera == true
+	t.Enabled = false
+	t.Parent = parent
+	return t
+end
 
 -- The real floor height under a point (the server's estimate comes from the
 -- caster's hip height, which can be a little off for scaled avatars).
@@ -921,7 +1120,38 @@ local function onRoller(e)
 		emitter(spray, { Texture = TEX.Drop, Shape = Enum.ParticleEmitterShape.Box, Rate = 70, Light = 0, Size = ns(0, 0.6, 1, 0.25), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(6, 12), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -45, 0), Color = cs(MUD.Light, MUD.Main) }),
 		emitter(spray, { Texture = TEX.Dust, Rate = 14, Light = 0, Size = ns(0, 2.5, 1, 5), Transparency = ns(0, 0.45, 1, 1), Lifetime = NumberRange.new(0.6, 1), Speed = NumberRange.new(1, 3), Spread = Vector2.new(180, 20), Color = cs(MUD.Light) }),
 		emitter(spray, { Texture = TEX.Rocks, Rate = 10, Light = 0, Size = ns(0, 0.9, 1, 0.6), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(8, 14), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -50, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(MUD.Light) }),
+		-- Black ink shade: black mud splatter flung with the brown.
+		emitter(spray, { Texture = TEX.Drop, Shape = Enum.ParticleEmitterShape.Box, Rate = 30, Light = 0, Size = ns(0, 0.7, 1, 0.3), Lifetime = NumberRange.new(0.35, 0.6), Speed = NumberRange.new(7, 13), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -45, 0), Color = cs(Color3.new(0, 0, 0)) }),
+		-- Muddy water spraying off the sides, catching the light.
+		emitter(spray, { Texture = TEX.Drop, Shape = Enum.ParticleEmitterShape.Box, Rate = 40, Size = ns(0, 0.5, 1, 0.15), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(10, 16), Spread = Vector2.new(80, 80), Accel = Vector3.new(0, -40, 0), Color = cs(Color3.new(1, 1, 1), MUD.Water), Light = 0.4 }),
 	}
+	-- A dark ink track pressed into the ground behind the boulder.
+	local track0, track1 = Instance.new("Attachment"), Instance.new("Attachment")
+	track0.Position, track1.Position = side * (diameter * 0.45) - Vector3.new(0, 0.4, 0), -side * (diameter * 0.45) - Vector3.new(0, 0.4, 0)
+	track0.Parent, track1.Parent = spray, spray
+	local track = Instance.new("Trail")
+	track.Attachment0, track.Attachment1 = track0, track1
+	track.Lifetime = 1.4
+	-- The anime strip tinted black gives the track ragged ink edges.
+	track.Texture = ANIME_WATER_TRAIL
+	track.TextureMode = Enum.TextureMode.Wrap
+	track.TextureLength = 12
+	track.Color = cs(Color3.new(0, 0, 0))
+	track.Transparency = ns(0, 0.3, 0.7, 0.55, 1, 1)
+	track.LightEmission = 0
+	track.LightInfluence = 0
+	track.FaceCamera = false
+	track.Enabled = false
+	track.Parent = spray
+	table.insert(emitters, track)
+	-- Anime water wake: a wall of water peeling off each side, a sheet of water
+	-- sliding along the ground behind, and a ribbon wrapped round the boulder
+	-- that loops as it rolls.
+	for _, s in { 1, -1 } do
+		table.insert(emitters, waterTrail(spray, side * s * r * 1.05 + Vector3.new(0, -0.2, 0), side * s * r * 1.25 + Vector3.new(0, 2.6, 0), 0.55))
+	end
+	table.insert(emitters, waterTrail(spray, side * r * 1.35 - Vector3.new(0, 0.35, 0), -side * r * 1.35 - Vector3.new(0, 0.35, 0), 0.8, { Length = 14, Transparency = ns(0, 0.15, 0.6, 0.45, 1, 1), WidthScale = ns(0, 1, 1, 0.6) }))
+	table.insert(emitters, waterTrail(boulder, Vector3.new(0, r * 1.05, 0) + side * 0.9, Vector3.new(0, r * 1.05, 0) - side * 0.9, 0.35, { Length = 6, Light = 0.4 }))
 
 	local key = e.Skill .. tostring(e.From)
 	local conn
@@ -949,6 +1179,26 @@ local function onRoller(e)
 			{ Texture = TEX.Dust, Count = 6, Light = 0, Size = ns(0, 4, 1, 9), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.8, 1.2), Speed = NumberRange.new(3, 6), Spread = Vector2.new(180, 20), Color = cs(MUD.Light) },
 		}, 2)
 		debrisBurst(ground + Vector3.new(0, 1, 0), MUD.Main, 12, { Material = Enum.Material.Mud, Size = 0.9, Height = 5, Reach = 8, Floor = floorY })
+		-- Black ink shade: a black splash and ink clods thrown with the mud.
+		burst(ground + Vector3.new(0, 1.2, 0), {
+			{ Texture = TEX.Splash, Count = 2, Light = 0, Size = ns(0, 4, 1, 7), Lifetime = NumberRange.new(0.4), Color = cs(Color3.new(0, 0, 0), MUD.Dark), ZOffset = -1 },
+			{ Texture = TEX.Drop, Count = 24, Light = 0, Size = ns(0, 1, 1, 0.3), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(16, 28), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -50, 0), Color = cs(Color3.new(0, 0, 0)) },
+			{ Texture = TEX.Drop, Count = 20, Size = ns(0, 0.6, 1, 0.2), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(18, 30), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -50, 0), Color = cs(Color3.new(1, 1, 1), MUD.Water), Light = 0.4 },
+		}, 2)
+		debrisBurst(ground + Vector3.new(0, 1, 0), Color3.new(0.06, 0.04, 0.03), 6, { Material = Enum.Material.Mud, Size = 0.7, Height = 6, Reach = 9, Floor = floorY })
+		-- A mud wave rolls out across the ground with a black rim.
+		ring(ground, MUD.Light, 2, diameter * 3, 0.45, floorY)
+		task.delay(0.05, function()
+			ring(ground, MUD.Dark, 2, diameter * 2.5, 0.5, floorY)
+		end)
+		groundDecal(ground, TEX.Ring, Color3.new(0, 0, 0), diameter * 0.8, diameter * 2.6, 0.7, { Floor = floorY, Lift = 0.03, StartAlpha = 0.15, GrowTime = 0.35 })
+		-- A glossy puddle that bubbles for a moment.
+		groundDecal(ground, TEX.Glow, MUD.Water, diameter * 1.4, diameter * 1.8, 3, { Floor = floorY, Lift = 0.02, Hold = 2, StartAlpha = 0.55 })
+		local puddle = anchor(CFrame.new(ground + Vector3.new(0, 0.2, 0)), Vector3.new(diameter * 1.4, 0.2, diameter * 1.4), 3.5)
+		local bubbles = emitter(puddle, { Enabled = true, Texture = TEX.Glow, Shape = Enum.ParticleEmitterShape.Cylinder, Rate = 16, Size = ns(0, 0.2, 0.8, 0.9, 1, 0), Transparency = ns(0, 0.3, 1, 0.5), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(0.2, 0.6), Color = cs(MUD.Light, MUD.Main), Light = 0 })
+		task.delay(2.2, function()
+			bubbles.Enabled = false
+		end)
 		groundDecal(ground, TEX.Glow, MUD.Main, 4, diameter * 2.4, 3, { Floor = floorY, Hold = 2, GrowTime = 0.15, StartAlpha = 0.1 })
 		tween(boulder, 0.2, { Size = boulder.Size * Vector3.new(1.5, 0.3, 1.5), Transparency = 1 })
 		Debris:AddItem(boulder, 0.3)
@@ -964,13 +1214,24 @@ local function onRoller(e)
 			em.Enabled = true
 		end
 		local t0 = os.clock()
-		local lastMark = 0
+		local lastMark, lastWave = 0, 0
 		conn = RunService.RenderStepped:Connect(function()
 			local d = math.min((os.clock() - t0) * e.Speed, e.Length + 2)
 			local center = start + dir * d + Vector3.new(0, r, 0)
 			-- Roll: spin about the side axis by distance / radius.
 			boulder.CFrame = CFrame.new(center) * CFrame.fromAxisAngle(side, -d / r)
 			spray.CFrame = CFrame.new(center - Vector3.new(0, r - 0.5, 0))
+			-- Bow wave: mud and black splashes peeling off both sides.
+			if d - lastWave > 2 then
+				lastWave = d
+				for _, s in { 1, -1 } do
+					local at = Vector3.new(center.X, floorY + 0.6, center.Z) + side * s * r * 0.9
+					burst(at, {
+						{ Texture = TEX.Splash, Count = 1, Light = 0, Size = ns(0, 2.5, 1, 4.5), Lifetime = NumberRange.new(0.35), Color = cs(MUD.Light, MUD.Main) },
+						{ Texture = TEX.Drop, Count = 6, Light = 0, Size = ns(0, 0.6, 1, 0.2), Lifetime = NumberRange.new(0.35, 0.55), Speed = NumberRange.new(8, 12), Spread = Vector2.new(40, 40), Accel = Vector3.new(0, -45, 0), Color = cs(Color3.new(0, 0, 0), MUD.Dark) },
+					}, 1)
+				end
+			end
 			-- Slick mud trail.
 			if d - lastMark > 3 then
 				lastMark = d
@@ -1007,6 +1268,69 @@ local LAVA = {
 }
 local LAVA_FIRE = cs(LAVA.White, LAVA.Glow, LAVA.Main, LAVA.Dark)
 
+-- Blender-made lava pool (art/skill_models/lavapool): a splashy molten pool
+-- with a raised crust rim, floating crust plates and a black ink outline
+-- (LavaPool / LavaRim / LavaPlates / LavaInk in the Model
+-- RiftboundVFX.LavaPoolModel). The molten part is 8 studs in radius. Each
+-- part's "Offset" attribute is its centre relative to the pool centre on the floor.
+local LAVA_POOL_PARTS = { "LavaPool", "LavaRim", "LavaPlates", "LavaInk" }
+
+-- Spreads the pool out at `center` on floorY with a molten radius of pr, keeps
+-- the plates drifting for `life` seconds, then sinks and fades it. Returns
+-- false when the templates are missing.
+local function lavaPoolModel(center, floorY, pr, life)
+	templates = templates or ReplicatedStorage:FindFirstChild("RiftboundVFX")
+	local model = templates and templates:FindFirstChild("LavaPoolModel")
+	if not (model and model:FindFirstChild("LavaPool")) then
+		return false
+	end
+	local pieces = {}
+	for _, name in LAVA_POOL_PARTS do
+		local src = model:FindFirstChild(name)
+		if src then
+			local p = src:Clone()
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			p.CastShadow = false
+			p.Material = Enum.Material.SmoothPlastic
+			if name == "LavaInk" then
+				p.Color = Color3.new(0, 0, 0)
+			end
+			p.Parent = folder
+			table.insert(pieces, { Part = p, Size = p.Size, Offset = p:GetAttribute("Offset") or Vector3.zero, Plates = name == "LavaPlates" })
+		end
+	end
+	local scale = pr / 8
+	local base = Vector3.new(center.X, floorY, center.Z)
+	local turn = math.random() * math.pi * 2
+	local start = os.clock()
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - start
+		-- Splashes out past full size and settles (back-out), then sinks away at the end.
+		local k = math.min(t / 0.3, 1)
+		local grow = 1 + 2.2 * (k - 1) ^ 3 + 1.2 * (k - 1) ^ 2
+		local sink = math.clamp((t - life) / 0.5, 0, 1)
+		local s = scale * math.max(grow, 0.05) * (1 - 0.3 * sink)
+		for _, pc in pieces do
+			local spin = turn + (if pc.Plates then t * 0.25 else 0)
+			local bob = if pc.Plates then math.sin(t * 2.5) * 0.06 else 0
+			pc.Part.Size = pc.Size * s
+			pc.Part.CFrame = CFrame.new(base + Vector3.new(0, bob - sink * 0.4, 0)) * CFrame.Angles(0, spin, 0) * CFrame.new(pc.Offset * s)
+			pc.Part.Transparency = sink
+		end
+		if sink >= 1 then
+			conn:Disconnect()
+			for _, pc in pieces do
+				pc.Part:Destroy()
+			end
+		end
+	end)
+	return true
+end
+
 local function onMeteor(e)
 	local floorY = floorAt(e.At, e.At.Y)
 	local center = Vector3.new(e.At.X, floorY, e.At.Z)
@@ -1038,7 +1362,28 @@ local function onMeteor(e)
 		emitter(rock, { Enabled = true, Texture = TEX.Flame, Rate = 120, Size = ns(0, 6, 1, 1.5), Lifetime = NumberRange.new(0.25, 0.4), Speed = NumberRange.new(2, 5), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-120, 120), Color = LAVA_FIRE, Light = 0.9 }),
 		emitter(rock, { Enabled = true, Texture = TEX.Smoke, Rate = 40, Light = 0, Size = ns(0, 3, 1, 8), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.8, 1.2), Speed = NumberRange.new(1, 3), Spread = Vector2.new(180, 180), Color = cs(LAVA.Smoke) }),
 		emitter(rock, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 60, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.3, 0.6), Speed = NumberRange.new(6, 14), Spread = Vector2.new(180, 180), Color = cs(LAVA.White, LAVA.Main), Light = 1 }),
+		-- Black ink shade: a tight black smoke streak trailing the rock.
+		emitter(rock, { Enabled = true, Texture = TEX.Smoke, Rate = 50, Light = 0, Size = ns(0, 3.5, 1, 1), Transparency = ns(0, 0.2, 1, 1), Lifetime = NumberRange.new(0.25, 0.4), Speed = NumberRange.new(0.5, 1.5), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-90, 90), Color = cs(Color3.new(0, 0, 0)), ZOffset = -1 }),
 	}
+	-- A fiery comet tail behind the rock.
+	do
+		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+		a0.Position, a1.Position = Vector3.new(0, 2.2, 0), Vector3.new(0, -2.2, 0)
+		a0.Parent, a1.Parent = rock, rock
+		local tail = Instance.new("Trail")
+		tail.Attachment0, tail.Attachment1 = a0, a1
+		tail.Lifetime = 0.3
+		tail.Color = cs(LAVA.White, LAVA.Glow, LAVA.Main)
+		tail.Transparency = ns(0, 0, 0.6, 0.4, 1, 1)
+		tail.WidthScale = ns(0, 1, 1, 0.2)
+		tail.LightEmission = 1
+		tail.LightInfluence = 0
+		tail.FaceCamera = true
+		tail.Texture = TEX.Glow
+		tail.TextureMode = Enum.TextureMode.Stretch
+		tail.Parent = rock
+		table.insert(trailEmitters, tail)
+	end
 	local light = Instance.new("PointLight")
 	light.Color = LAVA.Glow
 	light.Range = 30
@@ -1071,7 +1416,15 @@ local function onMeteor(e)
 			{ Texture = TEX.Flame, Count = 30, Size = ns(0, 4, 1, 1.2), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(14, 28), Spread = Vector2.new(180, 70), Drag = 4, Accel = Vector3.new(0, 10, 0), RotSpeed = NumberRange.new(-150, 150), Color = LAVA_FIRE, Light = 0.9 },
 			{ Texture = TEX.Rocks, Count = 16, Light = 0, Size = ns(0, 1.4, 1, 1), Transparency = ns(0, 0, 0.8, 0, 1, 1), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(18, 32), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(rgb(255, 170, 120)) },
 			{ Texture = TEX.Smoke, Count = 10, Light = 0, Size = ns(0, 4, 1, 9), Transparency = ns(0, 0.45, 1, 1), Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(5, 10), Spread = Vector2.new(180, 40), Drag = 2, Accel = Vector3.new(0, 4, 0), Color = cs(LAVA.Smoke) },
+			-- Black ink shade: ink shards and a black smoke column.
+			{ Texture = TEX.Spark, Count = 18, Parallel = true, Light = 0, Size = ns(0, 1.2, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(20, 34), Spread = Vector2.new(180, 60), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+			{ Texture = TEX.Smoke, Count = 6, Light = 0, Size = ns(0, 3, 1, 7), Transparency = ns(0, 0.25, 1, 1), Lifetime = NumberRange.new(0.7, 1), Speed = NumberRange.new(10, 16), Spread = Vector2.new(15, 15), Drag = 2, Color = cs(Color3.new(0, 0, 0)), ZOffset = -1 },
+			-- Heat shockwave, an ember fountain and splashing lava drops.
+			{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, r * 0.5, 1, r * 3), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.35), Color = cs(LAVA.White, LAVA.Glow), Light = 1, ZOffset = 2 },
+			{ Texture = TEX.Spark, Count = 40, Parallel = true, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.8, 1.3), Speed = NumberRange.new(20, 38), Spread = Vector2.new(30, 30), Accel = Vector3.new(0, -30, 0), Color = cs(LAVA.White, LAVA.Glow, LAVA.Main), Light = 1 },
+			{ Texture = TEX.Drop, Count = 20, Size = ns(0, 0.9, 1, 0.4), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(14, 24), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -50, 0), Color = cs(LAVA.Glow, LAVA.Main), Light = 1 },
 		}, 2.5)
+		groundDecal(center, TEX.Ring, Color3.new(0, 0, 0), r * 1.6, r * 2.5, 1, { Floor = floorY, Lift = 0.03, StartAlpha = 0.1, GrowTime = 0.25 })
 		debrisBurst(center + Vector3.new(0, 0.5, 0), LAVA.Main, 12, { Material = Enum.Material.Neon, Size = 0.7, Height = 6, Reach = r, Floor = floorY })
 		debrisBurst(center + Vector3.new(0, 0.5, 0), LAVA.Crust, 8, { Material = Enum.Material.Basalt, Size = 1, Height = 5, Reach = r * 0.8, Floor = floorY })
 		ring(center, LAVA.White, 2, r * 2.8, 0.35, floorY)
@@ -1088,28 +1441,31 @@ local function onMeteor(e)
 		-- Lava pool.
 		local pr = e.PoolRadius or r
 		local life = (e.Duration or 3)
-		local pool = Instance.new("Part")
-		pool.Shape = Enum.PartType.Cylinder
-		pool.Material = Enum.Material.Neon
-		pool.Color = LAVA.Dark
-		pool.Transparency = 0.1
-		pool.Anchored = true
-		pool.CanCollide = false
-		pool.CanQuery = false
-		pool.CanTouch = false
-		pool.CastShadow = false
-		local flat = CFrame.new(center.X, floorY + 0.05, center.Z) * CFrame.Angles(0, 0, math.pi / 2)
-		pool.Size = Vector3.new(0.2, 1, 1)
-		pool.CFrame = flat
-		pool.Parent = folder
-		tween(pool, 0.25, { Size = Vector3.new(0.2, pr * 2, pr * 2) }, Enum.EasingStyle.Back)
-		local crust = pool:Clone()
-		crust.Material = Enum.Material.CrackedLava
-		crust.Color = LAVA.Glow
-		crust.Transparency = 0
-		crust.CFrame = flat * CFrame.new(0.04, 0, 0)
-		crust.Parent = folder
-		tween(crust, 0.25, { Size = Vector3.new(0.2, pr * 1.4, pr * 1.4) }, Enum.EasingStyle.Back)
+		local pool, crust
+		if not lavaPoolModel(center, floorY, pr, life) then
+			pool = Instance.new("Part")
+			pool.Shape = Enum.PartType.Cylinder
+			pool.Material = Enum.Material.Neon
+			pool.Color = LAVA.Dark
+			pool.Transparency = 0.1
+			pool.Anchored = true
+			pool.CanCollide = false
+			pool.CanQuery = false
+			pool.CanTouch = false
+			pool.CastShadow = false
+			local flat = CFrame.new(center.X, floorY + 0.05, center.Z) * CFrame.Angles(0, 0, math.pi / 2)
+			pool.Size = Vector3.new(0.2, 1, 1)
+			pool.CFrame = flat
+			pool.Parent = folder
+			tween(pool, 0.25, { Size = Vector3.new(0.2, pr * 2, pr * 2) }, Enum.EasingStyle.Back)
+			crust = pool:Clone()
+			crust.Material = Enum.Material.CrackedLava
+			crust.Color = LAVA.Glow
+			crust.Transparency = 0
+			crust.CFrame = flat * CFrame.new(0.04, 0, 0)
+			crust.Parent = folder
+			tween(crust, 0.25, { Size = Vector3.new(0.2, pr * 1.4, pr * 1.4) }, Enum.EasingStyle.Back)
+		end
 		groundDecal(center, TEX.Crack, LAVA.Crust, pr * 2.2, pr * 2.4, life + 1, { Floor = floorY, Hold = life, GrowTime = 0.15, StartAlpha = 0 })
 		groundDecal(center, TEX.Glow, LAVA.Glow, pr * 2.6, pr * 2.6, life + 0.5, { Floor = floorY, Lift = 0.02, Hold = life - 0.3, StartAlpha = 0.3, FadeIn = 0.2 })
 		local area = anchor(CFrame.new(center.X, floorY + 0.3, center.Z), Vector3.new(pr * 1.7, 0.3, pr * 1.7), life + 2)
@@ -1122,26 +1478,46 @@ local function onMeteor(e)
 			emitter(area, { Enabled = true, Texture = TEX.Smoke, Shape = Enum.ParticleEmitterShape.Cylinder, Rate = 8, Light = 0, Size = ns(0, 2, 1, 5), Transparency = ns(0, 0.6, 1, 1), Lifetime = NumberRange.new(1, 1.5), Speed = NumberRange.new(1, 3), Accel = Vector3.new(0, 3, 0), Color = cs(LAVA.Smoke) }),
 		}
 		-- Pulsing glow, then the lava cools and sinks away.
-		local p0 = os.clock()
-		local pulse
-		pulse = RunService.RenderStepped:Connect(function()
-			local t = os.clock() - p0
-			if t > life or not pool.Parent then
-				pulse:Disconnect()
-				return
+		if pool then
+			local p0 = os.clock()
+			local pulse
+			pulse = RunService.RenderStepped:Connect(function()
+				local t = os.clock() - p0
+				if t > life or not pool.Parent then
+					pulse:Disconnect()
+					return
+				end
+				pool.Color = LAVA.Dark:Lerp(LAVA.Main, 0.55 + 0.45 * math.sin(t * 6))
+			end)
+		end
+		-- Lava bubbles burst across the pool, each with a black ink puff.
+		task.spawn(function()
+			local t = 0
+			while t < life - 0.3 and (not pool or pool.Parent) do
+				local angle = math.random() * math.pi * 2
+				local at = Vector3.new(center.X, floorY + 0.4, center.Z) + Vector3.new(math.cos(angle), 0, math.sin(angle)) * pr * math.random() * 0.75
+				burst(at, {
+					{ Texture = TEX.Glow, Count = 1, Size = ns(0, 0.8, 0.7, 2.4, 1, 0), Transparency = ns(0, 0, 1, 0.3), Lifetime = NumberRange.new(0.25), Color = cs(LAVA.White, LAVA.Glow), Light = 1 },
+					{ Texture = TEX.Drop, Count = 6, Size = ns(0, 0.5, 1, 0.2), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(6, 10), Spread = Vector2.new(50, 50), Accel = Vector3.new(0, -40, 0), Color = cs(LAVA.Glow, LAVA.Main), Light = 1 },
+					{ Texture = TEX.Smoke, Count = 2, Light = 0, Size = ns(0, 1, 1, 2.5), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.5, 0.7), Speed = NumberRange.new(2, 4), Color = cs(Color3.new(0, 0, 0)) },
+				}, 1)
+				local wait = 0.18 + math.random() * 0.2
+				task.wait(wait)
+				t += wait
 			end
-			pool.Color = LAVA.Dark:Lerp(LAVA.Main, 0.55 + 0.45 * math.sin(t * 6))
 		end)
 		task.delay(life, function()
 			for _, em in poolEmitters do
 				em.Enabled = false
 			end
-			tween(pool, 0.5, { Size = Vector3.new(0.2, pr * 1.2, pr * 1.2), Transparency = 1, Color = LAVA.Dark })
-			tween(crust, 0.5, { Transparency = 1 })
+			if pool then
+				tween(pool, 0.5, { Size = Vector3.new(0.2, pr * 1.2, pr * 1.2), Transparency = 1, Color = LAVA.Dark })
+				tween(crust, 0.5, { Transparency = 1 })
+				Debris:AddItem(pool, 0.6)
+				Debris:AddItem(crust, 0.6)
+			end
 			tween(rock, 0.6, { Transparency = 1, CFrame = rock.CFrame * CFrame.new(0, -2, 0) })
 			tween(light, 0.5, { Brightness = 0 })
-			Debris:AddItem(pool, 0.6)
-			Debris:AddItem(crust, 0.6)
 			Debris:AddItem(rock, 0.7)
 		end)
 	end)
@@ -1159,7 +1535,9 @@ local STONE = {
 	Wind = rgb(220, 248, 240),
 }
 
--- A ring of `count` rock spikes at `radius`, leaning outward.
+-- A ring of `count` rock spikes at `radius`, leaning outward. Uses the painted
+-- Blender spike from Stone Spike when it is there, and crumbles it into dark
+-- chips with black ink shards, like Stone Spike.
 local function spikeRing(center, floorY, radius, count, height, hold)
 	for i = 1, count do
 		local angle = i / count * math.pi * 2 + (math.random() - 0.5) * 0.25
@@ -1167,8 +1545,13 @@ local function spikeRing(center, floorY, radius, count, height, hold)
 		local spot = Vector3.new(center.X, floorY, center.Z) + radial * radius * (0.92 + math.random() * 0.16)
 		local h = height * (0.8 + math.random() * 0.4)
 		local w = h * 0.45
-		local spike = meshTemplate("RockSpike")
-		if spike then
+		local painted = meshTemplate("StoneSpikeMesh")
+		local spike = painted or meshTemplate("RockSpike")
+		if painted then
+			-- The Blender spike is tall and slim; keep it chunky.
+			spike.Size = Vector3.new(w * 1.1, h * 1.15, w * 1.1)
+			h = spike.Size.Y
+		elseif spike then
 			spike.Size = Vector3.new(w * 1.4, h, w * 1.4)
 		else
 			spike = Instance.new("WedgePart")
@@ -1184,14 +1567,32 @@ local function spikeRing(center, floorY, radius, count, height, hold)
 		local base = CFrame.lookAt(spot, spot + radial) * CFrame.Angles(-0.35, 0, 0) * CFrame.Angles(0, math.random() * 6, 0)
 		spike.CFrame = base * CFrame.new(0, -h / 2, 0)
 		spike.Parent = folder
-		tween(spike, 0.13, { CFrame = base * CFrame.new(0, h / 2 - 0.4, 0) }, Enum.EasingStyle.Back)
+		local up = base * CFrame.new(0, h / 2 - 0.4, 0)
+		-- Punches up with a twist and overshoots, then settles.
+		spike.CFrame = base * CFrame.new(0, -h / 2, 0) * CFrame.Angles(0, -0.6, 0)
+		tween(spike, 0.13, { CFrame = up * CFrame.new(0, h * 0.12, 0) })
+		task.delay(0.13, function()
+			if spike.Parent then
+				tween(spike, 0.1, { CFrame = up }, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
+			end
+		end)
 		burst(spot + Vector3.new(0, 0.5, 0), {
 			{ Texture = TEX.Dust, Count = 1, Light = 0, Size = ns(0, 2, 1, 4), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.5, 0.7), Speed = NumberRange.new(1, 3), Spread = Vector2.new(60, 60), Color = cs(STONE.Light) },
 			{ Texture = TEX.Rocks, Count = 3, Light = 0, Size = ns(0, 0.8, 1, 0.5), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(8, 14), Spread = Vector2.new(50, 50), Accel = Vector3.new(0, -50, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(STONE.Light) },
+			-- Black ink shade: a dark puff and black shards kicked out of the ground.
+			{ Texture = TEX.Smoke, Count = 1, Light = 0, Size = ns(0, 1.2, 1, 3), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.35, 0.5), Speed = NumberRange.new(2, 4), Spread = Vector2.new(60, 60), Color = cs(Color3.new(0, 0, 0)) },
+			{ Texture = TEX.Shard, Count = 3, Light = 0, Size = ns(0, 0.7, 1, 0.2), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(10, 16), Spread = Vector2.new(45, 45), Accel = Vector3.new(0, -50, 0), RotSpeed = NumberRange.new(-400, 400), Color = cs(Color3.new(0, 0, 0)) },
 		}, 1)
 		task.delay(hold, function()
 			if spike.Parent then
-				tween(spike, 0.35, { CFrame = base * CFrame.new(0, -h / 2, 0), Transparency = 0.6 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				-- Crumble: shudder, break into dark chips, sink.
+				tween(spike, 0.06, { CFrame = up * CFrame.Angles(0.05, 0, -0.05) })
+				task.delay(0.06, function()
+					if spike.Parent then
+						debrisBurst(spike.Position, rgb(48, 38, 32), 2, { Floor = floorY, Size = w * 0.3, Height = 2.5, Reach = 2.5, Material = Enum.Material.Basalt, Wedge = true })
+						tween(spike, 0.3, { CFrame = base * CFrame.new(0, -h / 2, 0), Size = spike.Size * Vector3.new(0.7, 1, 0.7) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+					end
+				end)
 			end
 		end)
 		Debris:AddItem(spike, hold + 0.4)
@@ -1219,8 +1620,16 @@ local function onLeap(e)
 	burst(Vector3.new(feet.X, floorY + 0.5, feet.Z), {
 		{ Texture = TEX.Dust, Count = 6, Light = 0, Size = ns(0, 3, 1, 6), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(8, 14), Spread = Vector2.new(180, 10), Drag = 3, Color = cs(STONE.Light) },
 		{ Texture = TEX.Swirl, Count = 4, Size = ns(0, 2, 1, 6), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.4), RotSpeed = NumberRange.new(-300, 300), Color = cs(STONE.Wind), Light = 0.6 },
+		-- Black ink shade: dark dust, black swirls and black grit thrown out.
+		{ Texture = TEX.Smoke, Count = 4, Light = 0, Size = ns(0, 2, 1, 4.5), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(10, 16), Spread = Vector2.new(180, 8), Drag = 4, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Swirl, Count = 2, Light = 0, Size = ns(0, 1.5, 1, 5), Transparency = ns(0, 0.25, 1, 1), Lifetime = NumberRange.new(0.35), RotSpeed = NumberRange.new(-400, 400), Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Spark, Count = 14, Parallel = true, Light = 0, Size = ns(0, 0.7, 1, 0), Lifetime = NumberRange.new(0.2, 0.35), Speed = NumberRange.new(18, 28), Spread = Vector2.new(180, 15), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Rocks, Count = 8, Light = 0, Size = ns(0, 0.7, 1, 0.4), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(10, 18), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(STONE.Main, STONE.Dark) },
 	}, 1.5)
 	ring(feet, STONE.Wind, 2, 14, 0.4, floorY)
+	ring(feet, Color3.new(0, 0, 0), 2, 17, 0.45, floorY)
+	groundDecal(feet, TEX.Crack, Color3.new(0, 0, 0), 2, 7, 1, { Floor = floorY, Hold = 0.5, GrowTime = 0.08, StartAlpha = 0.25 })
+	debrisBurst(Vector3.new(feet.X, floorY + 0.5, feet.Z), STONE.Main, 4, { Material = Enum.Material.Slate, Size = 0.6, Height = 3, Reach = 6, Floor = floorY, Wedge = true })
 	-- Wind spiralling around you on the way up, and pebbles caught in it.
 	local att = Instance.new("Attachment")
 	att.Parent = root
@@ -1228,10 +1637,45 @@ local function onLeap(e)
 		emitter(att, { Enabled = true, Texture = TEX.Swirl, Rate = 30, Size = ns(0, 2, 1, 4), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(1, 3), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-400, 400), Color = cs(STONE.Wind), Light = 0.7 }),
 		emitter(att, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 40, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.2, 0.35), Speed = NumberRange.new(10, 18), Dir = Enum.NormalId.Bottom, Spread = Vector2.new(25, 25), Color = cs(STONE.Wind), Light = 1 }),
 		emitter(att, { Enabled = true, Texture = TEX.Rocks, Rate = 12, Light = 0, Size = ns(0, 0.6, 1, 0.4), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(2, 5), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-300, 300), Color = cs(STONE.Light) }),
+		-- Black ink streaks and swirls in the updraft.
+		emitter(att, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 18, Light = 0, Size = ns(0, 0.7, 1, 0), Lifetime = NumberRange.new(0.2, 0.3), Speed = NumberRange.new(10, 16), Dir = Enum.NormalId.Bottom, Spread = Vector2.new(30, 30), Color = cs(Color3.new(0, 0, 0)) }),
+		emitter(att, { Enabled = true, Texture = TEX.Swirl, Rate = 10, Light = 0, Size = ns(0, 1.5, 1, 3.5), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.25, 0.4), Speed = NumberRange.new(1, 2), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-400, 400), Color = cs(Color3.new(0, 0, 0)) }),
 	}
+	-- Wind trails that follow your body: a white streak down each side of the
+	-- torso, each with a thinner black ink streak just outside it.
+	local trails = {}
+	for _, spec in {
+		{ X = -1.1, Width = 1.6, Color = STONE.Wind, Alpha = 0.25, Light = 0.6 },
+		{ X = 1.1, Width = 1.6, Color = STONE.Wind, Alpha = 0.25, Light = 0.6 },
+		{ X = -1.5, Width = 0.7, Color = Color3.new(0, 0, 0), Alpha = 0.1, Light = 0 },
+		{ X = 1.5, Width = 0.7, Color = Color3.new(0, 0, 0), Alpha = 0.1, Light = 0 },
+	} do
+		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+		a0.Position = Vector3.new(spec.X, spec.Width / 2, 0)
+		a1.Position = Vector3.new(spec.X, -spec.Width / 2, 0)
+		a0.Parent, a1.Parent = root, root
+		local tr = Instance.new("Trail")
+		tr.Attachment0, tr.Attachment1 = a0, a1
+		tr.Lifetime = 0.3
+		tr.MinLength = 0.05
+		tr.Color = cs(spec.Color)
+		tr.Transparency = ns(0, spec.Alpha, 1, 1)
+		tr.WidthScale = ns(0, 1, 1, 0.15)
+		tr.LightEmission = spec.Light
+		tr.LightInfluence = 0
+		tr.FaceCamera = true
+		tr.Parent = root
+		table.insert(trails, tr)
+		Debris:AddItem(a0, 1.6)
+		Debris:AddItem(a1, 1.6)
+		Debris:AddItem(tr, 1.6)
+	end
 	task.delay(1.2, function()
 		for _, em in trail do
 			em.Enabled = false
+		end
+		for _, tr in trails do
+			tr.Enabled = false
 		end
 		Debris:AddItem(att, 1)
 	end)
@@ -1251,9 +1695,26 @@ local function onLeapSlam(e)
 		{ Texture = TEX.Dust, Count = 10, Light = 0, Size = ns(0, 4, 1, 9), Transparency = ns(0, 0.25, 1, 1), Lifetime = NumberRange.new(0.8, 1.2), Speed = NumberRange.new(14, 24), Spread = Vector2.new(180, 8), Drag = 3, Color = cs(STONE.Light, STONE.Main) },
 		{ Texture = TEX.Rocks, Count = 18, Light = 0, Size = ns(0, 1.2, 1, 0.8), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(16, 30), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(STONE.Light) },
 	}, 2)
+	-- Black ink shade: an ink shockwave just behind the white one, black dust
+	-- rolling out along the ground, black shards and a column of dark grit.
+	burst(center + Vector3.new(0, 1, 0), {
+		{ Texture = TEX.Shockwave, Count = 1, Light = 0, Size = ns(0, 2, 1, outer * 2.6), Transparency = ns(0, 0.15, 1, 1), Lifetime = NumberRange.new(0.42), Color = cs(Color3.new(0, 0, 0)), ZOffset = 0.5 },
+		{ Texture = TEX.Smoke, Count = 10, Light = 0, Size = ns(0, 3, 1, 6), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(18, 28), Spread = Vector2.new(180, 6), Drag = 4, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Shard, Count = 14, Light = 0, Size = ns(0, 1, 1, 0.3), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(16, 28), Spread = Vector2.new(65, 65), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-400, 400), Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Spark, Count = 20, Parallel = true, Light = 0, Size = ns(0, 0.9, 1, 0), Lifetime = NumberRange.new(0.2, 0.35), Speed = NumberRange.new(24, 38), Spread = Vector2.new(180, 20), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+	}, 2)
+	-- A column of dust and grit thrown straight up from the impact.
+	burst(center + Vector3.new(0, 0.5, 0), {
+		{ Texture = TEX.Dust, Count = 6, Light = 0, Size = ns(0, 3, 1, 7), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.7, 1), Speed = NumberRange.new(16, 26), Spread = Vector2.new(12, 12), Drag = 3, Color = cs(STONE.Light, STONE.Main) },
+		{ Texture = TEX.Rocks, Count = 10, Light = 0, Size = ns(0, 1, 1, 0.6), Lifetime = NumberRange.new(0.7, 1), Speed = NumberRange.new(20, 34), Spread = Vector2.new(20, 20), Accel = Vector3.new(0, -70, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(STONE.Main, STONE.Dark) },
+	}, 2)
 	debrisBurst(center + Vector3.new(0, 0.5, 0), STONE.Main, 10, { Material = Enum.Material.Slate, Size = 0.9, Height = 6, Reach = outer, Floor = floorY })
+	debrisBurst(center + Vector3.new(0, 0.5, 0), rgb(48, 38, 32), 6, { Material = Enum.Material.Basalt, Size = 0.8, Height = 5, Reach = outer * 0.8, Floor = floorY, Wedge = true })
 	groundDecal(center, TEX.Crack, rgb(45, 30, 20), outer * 0.9, outer * 2, 2.6, { Floor = floorY, Hold = 1.8, GrowTime = 0.12, StartAlpha = 0.05 })
+	-- Black ink cracks over the earth-brown ones.
+	groundDecal(center, TEX.Crack, Color3.new(0, 0, 0), outer * 0.7, outer * 1.6, 2.6, { Floor = floorY, Lift = 0.03, Hold = 1.8, GrowTime = 0.12, StartAlpha = 0.15 })
 	ring(center, STONE.Wind, 2, outer * 2.6, 0.4, floorY)
+	ring(center, Color3.new(0, 0, 0), 2, outer * 3, 0.5, floorY)
 	-- Two layers of spikes: the inner ring first, then a taller outer ring.
 	spikeRing(center, floorY, inner * 0.75, 8, 5, 1.2)
 	task.delay(0.15, function()
@@ -1262,6 +1723,29 @@ local function onLeapSlam(e)
 	end)
 	flash(center + Vector3.new(0, 3, 0), STONE.Light, outer * 2.5, 4, 0.35)
 	shake(0.6, center)
+end
+
+-------------------------------------------------------------------------------
+-- Nation golems: a swirl of light as one spawns (RiftboundVFX.GolemSpawn_<Nation>,
+-- authored for a 4-stud radius) and the two-fist slam of Brutes and Elites
+-- (RiftboundVFX.GolemSlam_<Nation>, authored for an 8-stud radius).
+-------------------------------------------------------------------------------
+
+local function onGolemSpawn(e)
+	local floorY = floorAt(e.At + Vector3.new(0, 3, 0), e.At.Y)
+	local center = Vector3.new(e.At.X, floorY, e.At.Z)
+	playTemplate("GolemSpawn_" .. tostring(e.Nation), CFrame.new(center + Vector3.new(0, 0.15, 0)), { Scale = (e.Radius or 4) / 4 })
+end
+
+local function onGolemSlam(e)
+	local floorY = floorAt(e.At + Vector3.new(0, 3, 0), e.At.Y)
+	local center = Vector3.new(e.At.X, floorY, e.At.Z)
+	local radius = e.Radius or 8
+	playTemplate("GolemSlam_" .. tostring(e.Nation), CFrame.new(center + Vector3.new(0, 0.3, 0)), { Scale = radius / 8 })
+	if e.Color then
+		flash(center + Vector3.new(0, 3, 0), e.Color, radius * 1.5, 1.5, 0.25)
+	end
+	shake(0.25, center)
 end
 
 -------------------------------------------------------------------------------
@@ -1390,8 +1874,26 @@ local function riftBoltImpact(at, floorY)
 	burst(at, {
 		{ Texture = TEX.Sparkle, Count = 1, Size = ns(0, 2.2, 1, 3), Lifetime = NumberRange.new(0.22), Color = cs(RIFT.White, RIFT.Lilac), Light = 1 },
 		{ Texture = TEX.Spark, Count = 8, Parallel = true, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.15, 0.3), Speed = NumberRange.new(14, 24), Spread = Vector2.new(180, 180), Drag = 4, Color = cs(RIFT.White, RIFT.Pink), Light = 1 },
+		-- Black ink shade: a black tear ring, black shards and streaks.
+		{ Texture = TEX.Ring, Count = 1, Light = 0, Size = ns(0, 0.5, 0.4, 3.6, 1, 4.2), Transparency = ns(0, 0.1, 0.6, 0.3, 1, 1), Lifetime = NumberRange.new(0.22), Color = cs(Color3.new(0, 0, 0)), ZOffset = 0.5 },
+		{ Texture = TEX.Shard, Count = 6, Light = 0, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.2, 0.35), Speed = NumberRange.new(10, 18), Spread = Vector2.new(180, 180), RotSpeed = NumberRange.new(-400, 400), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Spark, Count = 6, Parallel = true, Light = 0, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.15, 0.25), Speed = NumberRange.new(14, 24), Spread = Vector2.new(180, 180), Drag = 4, Color = cs(Color3.new(0, 0, 0)) },
+	}, 1)
+	-- A rift shockwave, an X of rift slashes, sparkles and a lingering crackle.
+	burst(at, {
+		{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, 0.6, 1, 5), Transparency = ns(0, 0.1, 1, 1), Lifetime = NumberRange.new(0.22), Color = cs(RIFT.White, RIFT.Main), Light = 1, ZOffset = 1 },
+		{ Texture = TEX.Spark, Count = 2, Parallel = true, Size = ns(0, 3.2, 1, 0), Lifetime = NumberRange.new(0.12, 0.16), Speed = NumberRange.new(0.5, 1), Spread = Vector2.new(180, 180), Color = cs(RIFT.White, RIFT.Pink), Light = 1, ZOffset = 1.5 },
+		{ Texture = TEX.Spark, Count = 2, Parallel = true, Light = 0, Size = ns(0, 3.6, 1, 0), Lifetime = NumberRange.new(0.12, 0.16), Speed = NumberRange.new(0.5, 1), Spread = Vector2.new(180, 180), Color = cs(Color3.new(0, 0, 0)), ZOffset = 1.2 },
+		{ Texture = TEX.Sparkles, Count = 8, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(4, 8), Spread = Vector2.new(180, 180), Drag = 2, Color = cs(RIFT.Lilac, RIFT.Pink), Light = 1 },
+		{ Texture = TEX.Electric, Count = 1, Size = ns(0, 1.6, 1, 2.4), Lifetime = NumberRange.new(0.25), RotSpeed = NumberRange.new(-200, 200), Color = cs(RIFT.White, RIFT.Main), Light = 1 },
 	}, 1)
 	ring(at, RIFT.Main, 0.8, 5, 0.25, floorY)
+	ring(at, Color3.new(0, 0, 0), 0.8, 6.5, 0.3, floorY)
+	if floorY and at.Y - floorY < 4 then
+		-- A small scorch where the bolt lands near the ground.
+		groundDecal(at, TEX.Crack, RIFT.Main, 0.8, 2.6, 0.9, { Floor = floorY, Hold = 0.4, GrowTime = 0.06, StartAlpha = 0.2 })
+		groundDecal(at, TEX.Crack, Color3.new(0, 0, 0), 0.6, 2, 0.9, { Floor = floorY, Lift = 0.03, Hold = 0.4, GrowTime = 0.06, StartAlpha = 0.25 })
+	end
 	flash(at, RIFT.Main, 8, 2.5, 0.15)
 end
 
@@ -1616,6 +2118,100 @@ end
 -- Projectiles
 -------------------------------------------------------------------------------
 
+-- Blender-made Fireball (art/skill_models/fireball): three nested flame shells
+-- (FireballCore / FireballMid / FireballOuter in RiftboundVFX) that spin at
+-- different speeds around the flight axis and pulse. Each template may carry
+-- an "Orient" CFrame attribute that turns its tail to +Z (behind the flight).
+local SHADE
+local FIREBALL_SHELLS = {
+	{ Name = "FireballOuter", Spin = -3, Pulse = 0.04, Alpha = 0.15, Scale = Vector3.new(0.62, 1.4, 0.62), Back = 1.7, Shade = true },
+	{ Name = "FireballCore", Spin = 9, Pulse = 0.08, Alpha = 0, Color = Color3.fromRGB(255, 236, 170) },
+	{ Name = "FireballMid", Spin = -6, Pulse = 0.06, Alpha = 0.15, Color = Color3.fromRGB(255, 130, 30) },
+	{ Name = "FireballOuter", Spin = 4, Pulse = 0.05, Alpha = 0.45, Color = Color3.fromRGB(235, 55, 10) },
+}
+
+local function fireballShells()
+	local shells = {}
+	for _, spec in FIREBALL_SHELLS do
+		local m = meshTemplate(spec.Name)
+		if not m then
+			for _, made in shells do
+				made.Part:Destroy()
+			end
+			return nil
+		end
+		if spec.Shade then
+			m.Material = Enum.Material.SmoothPlastic
+			m.Color = Color3.new(0, 0, 0)
+		else
+			m.Material = Enum.Material.Neon
+			m.Color = spec.Color or Color3.new(1, 1, 1)
+		end
+		m.Transparency = spec.Alpha
+		m.Parent = folder
+		table.insert(shells, { Part = m, Spec = spec, Size = m.Size * (spec.Scale or Vector3.one), Orient = m:GetAttribute("Orient") or CFrame.identity })
+	end
+	return shells
+end
+
+local function moveShells(shells, cf, t)
+	for _, sh in shells do
+		local k = 1 + sh.Spec.Pulse * math.sin(t * 14 + sh.Spec.Spin)
+		sh.Part.Size = sh.Size * k
+		sh.Part.CFrame = cf * CFrame.new(0, 0, sh.Spec.Back or 0) * CFrame.Angles(0, 0, t * sh.Spec.Spin) * sh.Orient
+	end
+end
+
+-- Blender-made Fireball blast: a flame dome bursting up out of a glowing core
+-- with a jagged shockwave ring, grown from nothing and faded out. Authored for
+-- a 3-stud blast radius.
+local FIREBALL_BLAST = {
+	-- A black ring just outside the glowing one gives the blast an ink rim.
+	{ Name = "FireballRing", Grow = 0.35, Life = 0.45, Alpha = 0.05, Scale = 1.45, Lift = false, Shade = true },
+	{ Name = "FireballBlastCore", Grow = 0.18, Life = 0.35, Alpha = 0, Scale = 0.75, Lift = true, Color = Color3.fromRGB(255, 236, 170) },
+	{ Name = "FireballBlast", Grow = 0.25, Life = 0.5, Alpha = 0.3, Scale = 0.8, Lift = true, Color = Color3.fromRGB(255, 100, 20) },
+	{ Name = "FireballRing", Grow = 0.3, Life = 0.4, Alpha = 0.2, Scale = 1.1, Lift = false, Color = Color3.fromRGB(255, 170, 60) },
+}
+
+-- Ink-black accent colours for the dark-shade layers.
+SHADE = { Ink = Color3.new(0, 0, 0), Ember = Color3.fromRGB(45, 8, 0) }
+
+local function fireballBlast(at, r, floorY)
+	local base = Vector3.new(at.X, (floorY or at.Y - 2) + 0.1, at.Z)
+	local spin = math.random() * math.pi * 2
+	for _, spec in FIREBALL_BLAST do
+		local m = meshTemplate(spec.Name)
+		if m then
+			local full = m.Size * (r / 3) * spec.Scale
+			local orient = m:GetAttribute("Orient") or CFrame.identity
+			local function place(size, turn)
+				local lift = if spec.Lift then size.Y * 0.5 else 0
+				return CFrame.new(base + Vector3.new(0, lift, 0)) * CFrame.Angles(0, turn, 0) * orient
+			end
+			if spec.Shade then
+				m.Material = Enum.Material.SmoothPlastic
+				m.Color = SHADE.Ink
+				m.CastShadow = false
+			else
+				m.Material = Enum.Material.Neon
+				m.Color = spec.Color or Color3.new(1, 1, 1)
+			end
+			m.Transparency = spec.Alpha
+			m.Size = full * 0.15
+			m.CFrame = place(m.Size, spin)
+			m.Parent = folder
+			TweenService:Create(m, TweenInfo.new(spec.Grow, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+				Size = full,
+				CFrame = place(full, spin + 0.6),
+			}):Play()
+			task.delay(spec.Grow, function()
+				tween(m, spec.Life, { Transparency = 1, Size = full * 1.15, CFrame = place(full * 1.15, spin + 0.9) })
+			end)
+			Debris:AddItem(m, spec.Grow + spec.Life + 0.1)
+		end
+	end
+end
+
 local function onProjectileStart(e)
 	if e.Skill == "PlasmaLance" then
 		launchPlasmaLance(e)
@@ -1634,6 +2230,7 @@ local function onProjectileStart(e)
 	part.Material = Enum.Material.Neon
 	part.CFrame = CFrame.lookAt(e.From, e.From + e.Dir)
 	local emitters = {}
+	local shells
 	if e.Skill == "RiftBolt" then
 		-- A small spinning rift crystal with a violet streak.
 		part.Size = Vector3.new(0.45, 0.45, 1.7)
@@ -1645,6 +2242,15 @@ local function onProjectileStart(e)
 		part.Shape = Enum.PartType.Ball
 		part.Size = Vector3.one * 1.4
 		part.Color = a.Core
+		shells = if e.Skill == "Fireball" then fireballShells() else nil
+		if shells then
+			part.Transparency = 1
+		end
+		if e.Skill == "Fireball" then
+			-- Ink-black flame licks and sparks behind the ball for contrast.
+			table.insert(emitters, emitter(part, { Enabled = true, Texture = TEX.Flame, Rate = 28, Light = 0, Size = ns(0, 1.6, 1, 0.2), Transparency = ns(0, 0.15, 1, 1), Lifetime = NumberRange.new(0.25, 0.4), Speed = NumberRange.new(2, 5), Dir = Enum.NormalId.Back, Spread = Vector2.new(20, 20), RotSpeed = NumberRange.new(-120, 120), Color = cs(SHADE.Ink, SHADE.Ember), ZOffset = -0.5 }))
+			table.insert(emitters, emitter(part, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 14, Light = 0, Size = ns(0, 0.45, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(4, 9), Dir = Enum.NormalId.Back, Spread = Vector2.new(70, 70), Color = cs(SHADE.Ink) }))
+		end
 		table.insert(emitters, emitter(part, { Enabled = true, Texture = TEX.Flame, Rate = 70, Size = ns(0, 2.6, 1, 0.3), Lifetime = NumberRange.new(0.22, 0.35), Speed = NumberRange.new(1, 3), Spread = Vector2.new(25, 25), Accel = Vector3.new(0, 6, 0), RotSpeed = NumberRange.new(-90, 90), Color = cs(a.Core, a.Main, a.Dark) }))
 		table.insert(emitters, emitter(part, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 30, Size = ns(0, 0.35, 1, 0), Lifetime = NumberRange.new(0.3, 0.6), Speed = NumberRange.new(3, 8), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, 10, 0), Color = cs(a.Core, a.Main) }))
 		table.insert(emitters, emitter(part, { Enabled = true, Texture = TEX.Smoke, Rate = 14, Light = 0, Size = ns(0, 1.2, 1, 3), Transparency = ns(0, 0.5, 1, 1), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(0.5, 1.5), Accel = Vector3.new(0, 4, 0), Color = cs(a.Smoke) }))
@@ -1674,14 +2280,25 @@ local function onProjectileStart(e)
 		local d = math.min((os.clock() - start) * e.Speed, range)
 		local pos = e.From + e.Dir * d
 		part.CFrame = CFrame.lookAt(pos, pos + e.Dir) * CFrame.Angles(0, 0, os.clock() * 12)
+		if shells then
+			moveShells(shells, CFrame.lookAt(pos, pos + e.Dir), os.clock() - start)
+		end
 	end)
-	projectiles[e.Id] = { Part = part, Emitters = emitters, Conn = conn }
+	local cleanup = shells and function()
+		for _, sh in shells do
+			sh.Part:Destroy()
+		end
+	end
+	projectiles[e.Id] = { Part = part, Emitters = emitters, Conn = conn, Cleanup = cleanup }
 	-- Safety: if the end event is lost, clean up anyway.
 	task.delay(range / e.Speed + 1, function()
 		local p = projectiles[e.Id]
 		if p then
 			p.Conn:Disconnect()
 			p.Part:Destroy()
+			if p.Cleanup then
+				p.Cleanup()
+			end
 			projectiles[e.Id] = nil
 		end
 	end)
@@ -1712,6 +2329,14 @@ local function onProjectileEnd(e)
 		return
 	end
 	-- Fireball explosion.
+	if e.Skill == "Fireball" then
+		fireballBlast(e.At, r, e.Floor)
+		-- Black spikes and flames thrown out with the blast.
+		burst(e.At, {
+			{ Texture = TEX.Spark, Count = 14, Parallel = true, Light = 0, Size = ns(0, 1.3, 1, 0), Lifetime = NumberRange.new(0.25, 0.45), Speed = NumberRange.new(30, 50), Spread = Vector2.new(180, 180), Drag = 4, Color = cs(SHADE.Ink) },
+			{ Texture = TEX.Flame, Count = 10, Light = 0, Size = ns(0, 3, 1, 0.8), Transparency = ns(0, 0.1, 1, 1), Lifetime = NumberRange.new(0.35, 0.55), Speed = NumberRange.new(12, 20), Spread = Vector2.new(180, 180), Drag = 5, RotSpeed = NumberRange.new(-120, 120), Color = cs(SHADE.Ink, SHADE.Ember), ZOffset = -1 },
+		}, 1.5)
+	end
 	playTemplate("Realistic-Explosion-01", CFrame.new(e.At), { Scale = 0.9 })
 	burst(e.At, {
 		{ Texture = TEX.Glow, Count = 1, Size = ns(0, 2, 0.3, r * 1.5, 1, r * 1.8), Transparency = ns(0, 0.25, 1, 1), Lifetime = NumberRange.new(0.25), Color = cs(a.Core, a.Main) },
@@ -1722,13 +2347,67 @@ local function onProjectileEnd(e)
 	}, 2.5)
 	flash(e.At, a.Main, r * 3.5, 6, 0.45)
 	ring(e.At, a.Core, 2, r * 2.6, 0.35, e.Floor)
-	groundDecal(e.At, TEX.Crack, rgb(30, 12, 8), r * 1.2, r * 1.6, 2.5, { Floor = e.Floor, Hold = 1.6, GrowTime = 0.1, StartAlpha = 0.15 })
+	groundDecal(e.At, TEX.Crack, if e.Skill == "Fireball" then rgb(255, 140, 60) else rgb(30, 12, 8), r * 1.4, r * 2, 2.5, { Floor = e.Floor, Hold = 1.6, GrowTime = 0.1, StartAlpha = 0.15 })
 	shake(0.28, e.At)
 end
 
 -------------------------------------------------------------------------------
 -- Lines: Tidal Wave
 -------------------------------------------------------------------------------
+
+-- Blender-made Tidal Wave (art/skill_models/tidalwave): a curling wave in four
+-- pieces (TidalBody / TidalCrest / TidalShade / TidalStreaks in the Model
+-- RiftboundVFX.TidalWaveModel). Body is the reference: its bottom sits on the
+-- floor, its width runs across the path and its curl faces -Z (the travel
+-- direction). Each piece keeps its offset from the body, so the wave can be
+-- stretched per axis (rise and crash) without the pieces drifting apart.
+local TIDAL_LOOK = {
+	-- Body carries the painted texture (TidalWave_Color.png): white so it shows true.
+	TidalBody = { Material = Enum.Material.SmoothPlastic, Color = Color3.new(1, 1, 1), Alpha = 0.05 },
+	TidalStreaks = { Material = Enum.Material.Neon, Color = Color3.fromRGB(120, 210, 255), Alpha = 0.1 },
+	TidalCrest = { Material = Enum.Material.Neon, Color = Color3.fromRGB(225, 248, 255), Alpha = 0 },
+	TidalShade = { Material = Enum.Material.SmoothPlastic, Color = Color3.new(0, 0, 0), Alpha = 0 },
+}
+
+-- The model is authored low; stretch it up so the wave towers over players.
+local TIDAL_HEIGHT = 1.7
+
+local function tidalWaveModel()
+	templates = templates or ReplicatedStorage:FindFirstChild("RiftboundVFX")
+	local source = templates and templates:FindFirstChild("TidalWaveModel")
+	local body = source and source:FindFirstChild("TidalBody")
+	if not body then
+		return nil
+	end
+	local pieces = {}
+	for _, src in source:GetChildren() do
+		local look = src:IsA("MeshPart") and TIDAL_LOOK[src.Name]
+		if look then
+			local p = src:Clone()
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			p.CastShadow = false
+			p.Material = look.Material
+			p.Color = look.Color
+			p.Transparency = look.Alpha
+			p.Parent = folder
+			table.insert(pieces, { Part = p, Size = src.Size, Rel = body.CFrame:ToObjectSpace(src.CFrame), Alpha = look.Alpha })
+		end
+	end
+	return { Pieces = pieces, BodySize = body.Size }
+end
+
+-- Places the wave with its base centre at `base` (a CFrame facing the travel
+-- direction), stretched by `stretch` (per-axis, in the wave's own space).
+local function placeTidalWave(wave, base, stretch)
+	local bodyCF = base * CFrame.new(0, wave.BodySize.Y * stretch.Y / 2, 0)
+	for _, piece in wave.Pieces do
+		piece.Part.Size = piece.Size * stretch
+		piece.Part.CFrame = bodyCF * CFrame.new(piece.Rel.Position * stretch) * piece.Rel.Rotation
+	end
+end
 
 local function onLine(e)
 	local a, b = palettes(e.Skill)
@@ -1743,11 +2422,13 @@ local function onLine(e)
 	local mover = anchor(look * CFrame.new(0, 1, -1), Vector3.new(e.Width, 1, 1.5), e.Sweep + 1.5)
 	local spray = emitter(mover, {
 		Enabled = true,
-		Texture = if frost then TEX.Swirl else TEX.Drop,
+		-- Spray streaks rather than the cartoon drop icon.
+		Texture = if frost then TEX.Swirl else TEX.Spark,
+		Parallel = not frost,
 		Shape = Enum.ParticleEmitterShape.Box,
 		InOut = Enum.ParticleEmitterShapeInOut.Outward,
 		Rate = if frost then 160 else 260,
-		Size = if frost then ns(0, 2.2, 1, 0) else ns(0, 0.9, 1, 0.3),
+		Size = if frost then ns(0, 2.2, 1, 0) else ns(0, 0.5, 1, 0.15),
 		Lifetime = NumberRange.new(0.35, 0.6),
 		Speed = NumberRange.new(8, 15),
 		Spread = Vector2.new(30, 30),
@@ -1770,9 +2451,52 @@ local function onLine(e)
 		Transparency = ns(0, 0.3, 1, 1),
 		Light = 0.5,
 	})
-	-- Wave body riding with the emitter: the AI-generated curling wave mesh
-	-- for Tidal Wave, a translucent wedge otherwise.
-	local waveMesh = (not frost) and meshTemplate("WaveMesh")
+	-- Wave body riding with the emitter: the Blender curling wave for Tidal
+	-- Wave, the older AI wave mesh if that is missing, a translucent wedge
+	-- otherwise.
+	local tidal = (not frost) and tidalWaveModel()
+	if tidal then
+		local k = e.Width / math.max(tidal.BodySize.X, 0.1)
+		local wstart = os.clock()
+		local wtotal = e.Sweep + 0.25
+		local wconn
+		playTemplate("Water-01", CFrame.new(startPos + Vector3.new(0, 1, 0)), { Scale = 1.2 })
+		wconn = RunService.RenderStepped:Connect(function()
+			local t = math.min((os.clock() - wstart) / wtotal, 1)
+			-- Rises fast, rolls forward with a slight surge, then holds height.
+			local rise = 1 - (1 - math.min(t * 3, 1)) ^ 3
+			local surge = 1 + 0.06 * math.sin(t * math.pi * 6)
+			placeTidalWave(tidal, look * CFrame.new(0, 0, -e.Length * t), Vector3.new(k, k * TIDAL_HEIGHT * (0.2 + 0.8 * rise) * surge, k))
+			if t >= 1 then
+				wconn:Disconnect()
+				-- Crash: the curl slams down and spreads out as it fades.
+				local crashStart = os.clock()
+				local cconn
+				cconn = RunService.RenderStepped:Connect(function()
+					local c = math.min((os.clock() - crashStart) / 0.35, 1)
+					placeTidalWave(tidal, look * CFrame.new(0, 0, -e.Length - c * 2), Vector3.new(k * (1 + 0.25 * c), k * TIDAL_HEIGHT * (1 - 0.8 * c), k * (1 + 0.6 * c)))
+					for _, piece in tidal.Pieces do
+						piece.Part.Transparency = piece.Alpha + (1 - piece.Alpha) * c
+					end
+					if c >= 1 then
+						cconn:Disconnect()
+						for _, piece in tidal.Pieces do
+							piece.Part:Destroy()
+						end
+					end
+				end)
+			end
+		end)
+		for i = 1, 2 do
+			task.delay(e.Sweep * i / 3, function()
+				playTemplate("Water-02", CFrame.new(startPos + e.Dir * (e.Length * i / 3) + Vector3.new(0, 1, 0)), { Scale = 1 })
+			end)
+		end
+		task.delay(e.Sweep, function()
+			playTemplate("Splash-01", CFrame.new(endPos + Vector3.new(0, 1, 0)), { Scale = 1.4 })
+		end)
+	end
+	local waveMesh = (not frost) and (not tidal) and meshTemplate("WaveMesh")
 	if waveMesh then
 		local base = waveMesh.Size
 		local k = e.Width / math.max(base.Z, 0.1)
@@ -1811,7 +2535,7 @@ local function onLine(e)
 	wave.CastShadow = false
 	wave.Material = if frost then Enum.Material.Ice else Enum.Material.Glass
 	wave.Color = a.Main
-	wave.Transparency = if waveMesh then 1 else 0.35
+	wave.Transparency = if waveMesh or tidal then 1 else 0.35
 	wave.Size = Vector3.new(e.Width, 0.5, 2.5)
 	wave.Parent = folder
 	Debris:AddItem(wave, e.Sweep + 0.6)
@@ -1860,8 +2584,94 @@ end
 --   Release: glowing wind ribbons spiral outward in a cyclone, a funnel twists
 --   up at your feet, crescent blades and an air dome burst out, dust kicks up.
 --   Settle: motes drift down and a soft swirl fades.
+-- Blender-made Gust (art/skill_models/gust): a shallow vortex of layered
+-- crescent wind arcs, an outer swirl 16 studs wide and a tighter inner swirl,
+-- each with ink-black copies of some arcs for the dark accent (GustOuter /
+-- GustOuterShade / GustInner / GustInnerShade in the Model
+-- RiftboundVFX.GustModel). Each part's "Offset" attribute is its centre
+-- relative to the vortex centre on the floor.
+local GUST_LOOK = {
+	-- The arcs carry the painted lime texture (Gust_Color.png), so they stay white.
+	GustOuter = { Material = Enum.Material.SmoothPlastic, Color = Color3.new(1, 1, 1), Alpha = 0 },
+	GustOuterShade = { Material = Enum.Material.SmoothPlastic, Color = Color3.new(0, 0, 0), Alpha = 0.15 },
+	GustInner = { Material = Enum.Material.SmoothPlastic, Color = Color3.new(1, 1, 1), Alpha = 0 },
+	GustInnerShade = { Material = Enum.Material.SmoothPlastic, Color = Color3.new(0, 0, 0), Alpha = 0.15 },
+}
+-- Gust's own lime palette, matching the painted arcs.
+local GUST_PAL = { Core = rgb(252, 255, 230), Main = rgb(220, 255, 140), Dark = rgb(150, 230, 90) }
+
+local function gustPiece(name)
+	templates = templates or ReplicatedStorage:FindFirstChild("RiftboundVFX")
+	local model = templates and templates:FindFirstChild("GustModel")
+	local src = model and model:FindFirstChild(name)
+	local look = GUST_LOOK[name]
+	if not (src and look) then
+		return nil
+	end
+	local p = src:Clone()
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Material = look.Material
+	p.Color = look.Color
+	p.Transparency = look.Alpha
+	p.Parent = folder
+	return p, look.Alpha
+end
+
+-- Plays the Blender pieces at `center` (floor at floorY) for a blast of radius r:
+-- the vortex spins open from a tight knot to the edge of the blast, the inner
+-- swirl turning faster than the outer, rising from flat to full height, then
+-- everything fades while still spinning.
+local function gustModel(center, floorY, r)
+	local pieces = {}
+	for _, name in { "GustOuter", "GustOuterShade", "GustInner", "GustInnerShade" } do
+		local p, alpha = gustPiece(name)
+		if p then
+			pieces[name] = { Part = p, Size = p.Size, Alpha = alpha, Offset = p:GetAttribute("Offset") or Vector3.zero }
+		end
+	end
+	if not pieces.GustOuter then
+		for _, pc in pieces do
+			pc.Part:Destroy()
+		end
+		return false
+	end
+	-- One scale for every piece so the inner and outer swirls keep their proportions.
+	local scale = r * 2 / math.max(pieces.GustOuter.Size.X, 0.1)
+	local base = Vector3.new(center.X, floorY + 0.05, center.Z)
+	local start = os.clock()
+	local LIFE = 0.75
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local t = math.min((os.clock() - start) / LIFE, 1)
+		local out = 1 - (1 - t) ^ 3
+		local fade = math.clamp((t - 0.5) / 0.5, 0, 1)
+		for name, pc in pieces do
+			local inner = name:find("Inner") ~= nil
+			local shade = name:find("Shade") ~= nil
+			-- Spins hardest at the start and keeps drifting as it fades.
+			local spin = (if inner then 9 else 5.5) * (0.7 * out + 0.3 * t) * (if shade then 0.92 else 1)
+			local k = scale * (if inner then 0.45 + 0.65 * out else 0.3 + 0.7 * out)
+			local ky = scale * (0.35 + 0.65 * out)
+			pc.Part.Size = pc.Size * Vector3.new(k, ky, k)
+			pc.Part.CFrame = CFrame.new(base) * CFrame.Angles(0, spin, 0) * CFrame.new(pc.Offset * Vector3.new(k, ky, k))
+			pc.Part.Transparency = pc.Alpha + (1 - pc.Alpha) * fade
+		end
+		if t >= 1 then
+			conn:Disconnect()
+			for _, pc in pieces do
+				pc.Part:Destroy()
+			end
+		end
+	end)
+	return true
+end
+
 local function gust(e)
-	local a = palettes(e.Skill)
+	local a = GUST_PAL
 	local white = Color3.new(1, 1, 1)
 	local floorY = e.Floor or e.At.Y - 2.9
 	local center = Vector3.new(e.At.X, floorY + 1.2, e.At.Z)
@@ -1892,16 +2702,16 @@ local function gust(e)
 		pullIn.Enabled = false
 		swirlIn.Enabled = false
 
-		-- 2a) Cyclone ribbons (trails on points spiralling outward) and a funnel.
+		-- 2a) Cyclone ribbons (trails on points spiralling outward, low to the ground).
 		local ribbons = {}
-		local function ribbon(base, height, width, kind)
+		local function ribbon(base, height, width)
 			local p = anchor(center, Vector3.new(0.2, 0.2, 0.2), 1.6)
 			local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
 			a0.Position, a1.Position = Vector3.new(0, width / 2, 0), Vector3.new(0, -width / 2, 0)
 			a0.Parent, a1.Parent = p, p
 			local trail = Instance.new("Trail")
 			trail.Attachment0, trail.Attachment1 = a0, a1
-			trail.Lifetime = if kind == "Funnel" then 0.25 else 0.42
+			trail.Lifetime = 0.42
 			trail.MinLength = 0.05
 			trail.Color = cs(white, a.Main)
 			trail.Transparency = ns(0, 0, 0.5, 0.35, 1, 1)
@@ -1912,13 +2722,10 @@ local function gust(e)
 			trail.Texture = TEX.Glow
 			trail.TextureMode = Enum.TextureMode.Stretch
 			trail.Parent = p
-			table.insert(ribbons, { Part = p, Base = base, Height = height, Kind = kind })
+			table.insert(ribbons, { Part = p, Base = base, Height = height })
 		end
 		for i = 1, 7 do
-			ribbon(i / 7 * math.pi * 2, 0.4 + math.random() * 1.4, 1.7, "Cyclone")
-		end
-		for i = 1, 3 do
-			ribbon(i / 3 * math.pi * 2, 7, 1.0, "Funnel")
+			ribbon(i / 7 * math.pi * 2, 0.4 + math.random() * 1.4, 1.7)
 		end
 		local start = os.clock()
 		local LIFE = 0.55
@@ -1931,16 +2738,9 @@ local function gust(e)
 			end
 			local out = 1 - (1 - t) * (1 - t)
 			for _, rb in ribbons do
-				local radius, angle, y
-				if rb.Kind == "Funnel" then
-					radius = 1 + 1.6 * t
-					angle = rb.Base + t * 16
-					y = rb.Height * out - 0.8
-				else
-					radius = 1.2 + (r * 1.05 - 1.2) * out
-					angle = rb.Base + t * 7.5
-					y = rb.Height * math.sin(math.pi * t) - 0.6
-				end
+				local radius = 1.2 + (r * 1.05 - 1.2) * out
+				local angle = rb.Base + t * 7.5
+				local y = rb.Height * math.sin(math.pi * t) - 0.6
 				rb.Part.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * radius, y, math.sin(angle) * radius))
 			end
 		end)
@@ -1972,6 +2772,9 @@ local function gust(e)
 
 		playTemplate("Wind-01", CFrame.new(center), { Scale = 1.3 })
 		playTemplate("Wind-02", CFrame.new(center), { Scale = 1.3 })
+		gustModel(center, floorY, r)
+		-- Twinkling star sparkles drifting out over the vortex.
+		radial({ Texture = TEX.Sparkle, Count = 18, Size = ns(0, 0.9, 0.5, 0.6, 1, 0), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(r * 0.6, r * 1.6), Drag = 3, RotSpeed = NumberRange.new(-90, 90), Color = cs(white, a.Main), Light = 1 })
 
 		-- 2c) Shimmering air dome and ground rings.
 		local bubble = Instance.new("Part")
@@ -2154,13 +2957,23 @@ local function onStrike(e)
 			Count = if r > 10 then 10 else 7,
 			Height = if magma then 7 else 6,
 			Material = if magma then Enum.Material.Basalt else Enum.Material.Slate,
-			Glow = if magma then a.Main elseif magnet then b.Main else nil,
+			Glow = if magma then a.Main elseif magnet then b.Main elseif e.Skill == "StoneSpike" then rgb(255, 160, 50) else nil,
+			Mesh = if e.Skill == "StoneSpike" then "StoneSpikeMesh" else nil,
 		})
-		debrisBurst(center + Vector3.new(0, 0.5, 0), if magma then rgb(255, 120, 40) else PAL.Earth.Dark, if magma then 14 else 12, {
+		if e.Skill == "StoneSpike" then
+			-- Ink-black shards and grit thrown out with the eruption.
+			burst(center + Vector3.new(0, 1, 0), {
+				{ Texture = TEX.Spark, Count = 16, Parallel = true, Light = 0, Size = ns(0, 1.4, 1, 0), Lifetime = NumberRange.new(0.25, 0.45), Speed = NumberRange.new(28, 46), Spread = Vector2.new(70, 70), Drag = 4, Color = cs(Color3.new(0, 0, 0)) },
+				{ Texture = TEX.Rocks, Count = 10, Light = 0, Size = ns(0, 1, 1, 0.6), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(16, 28), Spread = Vector2.new(55, 55), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(Color3.new(0.08, 0.06, 0.05)) },
+			}, 1.5)
+		end
+		local stone = e.Skill == "StoneSpike"
+		debrisBurst(center + Vector3.new(0, 0.5, 0), if magma then rgb(255, 120, 40) elseif stone then rgb(48, 38, 32) else PAL.Earth.Dark, if magma then 14 else 12, {
 			Floor = floorY,
 			Reach = r * 1.1,
 			Height = 6,
-			Material = if magma then Enum.Material.Neon else Enum.Material.Slate,
+			Material = if magma then Enum.Material.Neon elseif stone then Enum.Material.Basalt else Enum.Material.Slate,
+			Wedge = stone,
 		})
 		burst(center + Vector3.new(0, 1, 0), {
 			{ Texture = TEX.Rocks, Count = 14, Light = 0, Size = ns(0, 1.3, 1, 0.9), Transparency = ns(0, 0, 0.8, 0, 1, 1), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(18, 32), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -60, 0), RotSpeed = NumberRange.new(-300, 300), Color = cs(if magma then rgb(255, 170, 120) else Color3.new(1, 1, 1)) },
@@ -2198,6 +3011,16 @@ end
 -- Zones: Steam Cloud, Thunderstorm
 -------------------------------------------------------------------------------
 
+-- Thunderstorm: gold lightning under a charcoal cloud, with black ink (no
+-- purple, matching Magnet Quake).
+local STORM = {
+	Yellow = rgb(255, 225, 60),
+	Amber = rgb(255, 150, 20),
+	Cloud = rgb(96, 98, 110),
+	CloudDark = rgb(46, 46, 56),
+}
+local STORM_TINT = cs(Color3.new(1, 1, 1), STORM.Yellow, STORM.Amber)
+
 local function onZone(e)
 	local a, b = palettes(e.Skill)
 	local floorY = e.At.Y
@@ -2222,6 +3045,13 @@ local function onZone(e)
 		add({ Texture = TEX.Smoke, Rate = 45, Light = 0.2, Size = ns(0, 3, 1, 8), Transparency = ns(0, 0.6, 0.3, 0.35, 1, 1), Lifetime = NumberRange.new(1.4, 2.2), Speed = NumberRange.new(1, 3), Accel = Vector3.new(0, 3, 0), RotSpeed = NumberRange.new(-30, 30), Color = cs(Color3.new(1, 1, 1), b.Smoke) })
 		add({ Texture = TEX.Spark, Parallel = true, Rate = 25, Size = ns(0, 0.4, 1, 0), Lifetime = NumberRange.new(0.6, 1), Speed = NumberRange.new(3, 6), Accel = Vector3.new(0, 8, 0), Color = cs(a.Core, a.Main) })
 		add({ Texture = TEX.Drop, Rate = 15, Size = ns(0, 0.4, 1, 0.2), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(4, 8), Accel = Vector3.new(0, -20, 0), Color = cs(b.Core, b.Main), Light = 0.5 })
+		-- Black ink shade: dark wisps curling low under the white steam, and an
+		-- ink ring on the ground at the cloud's edge.
+		add({ Texture = TEX.Smoke, Rate = 10, Light = 0, Size = ns(0, 2, 1, 5), Transparency = ns(0, 0.75, 0.3, 0.45, 1, 1), Lifetime = NumberRange.new(0.9, 1.4), Speed = NumberRange.new(0.5, 1.5), Accel = Vector3.new(0, 1.5, 0), RotSpeed = NumberRange.new(-60, 60), Color = cs(Color3.new(0, 0, 0)), ZOffset = -1 })
+		groundDecal(center, TEX.Ring, Color3.new(0, 0, 0), r * 2.05, r * 2.05, life, { Floor = floorY, Lift = 0.02, FadeIn = 0.2, StartAlpha = 0.35, Hold = e.Duration })
+		-- Boiling bubbles and rising heat swirls.
+		add({ Texture = TEX.Glow, Rate = 30, Size = ns(0, 0.5, 0.8, 0.3, 1, 0), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(2, 4), Accel = Vector3.new(0, 6, 0), Color = cs(Color3.new(1, 1, 1), b.Core), Light = 0.6 })
+		add({ Texture = TEX.Swirl, Rate = 6, Size = ns(0, 2, 1, 5), Transparency = ns(0, 0.55, 1, 1), Lifetime = NumberRange.new(0.8, 1.2), Speed = NumberRange.new(2, 3), RotSpeed = NumberRange.new(-120, 120), Color = cs(Color3.new(1, 1, 1), b.Main), Light = 0.4 })
 	elseif e.Skill == "Thunderstorm" then
 		local cloud = anchor(center + Vector3.new(0, 12, 0), Vector3.new(r * 1.8, 2, r * 1.8), life + 2)
 		local function addCloud(s)
@@ -2229,18 +3059,32 @@ local function onZone(e)
 			s.Shape = Enum.ParticleEmitterShape.Box
 			table.insert(emitters, emitter(cloud, s))
 		end
-		addCloud({ Texture = TEX.Smoke, Rate = 28, Light = 0, Size = ns(0, 5, 1, 8), Transparency = ns(0, 0.85, 0.3, 0.62, 1, 1), Lifetime = NumberRange.new(1.5, 2.2), Speed = NumberRange.new(0.3, 1), RotSpeed = NumberRange.new(-20, 20), Color = cs(rgb(120, 112, 150), rgb(80, 72, 110)) })
-		addCloud({ Texture = TEX.Glow, Rate = 5, Size = ns(0, 2.5, 1, 0), Lifetime = NumberRange.new(0.1, 0.2), Transparency = ns(0, 0.4, 1, 1), Color = cs(b.Core, a.Main) })
+		addCloud({ Texture = TEX.Smoke, Rate = 28, Light = 0, Size = ns(0, 5, 1, 8), Transparency = ns(0, 0.85, 0.3, 0.55, 1, 1), Lifetime = NumberRange.new(1.5, 2.2), Speed = NumberRange.new(0.3, 1), RotSpeed = NumberRange.new(-20, 20), Color = cs(STORM.Cloud, STORM.CloudDark) })
+		-- Black ink shade: a dark underbelly of black smoke below the grey cloud.
+		addCloud({ Texture = TEX.Smoke, Rate = 16, Light = 0, Size = ns(0, 4, 1, 7), Transparency = ns(0, 0.9, 0.3, 0.5, 1, 1), Lifetime = NumberRange.new(1.2, 1.8), Speed = NumberRange.new(0.3, 0.8), Dir = Enum.NormalId.Bottom, RotSpeed = NumberRange.new(-20, 20), Color = cs(Color3.new(0, 0, 0)), ZOffset = -1 })
+		addCloud({ Texture = TEX.Glow, Rate = 5, Size = ns(0, 2.5, 1, 0), Lifetime = NumberRange.new(0.1, 0.2), Transparency = ns(0, 0.4, 1, 1), Color = cs(Color3.new(1, 1, 1), STORM.Yellow) })
+		-- Driving rain: white streaks with black ink streaks among them.
+		addCloud({ Texture = TEX.Spark, Parallel = true, Rate = 90, Size = ns(0, 1.1, 1, 0.8), Transparency = ns(0, 0.15, 1, 0.6), Lifetime = NumberRange.new(0.25, 0.32), Speed = NumberRange.new(38, 46), Dir = Enum.NormalId.Bottom, Spread = Vector2.new(6, 6), Color = cs(rgb(225, 235, 255)), Light = 0.4 })
+		addCloud({ Texture = TEX.Spark, Parallel = true, Rate = 30, Size = ns(0, 1.2, 1, 0.8), Transparency = ns(0, 0.05, 1, 0.5), Lifetime = NumberRange.new(0.25, 0.32), Speed = NumberRange.new(38, 46), Dir = Enum.NormalId.Bottom, Spread = Vector2.new(6, 6), Color = cs(Color3.new(0, 0, 0)), Light = 0 })
 		add({ Texture = TEX.Swirl, Rate = 12, Size = ns(0, 2, 1, 4), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(1, 2), RotSpeed = NumberRange.new(-200, 200), Color = cs(a.Core, a.Main), Transparency = ns(0, 0.5, 1, 1) })
-		-- Ambient crackle inside the cloud.
+		add({ Texture = TEX.Swirl, Rate = 6, Light = 0, Size = ns(0, 1.5, 1, 3.5), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(1, 2), RotSpeed = NumberRange.new(-250, 250), Color = cs(Color3.new(0, 0, 0)), Transparency = ns(0, 0.45, 1, 1) })
+		-- Rain splashes across the ground.
+		add({ Texture = TEX.Spark, Parallel = true, Rate = 30, Size = ns(0, 0.3, 1, 0), Lifetime = NumberRange.new(0.12, 0.2), Speed = NumberRange.new(6, 10), Spread = Vector2.new(60, 60), Color = cs(rgb(225, 235, 255)), Light = 0.4 })
+		-- Ink ring at the storm's edge.
+		groundDecal(center, TEX.Ring, Color3.new(0, 0, 0), r * 2.1, r * 2.1, life, { Floor = floorY, Lift = 0.02, FadeIn = 0.2, StartAlpha = 0.3, Hold = e.Duration })
+		-- Ambient crackle inside the cloud, some arcs in black ink.
 		task.spawn(function()
 			local t = 0
 			while t < e.Duration do
 				local p1 = cloud.Position + Vector3.new((math.random() - 0.5) * r * 1.6, 0, (math.random() - 0.5) * r * 1.6)
 				local p2 = cloud.Position + Vector3.new((math.random() - 0.5) * r * 1.6, (math.random() - 0.5) * 2, (math.random() - 0.5) * r * 1.6)
-				lightning(p1, p2, b.Main, { Width = 0.3, Life = 0.12 })
-				task.wait(0.25 + math.random() * 0.25)
-				t += 0.35
+				if math.random() < 0.35 then
+					lightning(p1, p2, Color3.new(0, 0, 0), { Width = 0.3, Life = 0.12, Ink = true })
+				else
+					lightning(p1, p2, STORM.Yellow, { Width = 0.3, Life = 0.12, Halo = STORM.Amber })
+				end
+				task.wait(0.18 + math.random() * 0.2)
+				t += 0.28
 			end
 		end)
 	else
@@ -2260,6 +3104,16 @@ local function onZone(e)
 					local angle = math.random() * math.pi * 2
 					local at = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * r * math.random() * 0.7
 					playTemplate(pulse, CFrame.new(at + Vector3.new(0, 1, 0)), { Scale = 0.9 })
+				end
+				if e.Skill == "SteamCloud" then
+					-- A scalding steam geyser bursts from a random spot, with a black puff at its base.
+					local angle = math.random() * math.pi * 2
+					local at = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * r * math.random() * 0.75
+					burst(at + Vector3.new(0, 0.5, 0), {
+						{ Texture = TEX.Smoke, Count = 8, Light = 0.2, Size = ns(0, 1.5, 1, 4.5), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.6, 0.9), Speed = NumberRange.new(14, 20), Spread = Vector2.new(12, 12), Drag = 2, Color = cs(Color3.new(1, 1, 1), b.Smoke) },
+						{ Texture = TEX.Smoke, Count = 3, Light = 0, Size = ns(0, 1.5, 1, 3), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(2, 4), Spread = Vector2.new(80, 80), Color = cs(Color3.new(0, 0, 0)) },
+						{ Texture = TEX.Spark, Count = 8, Parallel = true, Size = ns(0, 0.4, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(10, 16), Spread = Vector2.new(25, 25), Color = cs(a.Core, a.Main), Light = 1 },
+					}, 1.2)
 				end
 			end
 		end
@@ -2294,17 +3148,33 @@ local function onBolt(e)
 	local a, b = palettes(e.Skill)
 	local light = if e.Skill == "ChainShock" then b else a
 	if e.Strike then
-		playTemplate("Lighting-03", CFrame.new(e.To), { Scale = 1, Color = ELECTRIC_TINT })
-		lightning(e.From, e.To, light.Main, { Width = 1.2, Life = 0.35 })
-		lightning(e.From + Vector3.new(1, 0, 0), e.To, light.Core, { Width = 0.5, Life = 0.2 })
+		-- Thunderstorm strike: a thick gold bolt with black ink bolts beside it.
+		local floorY = e.To.Y - 2
+		local ground = Vector3.new(e.To.X, floorY, e.To.Z)
+		playTemplate("Lighting-03", CFrame.new(e.To), { Scale = 1, Color = STORM_TINT })
+		lightning(e.From, e.To, Color3.new(0, 0, 0), { Width = 0.8, Life = 0.38, Ink = true })
+		lightning(e.From + Vector3.new(-1.2, 0, 0.6), e.To, Color3.new(0, 0, 0), { Width = 0.4, Life = 0.28, Ink = true, NoBranch = true })
+		lightning(e.From, e.To, STORM.Yellow, { Width = 1.2, Life = 0.35, Halo = STORM.Amber })
+		lightning(e.From + Vector3.new(1, 0, 0), e.To, Color3.new(1, 1, 1), { Width = 0.5, Life = 0.2, Halo = STORM.Amber })
 		burst(e.To, {
-			{ Texture = TEX.Glow, Count = 1, Size = ns(0, 6, 1, 0), Lifetime = NumberRange.new(0.2), Color = cs(light.Core) },
-			{ Texture = TEX.Spark, Count = 30, Parallel = true, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.25, 0.5), Speed = NumberRange.new(20, 35), Spread = Vector2.new(180, 60), Drag = 3, Color = cs(light.Core, light.Main) },
+			{ Texture = TEX.Glow, Count = 1, Size = ns(0, 6, 1, 0), Lifetime = NumberRange.new(0.2), Color = cs(Color3.new(1, 1, 1), STORM.Yellow) },
+			{ Texture = TEX.Spark, Count = 30, Parallel = true, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.25, 0.5), Speed = NumberRange.new(20, 35), Spread = Vector2.new(180, 60), Drag = 3, Color = cs(Color3.new(1, 1, 1), STORM.Yellow) },
+			{ Texture = TEX.Electric, Count = 2, Size = ns(0, 3, 1, 4.5), Lifetime = NumberRange.new(0.3), RotSpeed = NumberRange.new(-200, 200), Color = cs(Color3.new(1, 1, 1), STORM.Yellow), Light = 1 },
+			-- Black ink shade: black streaks, shards and a puff of dark smoke.
+			{ Texture = TEX.Spark, Count = 14, Parallel = true, Light = 0, Size = ns(0, 0.8, 1, 0), Lifetime = NumberRange.new(0.2, 0.35), Speed = NumberRange.new(18, 30), Spread = Vector2.new(180, 50), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+			{ Texture = TEX.Shard, Count = 8, Light = 0, Size = ns(0, 0.8, 1, 0.2), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(12, 20), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -50, 0), RotSpeed = NumberRange.new(-400, 400), Color = cs(Color3.new(0, 0, 0)) },
+			{ Texture = TEX.Smoke, Count = 4, Light = 0, Size = ns(0, 2, 1, 5), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(6, 10), Spread = Vector2.new(180, 20), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
 		}, 1)
-		ring(e.To, light.Core, 1, 8, 0.3, e.To.Y - 2)
-		ring(e.To, PAL.Lightning.Dark, 1, 12, 0.4, e.To.Y - 2)
-		groundDecal(e.To, TEX.Crack, PAL.Lightning.Dark, 3, 5, 1.2, { Floor = e.To.Y - 2, Hold = 0.6, GrowTime = 0.08, StartAlpha = 0.2 })
-		flash(e.To + Vector3.new(0, 4, 0), light.Core, 22, 6, 0.15)
+		burst(ground + Vector3.new(0, 0.6, 0), {
+			{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, 1, 1, 10), Transparency = ns(0, 0.1, 1, 1), Lifetime = NumberRange.new(0.3), Color = cs(Color3.new(1, 1, 1), STORM.Yellow), Light = 1, ZOffset = 1 },
+			{ Texture = TEX.Shockwave, Count = 1, Light = 0, Size = ns(0, 1, 1, 13), Transparency = ns(0, 0.2, 1, 1), Lifetime = NumberRange.new(0.38), Color = cs(Color3.new(0, 0, 0)), ZOffset = 0.5 },
+		}, 1)
+		debrisBurst(ground + Vector3.new(0, 0.5, 0), rgb(48, 38, 32), 3, { Material = Enum.Material.Basalt, Size = 0.5, Height = 3, Reach = 4, Floor = floorY, Wedge = true })
+		ring(e.To, Color3.new(1, 1, 1), 1, 8, 0.3, floorY)
+		ring(e.To, Color3.new(0, 0, 0), 1, 12, 0.4, floorY)
+		groundDecal(e.To, TEX.Crack, STORM.Yellow, 3, 5, 1.2, { Floor = floorY, Hold = 0.6, GrowTime = 0.08, StartAlpha = 0.2 })
+		groundDecal(e.To, TEX.Crack, Color3.new(0, 0, 0), 2.5, 4.2, 1.2, { Floor = floorY, Lift = 0.03, Hold = 0.6, GrowTime = 0.08, StartAlpha = 0.15 })
+		flash(e.To + Vector3.new(0, 4, 0), STORM.Yellow, 22, 6, 0.15)
 		shake(0.18, e.To)
 		return
 	end
@@ -2313,9 +3183,28 @@ local function onBolt(e)
 		burst(e.To, { { Texture = TEX.Spark, Count = 8, Parallel = true, Size = ns(0, 0.4, 1, 0), Lifetime = NumberRange.new(0.2), Speed = NumberRange.new(8, 14), Spread = Vector2.new(180, 180), Color = cs(light.Core, light.Main) } }, 1)
 		return
 	end
+	if e.Skill == "SparkBolt" then
+		-- Black ink shade bolts under the glow, each on its own jagged path.
+		lightning(e.From, e.To, Color3.new(0, 0, 0), { Width = 0.55, Life = 0.32, Ink = true })
+		lightning(e.From, e.To, Color3.new(0, 0, 0), { Width = 0.3, Life = 0.22, Ink = true, NoBranch = true })
+	end
 	lightning(e.From, e.To, light.Main, { Width = 0.7, Life = 0.3 })
 	lightning(e.From, e.To, light.Core, { Width = 0.3, Life = 0.2 })
 	playTemplate("Lighting-02", CFrame.new(e.To), { Scale = 0.75, Color = ELECTRIC_TINT })
+	if e.Skill == "SparkBolt" then
+		-- Muzzle crackle where the bolt leaves, and a bigger hit: a spark
+		-- shower, black ink shards, a lingering crackle and a quick shock ring.
+		burst(e.From, {
+			{ Texture = TEX.Sparkle, Count = 1, Size = ns(0, 1.6, 1, 2.4), Lifetime = NumberRange.new(0.15), Color = cs(light.Core), Light = 1 },
+			{ Texture = TEX.Spark, Count = 8, Parallel = true, Size = ns(0, 0.35, 1, 0), Lifetime = NumberRange.new(0.12, 0.2), Speed = NumberRange.new(10, 18), Spread = Vector2.new(180, 180), Color = cs(light.Core, light.Main), Light = 1 },
+		}, 0.5)
+		burst(e.To, {
+			{ Texture = TEX.Spark, Count = 22, Parallel = true, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.2, 0.4), Speed = NumberRange.new(16, 28), Spread = Vector2.new(180, 180), Drag = 4, Color = cs(light.Core, light.Main), Light = 1 },
+			{ Texture = TEX.Spark, Count = 10, Parallel = true, Size = ns(0, 0.7, 1, 0), Lifetime = NumberRange.new(0.2, 0.35), Speed = NumberRange.new(12, 22), Spread = Vector2.new(180, 180), Drag = 4, Color = cs(Color3.new(0, 0, 0)), Light = 0 },
+			{ Texture = TEX.Electric, Count = 3, Size = ns(0, 2.5, 1, 3.5), Lifetime = NumberRange.new(0.35, 0.5), RotSpeed = NumberRange.new(-200, 200), Color = cs(light.Core, light.Main), Light = 1 },
+			{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, 1, 1, 7), Transparency = ns(0, 0.1, 1, 1), Lifetime = NumberRange.new(0.25), Color = cs(light.Core, light.Main), Light = 1, ZOffset = 1 },
+		}, 1)
+	end
 	burst(e.To, {
 		{ Texture = TEX.Electric, Count = 2, Size = ns(0, 4, 1, 5), Lifetime = NumberRange.new(0.3), Color = cs(light.Core, light.Main), Light = 1 },
 		{ Texture = TEX.Sparkle, Count = 1, Size = ns(0, 2.5, 1, 3), Lifetime = NumberRange.new(0.3), Color = cs(light.Core), Light = 1 },
@@ -2332,6 +3221,107 @@ end
 -- Firestorm: a fire tornado that drags enemies into its centre.
 -------------------------------------------------------------------------------
 
+-- Blender-made fire tornado (art/skill_models/firestorm), built the way Harry
+-- Alisavakis's stylised tornado is: four nested, noise-displaced funnel layers
+-- painted with 45-degree noise streaks in banded colours with holes cut out
+-- (white-hot inside to red-black outside), plus spiral planes at the bottom and
+-- top (FireLayer1-4 / FireSpiralBottom / FireSpiralTop in the Model
+-- RiftboundVFX.FirestormModel). Roblox can't pan textures, so each layer spins
+-- at its own speed instead, which turns the tilted streaks into a rising swirl.
+-- About 14 studs tall. Each part's "Offset" attribute is its centre relative to
+-- the funnel's base on the floor.
+local FIRESTORM_PARTS = {
+	-- Spin speeds (radians per second); inner layers spin fastest.
+	FireLayer1 = 9,
+	FireLayer2 = 7,
+	FireLayer3 = 5.5,
+	FireLayer4 = 4,
+	FireSpiralBottom = 3,
+	FireSpiralTop = 4.5,
+}
+-- The same atlas with more of the noise cut away, swapped in to dissolve it.
+local FIRESTORM_ERODE = { "rbxassetid://134760698364137", "rbxassetid://109304087267820" }
+
+-- Preload the VFX templates' textures (and the dissolve textures) so the
+-- first cast doesn't flash untextured white meshes.
+task.spawn(function()
+	local list = table.clone(FIRESTORM_ERODE)
+	local vfx = ReplicatedStorage:WaitForChild("RiftboundVFX", 10)
+	if vfx then
+		table.insert(list, vfx)
+	end
+	pcall(function()
+		game:GetService("ContentProvider"):PreloadAsync(list)
+	end)
+end)
+
+-- Plays the funnel at `center` on floorY for D seconds: it twists up out of the
+-- ground, sways while it spins, then erodes away. Returns false when the
+-- templates are missing.
+local function firestormModel(center, floorY, D)
+	templates = templates or ReplicatedStorage:FindFirstChild("RiftboundVFX")
+	local model = templates and templates:FindFirstChild("FirestormModel")
+	if not (model and model:FindFirstChild("FireLayer1")) then
+		return false
+	end
+	local pieces = {}
+	for name, speed in FIRESTORM_PARTS do
+		local src = model:FindFirstChild(name)
+		if src then
+			local p = src:Clone()
+			p.Anchored = true
+			p.CanCollide = false
+			p.CanQuery = false
+			p.CanTouch = false
+			p.CastShadow = false
+			p.Material = Enum.Material.SmoothPlastic
+			p.Parent = folder
+			table.insert(pieces, { Part = p, Size = p.Size, Offset = p:GetAttribute("Offset") or Vector3.zero, Speed = speed, Flat = name == "FireSpiralBottom" })
+		end
+	end
+	local base = Vector3.new(center.X, floorY, center.Z)
+	local start = os.clock()
+	local erodeStep = 0
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - start
+		local grow = math.clamp(t / 0.35, 0, 1)
+		grow = 1 - (1 - grow) ^ 3
+		-- Dissolve: two more-eroded textures, then a short fade.
+		local out = t - D
+		local step = if out > 0.3 then 2 elseif out > 0 then 1 else 0
+		if step ~= erodeStep then
+			erodeStep = step
+			for _, pc in pieces do
+				pc.Part.TextureID = FIRESTORM_ERODE[step]
+			end
+		end
+		local fade = math.clamp((out - 0.3) / 0.35, 0, 1)
+		local h = math.max(grow, 0.02) * (1 + 0.15 * math.clamp(out / 0.6, 0, 1))
+		local w = 0.5 + 0.5 * grow + 0.2 * math.clamp(out / 0.6, 0, 1)
+		-- A slow sway so the funnel leans and snakes as it spins.
+		local sway = CFrame.Angles(math.sin(t * 2.3) * 0.06, 0, math.cos(t * 1.9) * 0.06)
+		for _, pc in pieces do
+			local sy = if pc.Flat then 1 else h
+			pc.Part.Size = pc.Size * Vector3.new(w, sy, w)
+			local tilt = if pc.Flat then CFrame.identity else sway
+			pc.Part.CFrame = CFrame.new(base) * tilt * CFrame.Angles(0, t * pc.Speed, 0) * CFrame.new(pc.Offset * Vector3.new(w, sy, w))
+			pc.Part.Transparency = fade
+		end
+		if fade >= 1 then
+			conn:Disconnect()
+			for _, pc in pieces do
+				pc.Part:Destroy()
+			end
+		end
+	end)
+	return true
+end
+
+-- Deep red that sits alongside the black shade in Firestorm.
+local FIRESTORM_RED = rgb(225, 30, 20)
+local FIRESTORM_BLOOD = rgb(110, 0, 8)
+
 local function onTornado(e)
 	local a = palettes(e.Skill)
 	local center = e.At
@@ -2342,6 +3332,7 @@ local function onTornado(e)
 	local emitters, spinners, cleanup = {}, {}, {}
 
 	playTemplate("Fire-03", CFrame.new(center + Vector3.new(0, 1, 0)), { Scale = 1.3 })
+	firestormModel(center, floorY, D)
 	ring(center, a.Core, 2, r * 2.4, 0.4, floorY)
 	local _, edge = groundDecal(center, TEX.Ring, a.Main, r * 2, r * 2, D + 0.6, { Floor = floorY, FadeIn = 0.2, StartAlpha = 0.15, Hold = D, Spin = math.pi * 2 })
 	groundDecal(center, TEX.Glow, a.Main, r * 1.2, r * 2.2, D + 0.6, { Floor = floorY, Lift = 0.01, FadeIn = 0.3, StartAlpha = 0.45, Hold = D })
@@ -2391,7 +3382,45 @@ local function onTornado(e)
 		trail.Texture = TEX.Glow
 		trail.TextureMode = Enum.TextureMode.Stretch
 		trail.Parent = p
-		table.insert(ribbons, { Part = p, Trail = trail, Phase = i / 3 })
+		table.insert(ribbons, { Part = p, Trail = trail, Phase = i / 3, Scale = 1 })
+	end
+	-- Black ink shade: two black smoke ribbons spiralling just outside the fire.
+	for i = 1, 2 do
+		local p = anchor(CFrame.new(center), Vector3.new(0.2, 0.2, 0.2), D + 1)
+		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+		a0.Position, a1.Position = Vector3.new(0, 0.45, 0), Vector3.new(0, -0.45, 0)
+		a0.Parent, a1.Parent = p, p
+		local trail = Instance.new("Trail")
+		trail.Attachment0, trail.Attachment1 = a0, a1
+		trail.Lifetime = 0.3
+		trail.Color = cs(Color3.new(0, 0, 0))
+		trail.Transparency = ns(0, 0.1, 0.6, 0.5, 1, 1)
+		trail.WidthScale = ns(0, 1, 1, 0.1)
+		trail.LightEmission = 0
+		trail.LightInfluence = 0
+		trail.FaceCamera = true
+		trail.Parent = p
+		table.insert(ribbons, { Part = p, Trail = trail, Phase = i / 2 + 0.17, Scale = 1.2 })
+	end
+	-- Deep red ribbons between the fire and the black shade.
+	for i = 1, 2 do
+		local p = anchor(CFrame.new(center), Vector3.new(0.2, 0.2, 0.2), D + 1)
+		local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+		a0.Position, a1.Position = Vector3.new(0, 0.6, 0), Vector3.new(0, -0.6, 0)
+		a0.Parent, a1.Parent = p, p
+		local trail = Instance.new("Trail")
+		trail.Attachment0, trail.Attachment1 = a0, a1
+		trail.Lifetime = 0.32
+		trail.Color = cs(FIRESTORM_RED, FIRESTORM_BLOOD)
+		trail.Transparency = ns(0, 0.05, 0.6, 0.45, 1, 1)
+		trail.WidthScale = ns(0, 1, 1, 0.1)
+		trail.LightEmission = 0.5
+		trail.LightInfluence = 0
+		trail.FaceCamera = true
+		trail.Texture = TEX.Glow
+		trail.TextureMode = Enum.TextureMode.Stretch
+		trail.Parent = p
+		table.insert(ribbons, { Part = p, Trail = trail, Phase = i / 2 + 0.42, Scale = 1.1 })
 	end
 
 	-- Embers sucked inward from the edge (the pull, made visible).
@@ -2403,12 +3432,73 @@ local function onTornado(e)
 		Rate = 70, Size = ns(0, 0.5, 1, 0.1), Lifetime = NumberRange.new(0.35, 0.5),
 		Speed = NumberRange.new(r * 1.6, r * 2.2), Accel = Vector3.new(0, 8, 0), Color = cs(a.Core, a.Main), Light = 0.9,
 	}))
+	table.insert(emitters, emitter(field, {
+		Enabled = true, Texture = TEX.Spark, Parallel = true, Light = 0,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		InOut = Enum.ParticleEmitterShapeInOut.Inward,
+		Rate = 25, Size = ns(0, 0.8, 1, 0.1), Lifetime = NumberRange.new(0.35, 0.5),
+		Speed = NumberRange.new(r * 1.6, r * 2.2), Accel = Vector3.new(0, 8, 0), Color = cs(Color3.new(0, 0, 0)),
+	}))
+	groundDecal(center, TEX.Ring, Color3.new(0, 0, 0), r * 2.1, r * 2.1, D + 0.6, { Floor = floorY, Lift = 0.03, FadeIn = 0.2, StartAlpha = 0.3, Hold = D })
+	-- Red alongside the black: crimson embers in the pull, a blood-red glow and ring under the funnel.
+	table.insert(emitters, emitter(field, {
+		Enabled = true, Texture = TEX.Spark, Parallel = true, Light = 0.5,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		InOut = Enum.ParticleEmitterShapeInOut.Inward,
+		Rate = 35, Size = ns(0, 0.7, 1, 0.1), Lifetime = NumberRange.new(0.35, 0.5),
+		Speed = NumberRange.new(r * 1.6, r * 2.2), Accel = Vector3.new(0, 8, 0), Color = cs(FIRESTORM_RED, FIRESTORM_BLOOD),
+	}))
+	groundDecal(center, TEX.Glow, FIRESTORM_RED, r * 1.4, r * 2.4, D + 0.6, { Floor = floorY, Lift = 0.015, FadeIn = 0.25, StartAlpha = 0.5, Hold = D })
+	groundDecal(center, TEX.Ring, FIRESTORM_BLOOD, r * 1.85, r * 1.85, D + 0.6, { Floor = floorY, Lift = 0.025, FadeIn = 0.2, StartAlpha = 0.35, Hold = D, Spin = -math.pi * 2 })
+	-- A roaring flame column up the core, and a ring of low flames around the edge.
+	local core = anchor(CFrame.new(center + Vector3.new(0, 0.5, 0)), Vector3.new(2, 0.5, 2), D + 2)
+	table.insert(emitters, emitter(core, {
+		Enabled = true, Texture = TEX.Flame, Shape = Enum.ParticleEmitterShape.Cylinder,
+		Rate = 40, Size = ns(0, 3, 0.6, 2.4, 1, 0.6), Lifetime = NumberRange.new(0.5, 0.7),
+		Speed = NumberRange.new(16, 22), RotSpeed = NumberRange.new(-120, 120), Color = cs(a.Core, a.Main, FIRESTORM_RED), Light = 0.9,
+	}))
+	local edgeFire = anchor(CFrame.new(center + Vector3.new(0, 0.3, 0)), Vector3.new(r * 1.9, 0.3, r * 1.9), D + 2)
+	table.insert(emitters, emitter(edgeFire, {
+		Enabled = true, Texture = TEX.Flame,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		Rate = 50, Size = ns(0, 1.8, 1, 0.4), Lifetime = NumberRange.new(0.35, 0.55),
+		Speed = NumberRange.new(2, 4), Accel = Vector3.new(0, 6, 0), RotSpeed = NumberRange.new(-90, 90), Color = cs(a.Core, a.Main, FIRESTORM_RED), Light = 0.8,
+	}))
+	-- Ignition: a fire burst, a red-black shockwave and flung cinders.
+	burst(center + Vector3.new(0, 1.5, 0), {
+		{ Texture = TEX.FireBurst, Count = 3, Size = ns(0, r * 0.6, 1, r * 1.2), Transparency = ns(0, 0, 1, 0.4), Lifetime = NumberRange.new(0.4, 0.5), Color = cs(a.Core, a.Main, FIRESTORM_RED), Light = 0.85 },
+		{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, r * 0.4, 1, r * 2.6), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.35), Color = cs(a.Core, FIRESTORM_RED), Light = 1, ZOffset = 1 },
+		{ Texture = TEX.Spark, Count = 30, Parallel = true, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(20, 32), Spread = Vector2.new(180, 50), Drag = 2, Color = cs(a.Core, FIRESTORM_RED), Light = 1 },
+		{ Texture = TEX.Spark, Count = 14, Parallel = true, Light = 0, Size = ns(0, 0.9, 1, 0), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(16, 26), Spread = Vector2.new(180, 50), Drag = 2, Color = cs(Color3.new(0, 0, 0)) },
+	}, 1.5)
+	-- Fire crescents whipping around the top of the funnel, and embers flung off the rim.
+	table.insert(emitters, emitter(spinners[LAYERS].Part, {
+		Enabled = true, Texture = TEX.Crescent, Locked = true,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		Rate = 10, Size = ns(0, 3, 1, 5), Transparency = ns(0, 0.1, 0.7, 0.4, 1, 1),
+		Lifetime = NumberRange.new(0.25, 0.35), Color = cs(a.Core, a.Main), Light = 0.9,
+	}))
+	table.insert(emitters, emitter(spinners[LAYERS].Part, {
+		Enabled = true, Texture = TEX.Spark, Parallel = true,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		Rate = 40, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.6, 1),
+		Speed = NumberRange.new(8, 14), Spread = Vector2.new(40, 40), Accel = Vector3.new(0, -12, 0), Color = cs(a.Core, a.Main), Light = 1,
+	}))
+	-- Heat pulses rippling out across the ground.
+	task.spawn(function()
+		local t = 0
+		while t < D do
+			ring(center, a.Main, r * 0.3, r * 1.9, 0.45, floorY)
+			task.wait(0.5)
+			t += 0.5
+		end
+	end)
 	-- Smoke venting from the top.
 	local top = anchor(CFrame.new(center + Vector3.new(0, 12, 0)), Vector3.new(6, 1, 6), D + 3)
 	table.insert(emitters, emitter(top, {
 		Enabled = true, Texture = TEX.Smoke, Rate = 12, Light = 0, Size = ns(0, 4, 1, 9),
 		Transparency = ns(0, 0.55, 1, 1), Lifetime = NumberRange.new(1.2, 1.8), Speed = NumberRange.new(2, 4),
-		RotSpeed = NumberRange.new(-60, 60), Color = cs(a.Smoke),
+		RotSpeed = NumberRange.new(-60, 60), Color = cs(FIRESTORM_BLOOD, Color3.new(0.05, 0.03, 0.03)),
 	}))
 	local glow = Instance.new("PointLight")
 	glow.Color = a.Main
@@ -2428,7 +3518,7 @@ local function onTornado(e)
 		for _, rb in ribbons do
 			local k = (t * 0.9 + rb.Phase) % 1
 			local height = k * 11
-			local radius = (1.4 + height * 0.55) * (0.4 + 0.6 * grow)
+			local radius = (1.4 + height * 0.55) * (0.4 + 0.6 * grow) * rb.Scale
 			local angle = t * 11 + rb.Phase * math.pi * 2
 			if k < 0.03 then
 				rb.Trail:Clear()
@@ -2446,6 +3536,13 @@ local function onTornado(e)
 			end
 			glow.Enabled = false
 			playTemplate("Fire-02", CFrame.new(center + Vector3.new(0, 2, 0)), { Scale = 1.2 })
+			-- Collapse: the funnel bursts apart in fire, red and black.
+			burst(center + Vector3.new(0, 4, 0), {
+				{ Texture = TEX.Flame, Count = 24, Size = ns(0, 3, 1, 0.8), Lifetime = NumberRange.new(0.4, 0.7), Speed = NumberRange.new(14, 24), Spread = Vector2.new(180, 180), Drag = 3, RotSpeed = NumberRange.new(-150, 150), Color = cs(a.Core, a.Main, FIRESTORM_RED), Light = 0.9 },
+				{ Texture = TEX.Smoke, Count = 8, Light = 0, Size = ns(0, 3, 1, 7), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.8, 1.2), Speed = NumberRange.new(6, 12), Spread = Vector2.new(180, 180), Drag = 2, Color = cs(FIRESTORM_BLOOD, Color3.new(0, 0, 0)) },
+				{ Texture = TEX.Spark, Count = 16, Parallel = true, Light = 0, Size = ns(0, 1, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(18, 28), Spread = Vector2.new(180, 180), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+			}, 2)
+			ring(center, FIRESTORM_RED, 2, r * 2.4, 0.4, floorY)
 			if edge.Parent then
 				tween(edge, 0.4, { Transparency = 1 })
 			end
@@ -2459,6 +3556,9 @@ end
 -------------------------------------------------------------------------------
 
 local magnets = {} -- [skill event] -> state, so the blast can find its core
+-- Magnet Quake is gold and yellow with black ink (the user asked for no purple).
+local MAGNET = { Yellow = rgb(255, 225, 60), Amber = rgb(255, 150, 20) }
+local MAGNET_TINT = cs(Color3.new(1, 1, 1), MAGNET.Yellow, MAGNET.Amber)
 
 local function nearbyEnemies(center, radius)
 	local list = {}
@@ -2482,12 +3582,16 @@ local function onMagnet(e)
 	local floorY = center.Y
 	local r = e.Radius
 	local T = e.PullTime or 0.6
-	local purple = PAL.Rift.Main
+	local yellow = MAGNET.Yellow
 	local orbPos = center + Vector3.new(0, 3.5, 0)
 
 	-- Imploding rune circle.
 	groundDecal(center, TEX.Telegraph, b.Main, r * 2.2, 2, T + 0.1, { Floor = floorY, Spin = math.pi * 3, StartAlpha = 0.1, GrowTime = T, Style = Enum.EasingStyle.Quad })
-	groundDecal(center, TEX.Ring, purple, r * 2.4, 1, T, { Floor = floorY, Lift = 0.01, StartAlpha = 0.2, GrowTime = T })
+	groundDecal(center, TEX.Ring, yellow, r * 2.4, 1, T, { Floor = floorY, Lift = 0.01, StartAlpha = 0.2, GrowTime = T })
+	-- Black ink shade: a second rune circle turning the other way, and a black
+	-- ring closing in just outside the yellow one.
+	groundDecal(center, TEX.Telegraph, Color3.new(0, 0, 0), r * 2.5, 2.5, T + 0.1, { Floor = floorY, Lift = 0.02, Spin = -math.pi * 2, StartAlpha = 0.35, GrowTime = T, Style = Enum.EasingStyle.Quad })
+	groundDecal(center, TEX.Ring, Color3.new(0, 0, 0), r * 2.7, 1.5, T, { Floor = floorY, Lift = 0.03, StartAlpha = 0.15, GrowTime = T })
 
 	-- The core: a crackling orb inside a pulsing field.
 	local core = Instance.new("Part")
@@ -2504,7 +3608,7 @@ local function onMagnet(e)
 	core.Parent = folder
 	local field = core:Clone()
 	field.Material = Enum.Material.ForceField
-	field.Color = purple
+	field.Color = yellow
 	field.Size = Vector3.one * 2
 	field.Parent = folder
 	tween(core, T, { Size = Vector3.one * 1.8 }, Enum.EasingStyle.Back)
@@ -2517,8 +3621,8 @@ local function onMagnet(e)
 	light.Shadows = false
 	light.Parent = core
 	emitter(core, { Enabled = true, Texture = TEX.Electric, Rate = 14, Size = ns(0, 3, 1, 4), Lifetime = NumberRange.new(0.25, 0.3), Color = cs(b.Core, b.Main), Light = 1 })
-	emitter(core, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 40, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.15, 0.25), Speed = NumberRange.new(8, 14), Spread = Vector2.new(180, 180), Color = cs(b.Core, purple), Light = 1 })
-	playTemplate("Charge-01", CFrame.new(orbPos), { Scale = 1.3 })
+	emitter(core, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 40, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.15, 0.25), Speed = NumberRange.new(8, 14), Spread = Vector2.new(180, 180), Color = cs(b.Core, yellow), Light = 1 })
+	playTemplate("Charge-01", CFrame.new(orbPos), { Scale = 1.3, Color = MAGNET_TINT })
 
 	-- Inward streaks across the whole field.
 	local pullField = anchor(CFrame.new(center + Vector3.new(0, 1.5, 0)), Vector3.new(r * 2, 3, r * 2), T + 1.5)
@@ -2527,8 +3631,53 @@ local function onMagnet(e)
 		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
 		InOut = Enum.ParticleEmitterShapeInOut.Inward,
 		Rate = 160, Size = ns(0, 0.4, 0.5, 0.7, 1, 0.2), Lifetime = NumberRange.new(0.18, 0.25),
-		Speed = NumberRange.new(r * 4, r * 5.5), Color = cs(b.Core, purple), Light = 1,
+		Speed = NumberRange.new(r * 4, r * 5.5), Color = cs(b.Core, yellow), Light = 1,
 	})
+	-- Black ink streaks, dark dust and rocks torn off the ground, all dragged in.
+	local inkStreaks = emitter(pullField, {
+		Enabled = true, Texture = TEX.Spark, Parallel = true,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		InOut = Enum.ParticleEmitterShapeInOut.Inward,
+		Rate = 60, Size = ns(0, 0.6, 0.5, 0.9, 1, 0.3), Lifetime = NumberRange.new(0.18, 0.25),
+		Speed = NumberRange.new(r * 4, r * 5.5), Color = cs(Color3.new(0, 0, 0)), Light = 0,
+	})
+	local pullRocks = emitter(pullField, {
+		Enabled = true, Texture = TEX.Rocks,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		InOut = Enum.ParticleEmitterShapeInOut.Inward,
+		Rate = 30, Size = ns(0, 0.9, 1, 0.3), Lifetime = NumberRange.new(0.3, 0.4),
+		Speed = NumberRange.new(r * 2.5, r * 3), RotSpeed = NumberRange.new(-400, 400), Color = cs(a.Main, Color3.new(0, 0, 0)), Light = 0,
+	})
+	local pullDust = emitter(pullField, {
+		Enabled = true, Texture = TEX.Smoke,
+		Shape = Enum.ParticleEmitterShape.Cylinder, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		InOut = Enum.ParticleEmitterShapeInOut.Inward,
+		Rate = 20, Size = ns(0, 3, 1, 1), Transparency = ns(0, 0.5, 1, 1), Lifetime = NumberRange.new(0.35, 0.45),
+		Speed = NumberRange.new(r * 2, r * 2.5), RotSpeed = NumberRange.new(-200, 200), Color = cs(Color3.new(0, 0, 0)), Light = 0,
+	})
+	-- Black shards spiralling into the core.
+	local coreInk = emitter(core, {
+		Enabled = true, Texture = TEX.Shard,
+		Shape = Enum.ParticleEmitterShape.Sphere, Style = Enum.ParticleEmitterShapeStyle.Surface,
+		InOut = Enum.ParticleEmitterShapeInOut.Inward,
+		Rate = 30, Size = ns(0, 0.8, 1, 0.2), Lifetime = NumberRange.new(0.2, 0.3),
+		Speed = NumberRange.new(10, 14), RotSpeed = NumberRange.new(-500, 500), Color = cs(Color3.new(0, 0, 0)), Light = 0,
+	})
+	-- Magnetic arcs snapping from the core to the ground, some in black ink.
+	task.spawn(function()
+		local t = 0
+		while t < T do
+			local angle = math.random() * math.pi * 2
+			local spot = center + Vector3.new(math.cos(angle), 0, math.sin(angle)) * r * (0.3 + math.random() * 0.5) + Vector3.new(0, 0.3, 0)
+			if math.random() < 0.4 then
+				lightning(orbPos, spot, Color3.new(0, 0, 0), { Width = 0.35, Life = 0.15, Ink = true, NoBranch = true, Halo = MAGNET.Amber })
+			else
+				lightning(orbPos, spot, if math.random() < 0.5 then b.Main else yellow, { Width = 0.4, Life = 0.15, NoBranch = true, Halo = MAGNET.Amber })
+			end
+			task.wait(0.07)
+			t += 0.07
+		end
+	end)
 
 	-- Lightning tethers from the core to every enemy being dragged in.
 	local tethers = {} -- [enemyRoot] = { Beam, Att }
@@ -2539,6 +3688,7 @@ local function onMagnet(e)
 		if t > T or not core.Parent then
 			conn:Disconnect()
 			streaks.Enabled = false
+			inkStreaks.Enabled, pullRocks.Enabled, pullDust.Enabled, coreInk.Enabled = false, false, false, false
 			for _, tether in tethers do
 				tether.Beam:Destroy()
 				tether.Att:Destroy()
@@ -2563,14 +3713,24 @@ local function onMagnet(e)
 				beam.FaceCamera = true
 				beam.LightEmission = 1
 				beam.LightInfluence = 0
-				beam.Color = cs(b.Core, purple)
+				beam.Color = cs(b.Core, yellow)
 				beam.Parent = core
-				tether = { Beam = beam, Att = att }
+				tether = { Beam = beam, Att = att, Next = 0, Ink = true }
 				tethers[root] = tether
 			end
 			tether.Att.WorldPosition = root.Position
 			tether.Beam.CurveSize0 = (math.random() - 0.5) * 4
 			tether.Beam.CurveSize1 = (math.random() - 0.5) * 4
+			-- Jagged bolts flickering along the tether, alternating black ink and glow.
+			if t >= tether.Next then
+				tether.Next = t + 0.08
+				tether.Ink = not tether.Ink
+				if tether.Ink then
+					lightning(orbPos, root.Position, Color3.new(0, 0, 0), { Width = 0.3, Life = 0.1, Ink = true, NoBranch = true, Halo = MAGNET.Amber })
+				else
+					lightning(orbPos, root.Position, if math.random() < 0.5 then b.Main else yellow, { Width = 0.35, Life = 0.1, NoBranch = true, Halo = MAGNET.Amber })
+				end
+			end
 		end
 	end)
 	magnets[e.Skill .. tostring(center)] = { Core = core, Field = field }
@@ -2591,7 +3751,7 @@ local function onMagnetBlast(e)
 	local center = e.At
 	local floorY = center.Y
 	local r = e.Radius
-	local purple = PAL.Rift.Main
+	local yellow = MAGNET.Yellow
 	local orbPos = center + Vector3.new(0, 3.5, 0)
 	local state = magnets[e.Skill .. tostring(center)]
 	if state then
@@ -2602,22 +3762,406 @@ local function onMagnetBlast(e)
 	for i = 1, 10 do
 		local angle = i / 10 * math.pi * 2 + math.random() * 0.3
 		local reach = r * (0.7 + math.random() * 0.5)
-		lightning(orbPos, center + Vector3.new(math.cos(angle) * reach, 0.6, math.sin(angle) * reach), if i % 2 == 0 then b.Main else purple, { Width = 0.7, Life = 0.35 })
+		local tip = center + Vector3.new(math.cos(angle) * reach, 0.6, math.sin(angle) * reach)
+		lightning(orbPos, tip, if i % 2 == 0 then b.Main else yellow, { Width = 0.7, Life = 0.35, Halo = MAGNET.Amber })
+		-- Black ink bolt on its own path beside every other one.
+		if i % 2 == 1 then
+			lightning(orbPos, tip, Color3.new(0, 0, 0), { Width = 0.45, Life = 0.32, Ink = true })
+		end
 	end
-	playTemplate("Lighting-03", CFrame.new(center + Vector3.new(0, 1, 0)), { Scale = 1.6, Color = ELECTRIC_TINT })
+	-- Black ink shade: an ink shockwave behind the glowing one, black smoke
+	-- rolling out, black shards and streaks flung outward.
+	burst(orbPos, {
+		{ Texture = TEX.Shockwave, Count = 1, Light = 0, Size = ns(0, r * 0.5, 1, r * 2.6), Transparency = ns(0, 0.15, 1, 1), Lifetime = NumberRange.new(0.45), Color = cs(Color3.new(0, 0, 0)), ZOffset = 0.5 },
+		{ Texture = TEX.Smoke, Count = 12, Light = 0, Size = ns(0, 3, 1, 7), Transparency = ns(0, 0.35, 1, 1), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(20, 32), Spread = Vector2.new(180, 25), Drag = 4, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Shard, Count = 18, Light = 0, Size = ns(0, 1, 1, 0.3), Lifetime = NumberRange.new(0.35, 0.6), Speed = NumberRange.new(25, 40), Spread = Vector2.new(180, 60), Drag = 2, RotSpeed = NumberRange.new(-500, 500), Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Spark, Count = 30, Parallel = true, Light = 0, Size = ns(0, 1, 1, 0), Lifetime = NumberRange.new(0.25, 0.4), Speed = NumberRange.new(35, 55), Spread = Vector2.new(180, 70), Drag = 2, Color = cs(Color3.new(0, 0, 0)) },
+	}, 2)
+	-- Rocks blown off the ground, light and dark.
+	debrisBurst(center + Vector3.new(0, 0.5, 0), a.Main, 8, { Material = Enum.Material.Slate, Size = 0.9, Height = 6, Reach = r * 0.9, Floor = floorY })
+	debrisBurst(center + Vector3.new(0, 0.5, 0), rgb(48, 38, 32), 6, { Material = Enum.Material.Basalt, Size = 0.8, Height = 5, Reach = r * 0.7, Floor = floorY, Wedge = true })
+	playTemplate("Lighting-03", CFrame.new(center + Vector3.new(0, 1, 0)), { Scale = 1.6, Color = MAGNET_TINT })
 	burst(orbPos, {
 		{ Texture = TEX.ThunderWave, Count = 1, Size = ns(0, r * 0.6, 1, r * 2), Transparency = ns(0, 0, 1, 0.3), Lifetime = NumberRange.new(0.4), Color = cs(b.Core, b.Main), Light = 1, ZOffset = 1 },
-		{ Texture = TEX.Electric, Count = 5, Size = ns(0, 5, 1, 7), Lifetime = NumberRange.new(0.3), Spread = Vector2.new(180, 180), Speed = NumberRange.new(4, 8), Color = cs(b.Core, purple), Light = 1 },
+		{ Texture = TEX.Electric, Count = 5, Size = ns(0, 5, 1, 7), Lifetime = NumberRange.new(0.3), Spread = Vector2.new(180, 180), Speed = NumberRange.new(4, 8), Color = cs(b.Core, yellow), Light = 1 },
 		{ Texture = TEX.Spark, Count = 70, Parallel = true, Size = ns(0, 0.7, 1, 0), Lifetime = NumberRange.new(0.3, 0.6), Speed = NumberRange.new(30, 55), Spread = Vector2.new(180, 70), Drag = 2, Color = cs(b.Core, b.Main), Light = 1 },
 		{ Texture = TEX.Dust, Count = 4, Light = 0, Size = ns(0, r * 0.6, 1, r), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.6, 0.8), Speed = NumberRange.new(2, 4), Spread = Vector2.new(180, 20), Color = cs(PAL.Earth.Smoke) },
 	}, 2)
 	ring(center, b.Core, 2, r * 2.6, 0.35, floorY)
 	task.delay(0.07, function()
-		ring(center, purple, 2, r * 2, 0.4, floorY)
+		ring(center, yellow, 2, r * 2, 0.4, floorY)
 	end)
 	groundDecal(center, TEX.Crack, b.Main, r * 0.6, r * 1.2, 2, { Floor = floorY, Lift = 0.02, StartAlpha = 0.1, Hold = 1.2, GrowTime = 0.1 })
+	-- Black ink cracks over the glowing ones, and a black ring just outside.
+	groundDecal(center, TEX.Crack, Color3.new(0, 0, 0), r * 0.5, r * 1.05, 2, { Floor = floorY, Lift = 0.04, StartAlpha = 0.2, Hold = 1.2, GrowTime = 0.1 })
+	task.delay(0.1, function()
+		ring(center, Color3.new(0, 0, 0), 2, r * 3, 0.45, floorY)
+	end)
 	flash(orbPos, b.Main, r * 3, 9, 0.5)
 	shake(0.6, center)
+end
+
+-------------------------------------------------------------------------------
+-- Thunder Serpent (skill id ChainShock): a serpent of water with lightning
+-- running through it slithers along the ground through the crowd, biting as
+-- it goes, then dives into the ground. The body is a set of trails left by a
+-- weaving head: the anime water strip, a white-hot lightning core and a black
+-- ink shade, with sparks arcing along it.
+-------------------------------------------------------------------------------
+
+local SERPENT = {
+	White = rgb(240, 252, 255),
+	Aqua = rgb(120, 220, 255),
+	Blue = rgb(40, 140, 235),
+	Deep = rgb(20, 60, 150),
+	Volt = rgb(255, 235, 120),
+}
+-- Blender serpent size (1 Blender unit = 1 stud at scale 1) and body length.
+local SERPENT_SCALE = 0.9
+local SERPENT_SEGMENTS = 11
+
+local function serpentTrail(parent, width, life, color, opts)
+	opts = opts or {}
+	local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
+	a0.Position = Vector3.new(0, width / 2, 0) + (opts.Offset or Vector3.zero)
+	a1.Position = Vector3.new(0, -width / 2, 0) + (opts.Offset or Vector3.zero)
+	a0.Parent, a1.Parent = parent, parent
+	local t = Instance.new("Trail")
+	t.Attachment0, t.Attachment1 = a0, a1
+	if opts.Texture then
+		t.Texture = opts.Texture
+		t.TextureMode = Enum.TextureMode.Wrap
+		t.TextureLength = opts.TextureLength or 8
+	end
+	t.Lifetime = life
+	t.MinLength = 0.05
+	t.Color = cs(color)
+	t.Transparency = opts.Transparency or ns(0, 0, 0.7, 0.3, 1, 1)
+	t.WidthScale = opts.WidthScale or ns(0, 1, 0.15, 1.1, 1, 0.1)
+	t.LightEmission = opts.Light or 0
+	t.LightInfluence = 0
+	t.FaceCamera = true
+	t.Parent = parent
+	return t
+end
+
+local function onSerpent(e)
+	local points = e.Points
+	if not points or #points < 2 then
+		return
+	end
+	local floorY = e.Floor or points[1].Y
+	local speed = e.Speed or 48
+	-- Cumulative distance along the route.
+	local dists = { 0 }
+	for i = 2, #points do
+		dists[i] = dists[i - 1] + (points[i] - points[i - 1]).Magnitude
+	end
+	local total = dists[#points]
+	local duration = total / speed
+	local function along(d)
+		for i = 2, #points do
+			if d <= dists[i] or i == #points then
+				local seg = dists[i] - dists[i - 1]
+				local k = if seg > 0 then math.clamp((d - dists[i - 1]) / seg, 0, 1) else 1
+				return points[i - 1]:Lerp(points[i], k), (points[i] - points[i - 1])
+			end
+		end
+		return points[#points], points[#points] - points[#points - 1]
+	end
+
+	-- Burst out of the ground in front of the caster.
+	local start = points[1]
+	burst(start + Vector3.new(0, 0.5, 0), {
+		{ Texture = TEX.Splash, Count = 10, Size = ns(0, 1.2, 1, 0.4), Lifetime = NumberRange.new(0.35, 0.55), Speed = NumberRange.new(10, 16), Spread = Vector2.new(40, 40), Accel = Vector3.new(0, -45, 0), Color = cs(SERPENT.White, SERPENT.Aqua), Light = 0.5 },
+		{ Texture = TEX.Smoke, Count = 3, Light = 0, Size = ns(0, 1.5, 1, 3), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.35, 0.5), Speed = NumberRange.new(4, 7), Spread = Vector2.new(70, 70), Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Spark, Count = 10, Parallel = true, Size = ns(0, 0.5, 1, 0), Lifetime = NumberRange.new(0.15, 0.3), Speed = NumberRange.new(14, 22), Spread = Vector2.new(60, 60), Color = cs(Color3.new(1, 1, 1), SERPENT.Volt), Light = 1 },
+	}, 1)
+	ring(start, SERPENT.Aqua, 1, 7, 0.35, floorY)
+	ring(start, Color3.new(0, 0, 0), 1, 9, 0.4, floorY)
+
+	-- A ball-shaped neon part with an optional SpecialMesh stretch.
+	local function orb(color, material, scale)
+		local p = Instance.new("Part")
+		p.Shape = Enum.PartType.Ball
+		p.Material = material or Enum.Material.Neon
+		p.Color = color
+		p.Size = Vector3.one
+		p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+		if scale then
+			local m = Instance.new("SpecialMesh")
+			m.MeshType = Enum.MeshType.Sphere
+			m.Scale = scale
+			m.Parent = p
+		end
+		p.Parent = folder
+		return p
+	end
+
+	-- The serpent itself. RiftboundVFX.SerpentModel may hold SerpentHead (the
+	-- free Creator Store "Dragon Head" 1513601847, tinted water-blue), and the
+	-- Blender SerpentSegment / SerpentTail. Each template can carry "Offset"
+	-- (pivot to the piece's origin) and "Orient" (turns it to face -Z). Any
+	-- piece that is missing falls back to glowing orbs with black ink shades.
+	-- Each piece: { Part, Rel (offset from its spine point), Size (base size),
+	-- Pulse (size wobble) }. Body entries also carry Back: studs behind the head.
+	local head = anchor(CFrame.new(start), Vector3.new(0.2, 0.2, 0.2), duration + 1.5)
+	templates = templates or ReplicatedStorage:FindFirstChild("RiftboundVFX")
+	local model = templates and templates:FindFirstChild("SerpentModel")
+	local function meshPiece(name, scale)
+		local src = model and model:FindFirstChild(name)
+		if not src then
+			return nil
+		end
+		local p = src:Clone()
+		p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch, p.CastShadow = true, false, false, false, false
+		p.Size = src.Size * scale
+		p.Parent = folder
+		local rel = CFrame.new((src:GetAttribute("Offset") or Vector3.zero) * scale) * (src:GetAttribute("Orient") or CFrame.identity)
+		return { Part = p, Rel = rel, Size = p.Size, Pulse = 0.04 }
+	end
+	local headParts, body = {}, {}
+	local SPACING = 0.85
+	local meshHead = meshPiece("SerpentHead", SERPENT_SCALE)
+	if meshHead then
+		table.insert(headParts, meshHead)
+		-- Black ink shade: a dark copy just under and behind the head.
+		local ink = meshPiece("SerpentHead", SERPENT_SCALE * 1.05)
+		ink.Part.Material = Enum.Material.SmoothPlastic
+		ink.Part.Color = Color3.new(0, 0, 0)
+		ink.Part.Transparency = 0.15
+		ink.Rel = CFrame.new(0, -0.18, 0.12) * ink.Rel
+		table.insert(headParts, ink)
+	else
+		local skull = orb(SERPENT.Aqua, nil, Vector3.new(1.7, 1.3, 2.6))
+		local inkSkull = orb(Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, Vector3.new(1.8, 1.1, 2.8))
+		inkSkull.Transparency = 0.1
+		local snout = orb(SERPENT.White, nil, Vector3.new(0.9, 0.7, 1.4))
+		for _, spec in {
+			{ skull, CFrame.identity },
+			{ inkSkull, CFrame.new(0, -0.3, 0.15) },
+			{ snout, CFrame.new(0, -0.1, -1.1) },
+			{ orb(Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, Vector3.new(0.35, 0.3, 0.5)), CFrame.new(0.55, 0.45, -0.55) },
+			{ orb(Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, Vector3.new(0.35, 0.3, 0.5)), CFrame.new(-0.55, 0.45, -0.55) },
+		} do
+			table.insert(headParts, { Part = spec[1], Rel = spec[2], Size = spec[1].Size, Pulse = 0 })
+		end
+	end
+	-- The neck starts behind the head.
+	local neck = if meshHead then 1.3 * SERPENT_SCALE else 0.6
+	if model and model:FindFirstChild("SerpentSegment") and model:FindFirstChild("SerpentTail") then
+		local back = neck
+		for i = 1, SERPENT_SEGMENTS do
+			local k = (i - 1) / (SERPENT_SEGMENTS - 1)
+			local s = SERPENT_SCALE * (1.05 - 0.55 * k)
+			back += 1.05 * s
+			table.insert(body, { Back = back, Parts = { meshPiece("SerpentSegment", s) } })
+		end
+		local tailScale = SERPENT_SCALE * 0.55
+		back += 0.9 * tailScale
+		table.insert(body, { Back = back, Parts = { meshPiece("SerpentTail", tailScale) } })
+	elseif not meshHead then
+		-- No model at all: a glowing orb body. With the dragon head the body is
+		-- just the water, ink and lightning trails streaming behind it.
+		for i = 1, 16 do
+			local k = i / 16
+			local size = 1.9 * (1 - k) + 0.45 * k
+			local seg = orb(SERPENT.Aqua:Lerp(SERPENT.Blue, k), nil, nil)
+			seg.Size = Vector3.one * size
+			seg.Transparency = 0.05 + 0.25 * k
+			local ink = orb(Color3.new(0, 0, 0), Enum.Material.SmoothPlastic, nil)
+			ink.Size = Vector3.one * size * 1.08
+			ink.Transparency = 0.15
+			local parts = {
+				{ Part = seg, Rel = CFrame.identity, Size = seg.Size, Pulse = 0.08 },
+				{ Part = ink, Rel = CFrame.new(0, -size * 0.18, 0), Size = ink.Size, Pulse = 0.08 },
+			}
+			if i % 4 == 2 then
+				local spark = orb(SERPENT.Volt, nil, nil)
+				spark.Size = Vector3.one * size * 0.45
+				table.insert(parts, { Part = spark, Rel = CFrame.new(0, size * 0.15, 0), Size = spark.Size, Pulse = 0 })
+			end
+			table.insert(body, { Back = neck + (i - 1) * SPACING, Parts = parts })
+		end
+	end
+	local bodyLength = if #body > 0 then body[#body].Back else 9
+	local light = Instance.new("PointLight")
+	light.Color = SERPENT.Aqua
+	light.Range = 12
+	light.Brightness = 2.5
+	light.Shadows = false
+	light.Parent = head
+	-- Trails streaming behind the head: the wide anime water ribbon, a black ink
+	-- shade under it, a gold lightning core and a thin white streak on top.
+	local trails = {
+		serpentTrail(head, 2.8, 0.42, Color3.new(1, 1, 1), { Texture = ANIME_WATER_TRAIL, TextureLength = 7, Light = 0.35 }),
+		serpentTrail(head, 3.4, 0.36, Color3.new(0, 0, 0), { Offset = Vector3.new(0, -0.5, 0), Transparency = ns(0, 0.2, 0.7, 0.45, 1, 1) }),
+		serpentTrail(head, 0.7, 0.34, SERPENT.Volt, { Light = 1, Transparency = ns(0, 0, 0.8, 0.4, 1, 1) }),
+		serpentTrail(head, 0.3, 0.38, Color3.new(1, 1, 1), { Light = 1, Offset = Vector3.new(0, 0.6, 0), Transparency = ns(0, 0, 1, 1) }),
+	}
+	local emitters = {
+		-- Spray and foam thrown off the head, black splatter, crackling sparks.
+		emitter(head, { Enabled = true, Texture = TEX.Splash, Rate = 40, Size = ns(0, 0.8, 1, 0.3), Lifetime = NumberRange.new(0.3, 0.45), Speed = NumberRange.new(5, 10), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -40, 0), Color = cs(SERPENT.White, SERPENT.Aqua), Light = 0.5 }),
+		emitter(head, { Enabled = true, Texture = TEX.Drop, Rate = 14, Light = 0, Size = ns(0, 0.5, 1, 0.2), Lifetime = NumberRange.new(0.3, 0.45), Speed = NumberRange.new(5, 9), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -40, 0), Color = cs(Color3.new(0, 0, 0)) }),
+		emitter(head, { Enabled = true, Texture = TEX.Spark, Parallel = true, Rate = 40, Size = ns(0, 0.45, 1, 0), Lifetime = NumberRange.new(0.12, 0.22), Speed = NumberRange.new(8, 16), Spread = Vector2.new(180, 180), Color = cs(Color3.new(1, 1, 1), SERPENT.Volt), Light = 1 }),
+		emitter(head, { Enabled = true, Texture = TEX.Electric, Rate = 8, Size = ns(0, 2.2, 1, 3), Lifetime = NumberRange.new(0.15, 0.2), RotSpeed = NumberRange.new(-200, 200), Color = cs(Color3.new(1, 1, 1), SERPENT.Aqua), Light = 1 }),
+	}
+
+	-- Path history: where the head has been and how far it had travelled.
+	local history = { { Pos = start + Vector3.new(0, -1, 0), D = 0 } }
+	local travelled = 0
+	local function bodyAt(back)
+		-- Position `back` studs behind the head along its own path.
+		local target = travelled - back
+		for i = #history, 2, -1 do
+			local a, b = history[i - 1], history[i]
+			if a.D <= target then
+				local span = b.D - a.D
+				local k = if span > 0 then (target - a.D) / span else 0
+				return a.Pos:Lerp(b.Pos, k)
+			end
+		end
+		return history[1].Pos
+	end
+
+	local startClock = os.clock()
+	local lastArc, lastWake = 0, 0
+	local ended, endClock = false, 0
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - startClock
+		local d = math.min(t * speed, total)
+		local pos, segDir = along(d)
+		local fwd = if segDir.Magnitude > 0.01 then segDir.Unit else Vector3.zAxis
+		local side = fwd:Cross(Vector3.yAxis)
+		-- Weave side to side and bob, rising out of the ground at the start
+		-- and diving back in at the end.
+		local rise = math.clamp(t / 0.15, 0, 1)
+		local dive = math.clamp((d - (total - 4)) / 4, 0, 1)
+		local weave = math.sin(t * 14) * 1.4
+		local bob = 1.5 + math.sin(t * 8) * 0.5
+		local p = pos + side * weave + Vector3.new(0, -1 + (bob + 1) * rise - (bob + 2.5) * dive, 0)
+		local last = history[#history]
+		local step = (p - last.Pos).Magnitude
+		if step > 0.05 then
+			travelled += step
+			table.insert(history, { Pos = p, D = travelled })
+			if #history > 200 then
+				table.remove(history, 1)
+			end
+		end
+		local ahead = p - bodyAt(0.6)
+		local cf = CFrame.lookAt(p, p + (if ahead.Magnitude > 0.01 then ahead else fwd))
+		head.CFrame = cf
+		for _, piece in headParts do
+			piece.Part.CFrame = cf * piece.Rel
+		end
+		for i, seg in body do
+			-- Each segment faces along the body, toward the one in front of it.
+			local at = bodyAt(seg.Back)
+			local toward = bodyAt(math.max(seg.Back - 0.6, 0)) - at
+			local segCf = if toward.Magnitude > 0.01 then CFrame.lookAt(at, at + toward) else CFrame.new(at)
+			local pulse = math.sin(t * 20 - i * 0.7)
+			for _, piece in seg.Parts do
+				piece.Part.Size = piece.Size * (1 + piece.Pulse * pulse)
+				piece.Part.CFrame = segCf * piece.Rel
+			end
+		end
+		-- Lightning arcing along the body, some in black ink.
+		if t - lastArc > 0.05 and travelled > 4 then
+			lastArc = t
+			local from = math.random() * bodyLength * 0.8
+			local a, b = bodyAt(from), bodyAt(from + 2 + math.random() * 2)
+			if math.random() < 0.35 then
+				lightning(a, b, Color3.new(0, 0, 0), { Width = 0.3, Life = 0.1, Ink = true, NoBranch = true })
+			else
+				lightning(a, b, SERPENT.Volt, { Width = 0.35, Life = 0.1, NoBranch = true, Halo = SERPENT.Blue })
+			end
+		end
+		-- Wake on the ground: ripples and a blue glow.
+		if d - lastWake > 3 then
+			lastWake = d
+			ring(pos, SERPENT.Aqua, 0.5, 4.5, 0.35, floorY)
+			groundDecal(pos, TEX.Glow, SERPENT.Blue, 2, 3.5, 0.6, { Floor = floorY, Lift = 0.01, StartAlpha = 0.5, GrowTime = 0.1 })
+		end
+		if d >= total and not ended then
+			ended, endClock = true, os.clock()
+			for _, em in emitters do
+				em.Enabled = false
+			end
+			for _, tr in trails do
+				tr.Enabled = false
+			end
+			tween(light, 0.3, { Brightness = 0 })
+			for _, piece in headParts do
+				piece.Part:Destroy()
+			end
+		end
+		-- After the head dives, the body keeps pouring into the ground behind it.
+		if ended then
+			travelled += speed * (os.clock() - endClock)
+			endClock = os.clock()
+			table.insert(history, { Pos = p, D = travelled })
+			if os.clock() - startClock > duration + (bodyLength + 1) / speed + 0.1 then
+				conn:Disconnect()
+				for _, seg in body do
+					for _, piece in seg.Parts do
+						piece.Part:Destroy()
+					end
+				end
+			end
+		end
+	end)
+	shake(0.1, start)
+end
+
+local function onSerpentBite(e)
+	local at = e.At
+	local floorY = e.Floor or at.Y - 2.9
+	-- Jaws: two crossed white slashes snapping shut, each with a black copy.
+	burst(at, {
+		{ Texture = TEX.Spark, Count = 2, Parallel = true, Size = ns(0, 3.4, 1, 0), Lifetime = NumberRange.new(0.12, 0.16), Speed = NumberRange.new(0.5, 1), Spread = Vector2.new(180, 180), Color = cs(Color3.new(1, 1, 1), SERPENT.Aqua), Light = 1, ZOffset = 1.5 },
+		{ Texture = TEX.Spark, Count = 2, Parallel = true, Light = 0, Size = ns(0, 3.8, 1, 0), Lifetime = NumberRange.new(0.12, 0.16), Speed = NumberRange.new(0.5, 1), Spread = Vector2.new(180, 180), Color = cs(Color3.new(0, 0, 0)), ZOffset = 1.2 },
+		{ Texture = TEX.Splash, Count = 12, Size = ns(0, 1, 1, 0.3), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(10, 16), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -45, 0), Color = cs(SERPENT.White, SERPENT.Aqua), Light = 0.5 },
+		{ Texture = TEX.Drop, Count = 6, Light = 0, Size = ns(0, 0.6, 1, 0.2), Lifetime = NumberRange.new(0.3, 0.45), Speed = NumberRange.new(8, 13), Spread = Vector2.new(70, 70), Accel = Vector3.new(0, -45, 0), Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Electric, Count = 2, Size = ns(0, 3, 1, 4), Lifetime = NumberRange.new(0.25), RotSpeed = NumberRange.new(-200, 200), Color = cs(Color3.new(1, 1, 1), SERPENT.Volt), Light = 1 },
+		{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, 0.8, 1, 6), Transparency = ns(0, 0.1, 1, 1), Lifetime = NumberRange.new(0.25), Color = cs(Color3.new(1, 1, 1), SERPENT.Aqua), Light = 1, ZOffset = 1 },
+	}, 1)
+	-- A jolt of lightning up through the victim, and a black one beside it.
+	lightning(Vector3.new(at.X, floorY, at.Z), at + Vector3.new(0, 4, 0), SERPENT.Volt, { Width = 0.5, Life = 0.2, Halo = SERPENT.Blue })
+	lightning(Vector3.new(at.X + 0.6, floorY, at.Z), at + Vector3.new(0.4, 3.5, 0), Color3.new(0, 0, 0), { Width = 0.35, Life = 0.18, Ink = true, NoBranch = true })
+	ring(at, SERPENT.Aqua, 1, 6, 0.3, floorY)
+	ring(at, Color3.new(0, 0, 0), 1, 7.5, 0.35, floorY)
+	flash(at, SERPENT.Aqua, 10, 3, 0.15)
+end
+
+local function onSerpentDive(e)
+	local at = e.At
+	local floorY = e.Floor or at.Y
+	local ground = Vector3.new(at.X, floorY, at.Z)
+	-- The serpent plunges in: a water column, a splash ring, black splatter
+	-- and lightning discharging into the ground.
+	burst(ground + Vector3.new(0, 0.5, 0), {
+		{ Texture = TEX.Splash, Count = 22, Size = ns(0, 1.4, 1, 0.4), Lifetime = NumberRange.new(0.5, 0.8), Speed = NumberRange.new(16, 26), Spread = Vector2.new(25, 25), Accel = Vector3.new(0, -50, 0), Color = cs(SERPENT.White, SERPENT.Aqua), Light = 0.5 },
+		{ Texture = TEX.WaterFoam, Count = 4, Size = ns(0, 2, 1, 5), Transparency = ns(0, 0.3, 1, 1), Lifetime = NumberRange.new(0.5, 0.7), Speed = NumberRange.new(2, 4), Spread = Vector2.new(180, 20), Color = cs(SERPENT.White), Light = 0.4 },
+		{ Texture = TEX.Drop, Count = 10, Light = 0, Size = ns(0, 0.7, 1, 0.2), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(10, 18), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, -50, 0), Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Smoke, Count = 4, Light = 0, Size = ns(0, 2, 1, 4.5), Transparency = ns(0, 0.4, 1, 1), Lifetime = NumberRange.new(0.4, 0.6), Speed = NumberRange.new(6, 10), Spread = Vector2.new(180, 15), Drag = 3, Color = cs(Color3.new(0, 0, 0)) },
+		{ Texture = TEX.Shockwave, Count = 1, Size = ns(0, 1, 1, 9), Transparency = ns(0, 0.1, 1, 1), Lifetime = NumberRange.new(0.3), Color = cs(Color3.new(1, 1, 1), SERPENT.Aqua), Light = 1, ZOffset = 1 },
+	}, 1.5)
+	for i = 1, 5 do
+		local angle = i / 5 * math.pi * 2 + math.random() * 0.4
+		local tip = ground + Vector3.new(math.cos(angle) * 5, 0.3, math.sin(angle) * 5)
+		if i % 2 == 0 then
+			lightning(ground + Vector3.new(0, 1, 0), tip, Color3.new(0, 0, 0), { Width = 0.35, Life = 0.2, Ink = true, NoBranch = true })
+		else
+			lightning(ground + Vector3.new(0, 1, 0), tip, SERPENT.Volt, { Width = 0.45, Life = 0.22, NoBranch = true, Halo = SERPENT.Blue })
+		end
+	end
+	ring(ground, SERPENT.Aqua, 1, 10, 0.4, floorY)
+	ring(ground, Color3.new(0, 0, 0), 1, 12, 0.45, floorY)
+	groundDecal(ground, TEX.Crack, Color3.new(0, 0, 0), 2, 4.5, 1.2, { Floor = floorY, Lift = 0.03, Hold = 0.6, GrowTime = 0.08, StartAlpha = 0.2 })
+	flash(ground + Vector3.new(0, 2, 0), SERPENT.Aqua, 14, 4, 0.25)
+	shake(0.15, ground)
 end
 
 local function onHeal(e)
@@ -2644,10 +4188,15 @@ local HANDLERS = {
 	Meteor = onMeteor,
 	Leap = onLeap,
 	LeapSlam = onLeapSlam,
+	GolemSlam = onGolemSlam,
+	GolemSpawn = onGolemSpawn,
 	Cone = onCone,
 	Tornado = onTornado,
 	Magnet = onMagnet,
 	MagnetBlast = onMagnetBlast,
+	Serpent = onSerpent,
+	SerpentBite = onSerpentBite,
+	SerpentDive = onSerpentDive,
 	Heal = onHeal,
 	LevelUp = onLevelUp,
 	Cast = onCast,

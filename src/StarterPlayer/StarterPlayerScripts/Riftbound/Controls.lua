@@ -1,6 +1,7 @@
 -- Input: hold left mouse for the basic attack, hold right mouse to block,
 -- Q/E for equipped skills,
--- Shift to dash, R to drink the flask, B for the backpack, C for stats. Skills aim at the cursor.
+-- Shift to dash, R to drink the flask, B for the backpack, C for stats, 1/2/3 to
+-- socket a found rune into LMB/Q/E. Skills aim at the cursor.
 -- (F is the interact key.)
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
@@ -119,6 +120,12 @@ function Controls.Init(Remotes, HUD)
 			HUD.ToggleBackpack()
 		elseif key == Enum.KeyCode.C then
 			HUD.ToggleStats()
+		elseif key == Enum.KeyCode.One then
+			HUD.RuneHotkey(1)
+		elseif key == Enum.KeyCode.Two then
+			HUD.RuneHotkey(2)
+		elseif key == Enum.KeyCode.Three then
+			HUD.RuneHotkey(3)
 		end
 	end)
 
