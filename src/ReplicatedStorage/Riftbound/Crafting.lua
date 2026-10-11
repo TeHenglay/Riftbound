@@ -136,14 +136,13 @@ Crafting.ForgeRecipes = {
 	},
 }
 
--- Fusion materials come from both elements' nations, across their story:
+-- Fusion materials come from both elements' nations' stories:
 --   Act 1: FUSE_SHARDS of each nation's Shard
 --   Act 2: FUSE_CORES of each nation's Core (Ember Core, Abyssal Pearl, ...)
---   Act 3: FUSE_ESSENCE of each nation's Essence
 -- plus Rift Shards. E.g. Steam Cloud (Fire + Water) needs Fire Shard,
--- Water Shard, Ember Core, Abyssal Pearl, Fire Essence and Water Essence.
--- This replaces the Materials written in the recipes above.
-local FUSE_SHARDS, FUSE_CORES, FUSE_ESSENCE, FUSE_RIFT = 4, 2, 1, 10
+-- Water Shard, Ember Core and Abyssal Pearl. (Essences, from Act 3, are for
+-- Awakening only.) This replaces the Materials written in the recipes above.
+local FUSE_SHARDS, FUSE_CORES, FUSE_RIFT = 4, 3, 10
 local NATION_OF = { Fire = "Fire", Water = "Water", Earth = "Earth", Air = "Wind", Lightning = "Lightning" }
 
 for _, recipe in Crafting.ForgeRecipes do
@@ -152,7 +151,6 @@ for _, recipe in Crafting.ForgeRecipes do
 		local nation = NATION_OF[Skills.Defs[skillId].Elements[1]]
 		materials[Items.NationShards[nation]] = FUSE_SHARDS
 		materials[Items.NationCores[nation]] = FUSE_CORES
-		materials[nation .. "Essence"] = FUSE_ESSENCE
 	end
 	recipe.Materials = materials
 end
