@@ -158,8 +158,17 @@ LevelSkill.OnServerInvoke = function(player, id)
 	return BuildService.LevelUp(player, id)
 end
 
+-- Old free-fusion remote: fusing now always goes through the Forge recipe
+-- (10,000 gold and materials), so this charges the same way.
 MergeSkills.OnServerInvoke = function(player, idA, idB)
-	return BuildService.Merge(player, idA, idB)
+	if typeof(idA) ~= "string" or typeof(idB) ~= "string" then
+		return false, "Invalid request"
+	end
+	local result = require(Shared:WaitForChild("Merge")).Result(idA, idB)
+	if not result then
+		return false, "Those skills can't be fused"
+	end
+	return CraftingService.Craft(player, result)
 end
 
 CraftSkill.OnServerInvoke = function(player, recipeId)

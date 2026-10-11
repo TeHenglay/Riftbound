@@ -1755,6 +1755,137 @@ equipEBtn.MouseButton1Click:Connect(function()
 	handleEquip("E")
 end)
 
+-------------------------------------------------------------------------------
+-- Fusion warning: a new fusion always starts at level 1, so fusing skills
+-- above level 1 throws their levels away. Ask first.
+-------------------------------------------------------------------------------
+local FUSE_WARN_LEVEL = 2 -- warn when an ingredient is at this level or higher
+
+local confirmShade = new("TextButton", {
+	Name = "FuseConfirm",
+	Size = UDim2.fromScale(1, 1),
+	BackgroundColor3 = Color3.fromRGB(4, 3, 6),
+	BackgroundTransparency = 0.35,
+	Text = "",
+	AutoButtonColor = false,
+	Visible = false,
+	ZIndex = 60,
+	Parent = gui,
+})
+local confirmBox = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.5),
+	Size = UDim2.fromOffset(520, 280),
+	BackgroundColor3 = Color3.fromRGB(20, 18, 24),
+	ZIndex = 61,
+	Parent = confirmShade,
+}, {
+	new("UICorner", { CornerRadius = UDim.new(0, 6) }),
+	new("UIStroke", { Color = Color3.fromRGB(220, 150, 45), Thickness = 2 }),
+})
+local confirmTitle = text({
+	Position = UDim2.fromOffset(24, 18),
+	Size = UDim2.new(1, -48, 0, 30),
+	Text = "LEVELS WILL BE LOST",
+	FontFace = F.Title,
+	TextSize = 24,
+	TextColor3 = Color3.fromRGB(255, 205, 90),
+	TextXAlignment = Enum.TextXAlignment.Left,
+	ZIndex = 62,
+	Parent = confirmBox,
+})
+local confirmBody = text({
+	Position = UDim2.fromOffset(24, 58),
+	Size = UDim2.new(1, -48, 0, 140),
+	FontFace = F.Body,
+	TextSize = 16,
+	TextWrapped = true,
+	RichText = true,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	TextYAlignment = Enum.TextYAlignment.Top,
+	ZIndex = 62,
+	Parent = confirmBox,
+})
+local function confirmButton(label, x, color, stroke)
+	return new("TextButton", {
+		Position = UDim2.new(x, if x == 0 then 24 else 6, 1, -64),
+		Size = UDim2.new(0.5, -30, 0, 44),
+		Text = label,
+		FontFace = F.TitleBold,
+		TextSize = 16,
+		TextColor3 = Color3.fromRGB(245, 240, 230),
+		BackgroundColor3 = color,
+		AutoButtonColor = true,
+		ZIndex = 62,
+		Parent = confirmBox,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 4) }),
+		new("UIStroke", { Color = stroke, Thickness = 1.5 }),
+	})
+end
+local confirmNo = confirmButton("CANCEL", 0, Color3.fromRGB(40, 36, 44), Color3.fromRGB(90, 80, 100))
+local confirmYes = confirmButton("FUSE ANYWAY", 0.5, Color3.fromRGB(120, 60, 24), Color3.fromRGB(230, 150, 60))
+local confirmAction
+confirmNo.MouseButton1Click:Connect(function()
+	confirmShade.Visible = false
+	confirmAction = nil
+end)
+confirmShade.MouseButton1Click:Connect(function()
+	confirmShade.Visible = false
+	confirmAction = nil
+end)
+confirmYes.MouseButton1Click:Connect(function()
+	confirmShade.Visible = false
+	local action = confirmAction
+	confirmAction = nil
+	if action then
+		action()
+	end
+end)
+
+-- Runs `onYes` straight away, or after the player confirms if an ingredient
+-- is at FUSE_WARN_LEVEL or above.
+local function confirmFusion(recipe, onYes)
+	local lines = {}
+	for _, skillId in recipe.Skills do
+		local level = cachedBuild.Skills and cachedBuild.Skills[skillId] or 0
+		if level >= FUSE_WARN_LEVEL then
+			local def = Skills.Defs[skillId]
+			table.insert(lines, `<b>{def and def.Name or skillId}</b> (Lv {level})`)
+		end
+	end
+	if #lines == 0 then
+		onYes()
+		return
+	end
+	local result = Skills.Defs[recipe.Result]
+	local resultName = result and result.Name or recipe.Title
+	local owned = cachedBuild.Skills and cachedBuild.Skills[recipe.Result]
+	local outcome = if owned
+		then `You already have <b>{resultName}</b> (Lv {owned}): it stays at Lv {owned} and gains 1 copy.`
+		else `<b>{resultName}</b> starts at <b>level 1</b>.`
+	confirmBody.Text = `{table.concat(lines, " and ")} will be used up, and their levels and spare copies are lost.\n\n{outcome}\n\nOnly Awakening keeps a skill's level.`
+	confirmAction = onYes
+	confirmShade.Visible = true
+end
+
+local function forgeSelected()
+	actionBtn.Text = "FORGING..."
+	local success, result = CraftSkill:InvokeServer(selectedId)
+	if success then
+		task.spawn(function()
+			cachedBuild = GetBuild:InvokeServer() or cachedBuild
+			cachedInventory = GetInventory:InvokeServer() or cachedInventory
+			refreshAll()
+		end)
+	else
+		actionBtn.Text = "FAILED: " .. tostring(result)
+		task.delay(2, function()
+			renderDetails()
+		end)
+	end
+end
+
 actionBtn.MouseButton1Click:Connect(function()
 	if not selectedId then return end
 	if currentTab == "Base" then
@@ -1762,19 +1893,9 @@ actionBtn.MouseButton1Click:Connect(function()
 		return
 	end
 	if currentTab == "Forge" then
-		actionBtn.Text = "FORGING..."
-		local success, result = CraftSkill:InvokeServer(selectedId)
-		if success then
-			task.spawn(function()
-				cachedBuild = GetBuild:InvokeServer() or cachedBuild
-				cachedInventory = GetInventory:InvokeServer() or cachedInventory
-				refreshAll()
-			end)
-		else
-			actionBtn.Text = "FAILED: " .. tostring(result)
-			task.delay(2, function()
-				renderDetails()
-			end)
+		local recipe = Crafting.ForgeRecipes[selectedId]
+		if recipe then
+			confirmFusion(recipe, forgeSelected)
 		end
 	else
 		actionBtn.Text = "ASCENDING..."
