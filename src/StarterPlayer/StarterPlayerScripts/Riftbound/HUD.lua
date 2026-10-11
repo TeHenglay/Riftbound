@@ -672,7 +672,8 @@ local function showRuneTooltip(id)
 	content.Title.Text = def.Name
 	content.Title.TextColor3 = runeColor(id)
 	content.Meta.Text = `{spaced(def.Rarity)}   ·   R U N E   ·   T H I S   R U N`
-	content.Body.Text = emphasize(def.Effect)
+	local details = Runes.Details[id]
+	content.Body.Text = emphasize(def.Effect) .. (if details then `\n<font color="{hex(C.Ash)}">{details}</font>` else "")
 	tooltip.Visible = true
 end
 
@@ -831,6 +832,9 @@ local function chooseRune(index, slot)
 	end
 end
 
+local OFFER_H = 510 -- pick screen height: title row + cards
+local CARD_H = 424
+
 local function buildOfferScreen()
 	offerScreen = new("Frame", {
 		Name = "RuneOffer",
@@ -854,7 +858,7 @@ local function buildOfferScreen()
 		Name = "Holder",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(820, 440),
+		Size = UDim2.fromOffset(820, OFFER_H),
 		BackgroundTransparency = 1,
 		ZIndex = 40,
 		Parent = offerScreen,
@@ -864,24 +868,27 @@ local function buildOfferScreen()
 	local row = new("Frame", {
 		Name = "Cards",
 		Position = UDim2.fromOffset(0, 76),
-		Size = UDim2.new(1, 0, 0, 350),
+		Size = UDim2.new(1, 0, 0, CARD_H),
 		BackgroundTransparency = 1,
 		ZIndex = 40,
 		Parent = holder,
 	}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Center, Padding = UDim.new(0, 20), SortOrder = Enum.SortOrder.LayoutOrder }) })
 	for i = 1, Runes.Choices do
-		local card = slab({ Name = "Card" .. i, Size = UDim2.fromOffset(255, 350), LayoutOrder = i, ZIndex = 41, Parent = row })
+		local card = slab({ Name = "Card" .. i, Size = UDim2.fromOffset(255, CARD_H), LayoutOrder = i, ZIndex = 41, Parent = row })
 		new("UIScale", { Name = "Pop", Parent = card })
 		-- A rarity-coloured flash that fades as the card lands.
 		new("Frame", { Name = "Flash", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 46, Parent = card })
 		new("Frame", { Name = "Glow", Position = UDim2.fromOffset(14, 14), Size = UDim2.new(1, -28, 0, 4), BorderSizePixel = 0, ZIndex = 42, Parent = card })
 		text({ Name = "Title", Position = UDim2.fromOffset(20, 28), Size = UDim2.new(1, -40, 0, 52), FontFace = F.TitleBold, TextSize = 21, TextWrapped = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
 		text({ Name = "Rarity", Position = UDim2.fromOffset(20, 82), Size = UDim2.new(1, -40, 0, 14), FontFace = F.Label, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
-		text({ Name = "Effect", Position = UDim2.fromOffset(20, 104), Size = UDim2.new(1, -40, 0, 74), FontFace = F.Body, TextSize = 15, TextWrapped = true, RichText = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
-		text({ Position = UDim2.fromOffset(20, 186), Size = UDim2.new(1, -40, 0, 14), Text = "S O C K E T   I N T O", FontFace = F.Label, TextSize = 10, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		text({ Name = "Effect", Position = UDim2.fromOffset(20, 104), Size = UDim2.new(1, -40, 0, 42), FontFace = F.BodyBold, TextSize = 15, TextWrapped = true, RichText = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		-- How the rune works in more detail (Runes.Details), under a thin rule.
+		new("Frame", { Position = UDim2.fromOffset(20, 152), Size = UDim2.new(1, -40, 0, 1), BackgroundColor3 = C.Ash, BackgroundTransparency = 0.6, BorderSizePixel = 0, ZIndex = 42, Parent = card })
+		text({ Name = "Details", Position = UDim2.fromOffset(20, 160), Size = UDim2.new(1, -40, 0, 112), FontFace = F.Body, TextSize = 13, TextColor3 = C.Gold, TextWrapped = true, RichText = true, TextYAlignment = Enum.TextYAlignment.Top, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
+		text({ Position = UDim2.fromOffset(20, 280), Size = UDim2.new(1, -40, 0, 14), Text = "S O C K E T   I N T O", FontFace = F.Label, TextSize = 10, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 42, Parent = card })
 		local keys = new("Frame", {
 			Name = "Slots",
-			Position = UDim2.fromOffset(18, 204),
+			Position = UDim2.fromOffset(18, 298),
 			Size = UDim2.new(1, -36, 0, 66),
 			BackgroundTransparency = 1,
 			ZIndex = 42,
@@ -908,7 +915,7 @@ local function buildOfferScreen()
 		local keep = new("TextButton", {
 			Name = "Keep",
 			AnchorPoint = Vector2.new(0.5, 0),
-			Position = UDim2.new(0.5, 0, 0, 284),
+			Position = UDim2.new(0.5, 0, 0, 376),
 			Size = UDim2.new(1, -36, 0, 30),
 			Text = "K E E P   I N   P O U C H",
 			FontFace = F.Label,
@@ -929,7 +936,7 @@ local function buildOfferScreen()
 			local left = math.max(0, math.ceil(offerShown.Ends - workspace:GetServerTimeNow()))
 			holder.Timer.Text = `T H E   R I F T   H O L D S   ·   {left}s`
 			local view = workspace.CurrentCamera.ViewportSize
-			holder.UIScale.Scale = math.min(1, (view.X - 24) / 820, (view.Y - 24) / 440)
+			holder.UIScale.Scale = math.min(1, (view.X - 24) / 820, (view.Y - 24) / OFFER_H)
 		end
 	end)
 end
@@ -990,6 +997,7 @@ local function refreshOffer()
 			card.Rarity.Text = spaced(def.Rarity)
 			card.Rarity.TextColor3 = color
 			card.Effect.Text = emphasize(def.Effect)
+			card.Details.Text = emphasize(Runes.Details[id] or "")
 			for _, slot in Runes.Slots do
 				local b = card.Slots[slot]
 				local skillId = skillInSlot(slot)
@@ -998,10 +1006,13 @@ local function refreshOffer()
 				if not skillId then
 					ok, why = false, "No skill"
 				end
+				-- Allowed, but warn when the rune would do nothing for this skill.
+				local useful, reason = Runes.Applies(id, skillId and Skills.Defs[skillId])
 				b.Skill.Text = if skillId then Skills.Defs[skillId].Name else "Empty"
-				b.Skill.TextColor3 = if ok then C.Parchment else C.Ash
-				b.Count.Text = if ok then `{#list} / {Runes.Sockets}` else why:upper()
-				b.UIStroke.Color = if ok then color else C.Bronze
+				b.Skill.TextColor3 = if ok and useful then C.Parchment else C.Ash
+				b.Count.Text = if not ok then why:upper() elseif not useful then reason:upper() else `{#list} / {Runes.Sockets}`
+				b.Count.TextColor3 = if ok and not useful then C.Crimson else C.Ash
+				b.UIStroke.Color = if ok and useful then color else C.Bronze
 				b.AutoButtonColor = ok
 			end
 		end

@@ -80,6 +80,54 @@ Runes.Defs = {
 	BloodPact = rune("Legendary", "Rune of the Blood Pact", "-80% cooldown; casting costs 5% HP (refunded on 3+ hits)", { Cooldown = 0.8, BloodPact = 0.05 }),
 }
 
+-- The longer text on the rune card: how the rune works, its numbers, and
+-- which skills it suits. Runes that aren't Ready never drop, so they have none.
+Runes.Details = {
+	Might = "Every hit from this skill deals 15% more damage, zone and pool ticks included. Stacks: two give +30%.",
+	Expansion = "The skill gets bigger: explosion radius, zone and pool size, wave width, cone angle and chain jump distance all grow by 15%.",
+	Haste = "The skill recharges 12% faster. Cooldown cuts from every rune on one skill add up, to a maximum of 80%.",
+	Reach = "Projectiles fly 30% further, waves and cones reach 30% further, and ground skills can be aimed 30% further away. Does nothing for Gust, which bursts around you.",
+	Impact = "Enemies are knocked back 50% harder. Only for skills that push: Tidal Wave, Gust and Mudslide.",
+	Lingering = "Zones, lava pools and storms last 1.5s longer, and every status the skill applies (Burn, Soak, Shock, Slow, Stun, Freeze) lasts 1.5s longer.",
+	Prospector = "Enemies this skill hits drop 20% more gold and XP when they die, even if something else lands the final blow.",
+	HeavyMass = "Hits land 10% harder. The 5% slower flight only matters for projectile skills.",
+	Multishot = "Fires one extra projectile in a tight fan beside the first; stack it for more. Projectile skills only: Rift Bolt, Fireball and Plasma Lance.",
+	Precision = "Each hit has an 18% chance to crit for 175% damage. Zone and pool ticks can crit too.",
+	Executioner = "Hits on enemies below 35% health deal 10% more damage. Good for finishing off bosses.",
+	GiantHunter = "Deals 25% more damage to Elites and Bosses, the big named foes in each act.",
+	DeepChill = "Every hit slows the enemy by 15% for 3 seconds, refreshed with each hit. Zone ticks count.",
+	Tremor = "Stuns from this skill last 0.8s longer. Only for skills that stun: Stone Spike, Quake Leap and Magnet Quake.",
+	Aftershock = "Half a second after the skill first lands, a second burst hits everything nearby for 45% of the skill's damage. Once per cast.",
+	Graviton = "Where the skill first lands, enemies within 16 studs are yanked inward, bunching them up for your next hit. Once per cast.",
+	TwinSpark = "Each cast has a 22% chance to go off again for free 0.3s later, with the same runes.",
+	BloodSiphon = "Heals you for 4% of all damage this skill deals, zone and pool ticks included.",
+	ChainReaction = "When this skill kills an enemy, it explodes for 50% of the skill's damage on everything within 10 studs.",
+	Singularity = "Where the skill first lands, every enemy within 40 studs is dragged into the impact point. Once per cast.",
+	EndlessCascade = "Killing an enemy with this skill resets its cooldown instantly, so you can cast it again right away.",
+	Cataclysm = "The skill's area grows by 120%: radius, zones, pools, wave width, cone angle and chain jumps.",
+	BloodPact = "Cooldown is cut by 80%, but each cast costs 5% of your current health. Hit 3 or more enemies with one cast and you get that health back.",
+}
+
+-- Does rune `id` do anything for skill `def`? Most runes work on every skill;
+-- these only affect skills with the matching trait. Returns ok, reason.
+function Runes.Applies(id, def)
+	if not def then
+		return true
+	end
+	if id == "Impact" and not def.Knockback then
+		return false, "No knockback"
+	elseif id == "Multishot" and def.Kind ~= "Projectile" then
+		return false, "Not a projectile"
+	elseif id == "Tremor" and not (def.Status and def.Status.Stun) then
+		return false, "Doesn't stun"
+	elseif id == "Lingering" and not def.Duration and not def.Status then
+		return false, "Nothing lasts"
+	elseif id == "Reach" and def.Kind == "Nova" then
+		return false, "Bursts around you"
+	end
+	return true
+end
+
 -- Story acts have 2-4 waves, so the wave counter runs across the story:
 -- Act 1 is waves 1-4, Act 2 is 5-8, Act 3 is 9+.
 function Runes.RunWave(act, wave)

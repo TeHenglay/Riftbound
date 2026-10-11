@@ -64,18 +64,59 @@ local function pullIn(center, reach, speed, duration)
 	end
 end
 
-local hit
+local hit, onKill
 
--- Damage over time (pools, zones, vortexes); counts toward the caster's run stats.
+-- Rune damage bonuses that depend on the target (Executioner, Giant Hunter,
+-- Precision), plus Prospector's loot mark. Used by direct hits and ticks.
+local function runeDamage(mods, model, hum, damage)
+	if mods.Execute and hum.Health < hum.MaxHealth * 0.35 then
+		damage *= 1 + mods.Execute
+	end
+	if mods.GiantHunter and (model:GetAttribute("Elite") or model:GetAttribute("Boss")) then
+		damage *= 1 + mods.GiantHunter
+	end
+	if mods.Crit and math.random() < mods.Crit then
+		damage *= 1.75
+	end
+	if mods.Loot then
+		model:SetAttribute("LootBonus", math.max(model:GetAttribute("LootBonus") or 0, mods.Loot))
+	end
+	return damage
+end
+
+-- Blood Siphon: heal the caster for a share of the damage dealt.
+local function siphon(ctx, dealt)
+	if ctx.Mods.Siphon and dealt > 0 then
+		local char = ctx.Player.Character
+		local own = char and char:FindFirstChildOfClass("Humanoid")
+		if own and own.Health > 0 then
+			own.Health = math.min(own.MaxHealth, own.Health + dealt * ctx.Mods.Siphon)
+		end
+	end
+end
+
+-- Damage over time (pools, zones, vortexes); counts toward the caster's run
+-- stats. Runes work on ticks too, except the once-per-cast impact effects and
+-- Blood Pact's hit count.
 local function tickHit(ctx, model, amount)
 	local hum = model:FindFirstChildOfClass("Humanoid")
-	local before = hum and hum.Health or 0
-	Enemies.Damage(model, amount, ctx.Def.Elements, ctx.Color)
-	if hum then
-		local dealt = before - hum.Health
-		RunStats.AddDamage(ctx.Player, dealt)
-		if dealt > 0 and hum.Health <= 0 then
-			RunStats.AddKill(ctx.Player)
+	if not hum then
+		return
+	end
+	local mods = ctx.Mods
+	local before = hum.Health
+	Enemies.Damage(model, runeDamage(mods, model, hum, amount), ctx.Def.Elements, ctx.Color)
+	local dealt = before - hum.Health
+	RunStats.AddDamage(ctx.Player, dealt)
+	if mods.Chill then
+		Enemies.ApplyStatus(model, "Slow", { Duration = 3, Amount = 0.15 })
+	end
+	siphon(ctx, dealt)
+	if dealt > 0 and not Enemies.IsAlive(model) then
+		RunStats.AddKill(ctx.Player)
+		local at = model.PrimaryPart and model.PrimaryPart.Position
+		if at and not ctx.Echo then
+			onKill(ctx, at)
 		end
 	end
 end
@@ -100,7 +141,7 @@ local function onImpact(ctx, at)
 end
 
 -- Rune effects when this skill lands a killing blow.
-local function onKill(ctx, at)
+onKill = function(ctx, at)
 	local mods = ctx.Mods
 	if mods.Cascade then
 		BuildService.ResetCooldown(ctx.Player, ctx.Def.Id)
@@ -125,19 +166,7 @@ hit = function(ctx, model, mult)
 	if not hum then
 		return
 	end
-	local damage = ctx.Damage * (mult or 1)
-	if mods.Execute and hum.Health < hum.MaxHealth * 0.35 then
-		damage *= 1 + mods.Execute
-	end
-	if mods.GiantHunter and (model:GetAttribute("Elite") or model:GetAttribute("Boss")) then
-		damage *= 1 + mods.GiantHunter
-	end
-	if mods.Crit and math.random() < mods.Crit then
-		damage *= 1.75
-	end
-	if mods.Loot then
-		model:SetAttribute("LootBonus", math.max(model:GetAttribute("LootBonus") or 0, mods.Loot))
-	end
+	local damage = runeDamage(mods, model, hum, ctx.Damage * (mult or 1))
 	local before = hum.Health
 	Enemies.Damage(model, damage, ctx.Def.Elements, ctx.Color)
 	local dealt = before - hum.Health
@@ -154,13 +183,7 @@ hit = function(ctx, model, mult)
 		Enemies.ApplyStatus(model, "Slow", { Duration = 3, Amount = 0.15 })
 	end
 	ctx.Cast.Hits += 1
-	if mods.Siphon and dealt > 0 then
-		local char = ctx.Player.Character
-		local own = char and char:FindFirstChildOfClass("Humanoid")
-		if own and own.Health > 0 then
-			own.Health = math.min(own.MaxHealth, own.Health + dealt * mods.Siphon)
-		end
-	end
+	siphon(ctx, dealt)
 	local at = model.PrimaryPart and model.PrimaryPart.Position
 	if at then
 		fx({ Type = "Impact", Skill = ctx.Def.Id, At = at })
@@ -626,7 +649,7 @@ function Kinds.Magnet(ctx)
 	end)
 end
 
-local AREA_KEYS = { "Radius", "InnerRadius", "PoolRadius", "Width" }
+local AREA_KEYS = { "Radius", "InnerRadius", "PoolRadius", "Width", "JumpRange" }
 local RANGE_KEYS = { "Range", "Length" }
 
 -- A copy of the skill def reshaped by the slot's stat runes.
@@ -640,10 +663,18 @@ local function withMods(def, mods)
 			def[key] *= 1 + mods.Area
 		end
 	end
+	-- Cones widen with Expansion (up to a near half-circle).
+	if def.Angle and mods.Area then
+		def.Angle = math.min(def.Angle * (1 + mods.Area), 170)
+	end
 	for _, key in RANGE_KEYS do
 		if def[key] and mods.Range then
 			def[key] *= 1 + mods.Range
 		end
+	end
+	-- Skills aimed at the cursor without their own range (Quake Leap) reach further too.
+	if mods.Range and not def.Range and def.Kind ~= "Nova" then
+		def.Range = DEFAULT_RANGE * (1 + mods.Range)
 	end
 	if def.Knockback and mods.Knockback then
 		def.Knockback *= 1 + mods.Knockback
