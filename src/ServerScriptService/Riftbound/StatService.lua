@@ -86,6 +86,27 @@ function StatService.Remove(player)
 	speedMods[player] = nil
 end
 
+-- Saving (SaveService): a plain copy, and loading one back.
+function StatService.Export(player)
+	local d = data[player]
+	return d and { Points = d.Points, Ranks = table.clone(d.Ranks) }
+end
+
+function StatService.Import(player, saved)
+	local d = data[player]
+	if not d or type(saved) ~= "table" then
+		return
+	end
+	d.Points = math.max(0, math.floor(tonumber(saved.Points) or 0))
+	local ranks = type(saved.Ranks) == "table" and saved.Ranks or {}
+	for _, id in Stats.Order do
+		d.Ranks[id] = math.clamp(math.floor(tonumber(ranks[id]) or 0), 0, Stats.MaxRank)
+	end
+	publish(player)
+	applySpeed(player)
+	StatService.OnHealthChanged(player)
+end
+
 function StatService.GrantPoints(player, count)
 	local d = data[player]
 	if not d or count <= 0 then

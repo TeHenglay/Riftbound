@@ -11,6 +11,7 @@ local StatService = require(script.Parent.StatService)
 local ProgressionService = require(script.Parent.ProgressionService)
 local SkillEffects = require(script.Parent.SkillEffects)
 local CraftingService = require(script.Parent.CraftingService)
+local SaveService = require(script.Parent.SaveService)
 
 local remotes = Shared:FindFirstChild("Remotes") or Instance.new("Folder")
 remotes.Name = "Remotes"
@@ -56,6 +57,7 @@ InventoryService.OnChanged = function(player, snapshot)
 	InventoryChanged:FireClient(player, snapshot)
 end
 StatService.OnNotify = BuildService.OnNotify
+SaveService.OnNotify = BuildService.OnNotify
 StatService.OnHealthChanged = ProgressionService.RefreshHealth
 ProgressionService.HealthBonus = StatService.HealthBonus
 ProgressionService.OnLevelUp = function(player, _level, gained)
@@ -72,9 +74,15 @@ local function onPlayerAdded(player)
 	player.CharacterAdded:Connect(function()
 		BlockService.Reset(player)
 	end)
+	-- Saved level, gold, items, skills and stats replace the fresh defaults.
+	task.spawn(SaveService.Load, player)
 end
 Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(function(player)
+	-- Take the save before the services forget the player, then write it.
+	local save = SaveService.Collect(player)
+	SaveService.Forget(player)
+	task.spawn(SaveService.Write, player.UserId, save)
 	BuildService.Remove(player)
 	ProgressionService.Remove(player)
 	FlaskService.Remove(player)

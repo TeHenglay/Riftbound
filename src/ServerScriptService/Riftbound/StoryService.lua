@@ -29,6 +29,7 @@ local StoryBuilder = require(script.Parent.StoryBuilder)
 local PartyService = require(script.Parent.PartyService)
 local StatService = require(script.Parent.StatService)
 local BlockService = require(script.Parent.BlockService)
+local SaveService = require(script.Parent.SaveService)
 
 -- Nation foes replace the husks when the NationFoes module is in the place:
 -- every wave mob is the nation's element golem, the nation's named grunt and
@@ -209,6 +210,7 @@ end
 
 local function reward(run)
 	for player in run.Players do
+		SaveService.Commit(player) -- cleared: gold and XP from this run are kept
 		local diff = Story.Difficulties[run.Difficulty]
 		local key = Story.Key(run.Nation, run.Act)
 		local tierKey = Story.Key(run.Nation, run.Act, run.Difficulty)
@@ -487,6 +489,7 @@ local function join(run, player)
 	BuildService.ResetRunes(player) -- every run starts with empty sockets
 	RunStats.Reset(player)
 	freshBody(player)
+	SaveService.Checkpoint(player) -- run gold and XP only count once the act is cleared
 	return true
 end
 
@@ -573,6 +576,7 @@ function StoryService.Retry(player)
 		BuildService.ResetRunes(p) -- a fresh run starts with empty sockets
 		RunStats.Reset(p)
 		freshBody(p)
+		SaveService.Checkpoint(p)
 		local char = p.Character
 		if char and entry then
 			char:PivotTo(entry.CFrame + Vector3.new(0, 4, 0))
@@ -630,6 +634,10 @@ function StoryService.Leave(player)
 	local run = name and runs[name]
 	player:SetAttribute("StoryRun", nil)
 	BuildService.ResetRunes(player) -- runes never leave the run
+	-- Leaving before the act is cleared loses the gold and XP earned in it.
+	if SaveService.Rollback(player) and player.Parent then
+		StoryService.OnNotify(player, "Act not cleared: gold and XP from this run were lost", Color3.fromRGB(236, 80, 88))
+	end
 	if not run then
 		return
 	end

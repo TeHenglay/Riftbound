@@ -24,6 +24,26 @@ function InventoryService.Snapshot(player)
 	return table.clone(data[player] or {})
 end
 
+-- Saving (SaveService): a plain copy, and loading one back (unknown items dropped).
+function InventoryService.Export(player)
+	return data[player] and table.clone(data[player])
+end
+
+function InventoryService.Import(player, saved)
+	local items = data[player]
+	if not items or type(saved) ~= "table" then
+		return
+	end
+	table.clear(items)
+	for id, count in saved do
+		count = math.floor(tonumber(count) or 0)
+		if Items.Defs[id] and count > 0 then
+			items[id] = count
+		end
+	end
+	InventoryService.OnChanged(player, InventoryService.Snapshot(player))
+end
+
 function InventoryService.Add(player, id, count)
 	local items = data[player]
 	local def = Items.Defs[id]

@@ -34,6 +34,11 @@ function BuildService.GrantHomeSkill(player, nationId)
 	if not skillId or not Skills.Defs[skillId] then
 		return nil
 	end
+	-- Given once per player (saved), so fusing it away doesn't bring it back on rejoin.
+	if b.HomeGranted then
+		return skillId
+	end
+	b.HomeGranted = true
 	if not b.Skills[skillId] then
 		b.Skills[skillId] = 1
 		if not b.Slots["Q"] then
@@ -73,6 +78,36 @@ end
 
 function BuildService.Remove(player)
 	builds[player] = nil
+end
+
+-- Saving (SaveService): owned skills and levels, equipped slots and whether
+-- the home skill was given. Runes and cooldowns are never saved.
+function BuildService.Export(player)
+	local b = builds[player]
+	return b and { Skills = table.clone(b.Skills), Slots = table.clone(b.Slots), HomeGranted = b.HomeGranted == true }
+end
+
+function BuildService.Import(player, saved)
+	local b = builds[player]
+	if not b or type(saved) ~= "table" then
+		return
+	end
+	table.clear(b.Skills)
+	table.clear(b.Slots)
+	for id, level in type(saved.Skills) == "table" and saved.Skills or {} do
+		level = math.floor(tonumber(level) or 0)
+		if Skills.Defs[id] and id ~= BASIC_ATTACK and level >= 1 then
+			b.Skills[id] = math.min(level, Skills.MaxLevel)
+		end
+	end
+	for _, slot in SLOTS do
+		local id = type(saved.Slots) == "table" and saved.Slots[slot]
+		if id and b.Skills[id] then
+			b.Slots[slot] = id
+		end
+	end
+	b.HomeGranted = saved.HomeGranted == true or next(b.Skills) ~= nil
+	BuildService.OnChanged(player)
 end
 
 function BuildService.Snapshot(player)

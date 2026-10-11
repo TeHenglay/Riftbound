@@ -31,7 +31,7 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 - Each level gives +10 max health (fully healed on level up) and +5% skill damage.
 - Level and gold show above the skill bar, in the top-right corner and in the player list.
 - Gold isn't spent on anything yet. `ProgressionService.SpendGold` is ready for a shop.
-- Progress resets when you leave; saving comes with the meta-progression step.
+- Progress is saved (see "Saving" below).
 - Tuning: curve and bonuses are in `src/ReplicatedStorage/Riftbound/Progression.lua`;
   drop amounts per enemy are in `TestArena.server.lua` (`Xp`, `Gold`).
 
@@ -70,6 +70,20 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   next member leads; a party of one breaks up.
 - Code: `PartyService.lua` / `Party.server.lua` (server, party size in
   `PartyService.Max`) and `PartyPanel.lua` (client panel and invite popups).
+
+## Saving
+
+- `SaveService.lua` saves level, XP, gold, backpack items, skills (fusions and
+  awakenings, with levels and equipped slots) and stat points in the DataStore
+  `RiftboundSave_v1`. The nation (`RiftboundNation_v1`) and cleared story acts
+  (`RiftboundStory_v1`) have their own stores. Runes are never saved.
+- Loaded on join; saved on leave, every 2 minutes and on server shutdown. If
+  loading fails, that session isn't saved, so a failed load can't wipe a save.
+- Story runs only pay out on a clear: the run snapshots your level, XP, gold
+  and stat points when it starts. Clear the act and everything is kept; leave,
+  die or disconnect first and you go back to the snapshot.
+- In Studio, saving needs Game Settings > Security > Enable Studio Access to
+  API Services.
 
 ## Rift Flask
 

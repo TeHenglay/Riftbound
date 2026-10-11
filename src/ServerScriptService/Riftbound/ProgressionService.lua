@@ -103,6 +103,27 @@ function ProgressionService.Get(player)
 	return d and table.clone(d)
 end
 
+-- Saving (SaveService): a plain copy, and loading one back.
+function ProgressionService.Export(player)
+	local d = data[player]
+	return d and { Level = d.Level, Xp = d.Xp, Gold = d.Gold }
+end
+
+function ProgressionService.Import(player, saved)
+	local d = data[player]
+	if not d or type(saved) ~= "table" then
+		return
+	end
+	local function int(v, lo, hi)
+		return math.clamp(math.floor(tonumber(v) or lo), lo, hi)
+	end
+	d.Level = int(saved.Level, 1, Progression.MaxLevel)
+	d.Xp = if d.Level >= Progression.MaxLevel then 0 else int(saved.Xp, 0, Progression.XpToNext(d.Level) - 1)
+	d.Gold = int(saved.Gold, 0, 2 ^ 31 - 1)
+	publish(player)
+	applyHealth(player, false)
+end
+
 function ProgressionService.AddXp(player, amount)
 	local d = data[player]
 	if not d or amount <= 0 or d.Level >= Progression.MaxLevel then
