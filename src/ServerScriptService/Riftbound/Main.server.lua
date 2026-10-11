@@ -75,6 +75,13 @@ local function onPlayerAdded(player)
 	player.CharacterAdded:Connect(function()
 		BlockService.Reset(player)
 	end)
+	-- Training skills are taken back when the player leaves Training (the Rift),
+	-- including heading into a Story act or dying.
+	player:GetAttributeChangedSignal("Area"):Connect(function()
+		if player:GetAttribute("Area") ~= "Rift" then
+			BuildService.ClearTemp(player)
+		end
+	end)
 	-- Saved level, gold, items, skills and stats replace the fresh defaults.
 	task.spawn(SaveService.Load, player)
 end
@@ -124,9 +131,10 @@ TestEquipSkill.OnServerInvoke = function(player, slot, id)
 	if not Skills.Defs[id] then
 		return false, "Unknown skill"
 	end
+	-- Free test skills are only lent: never saved, gone when you leave Training.
 	local b = BuildService.Snapshot(player)
 	if not b or not b.Skills[id] then
-		BuildService.Grant(player, id)
+		BuildService.Grant(player, id, true)
 	end
 	BuildService.Equip(player, slot, id)
 	return true, id

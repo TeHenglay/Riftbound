@@ -59,7 +59,9 @@ function BuildService.GrantHomeSkill(player, nationId)
 end
 
 function BuildService.Init(player)
-	builds[player] = { Skills = {}, Copies = {}, Slots = {}, Cooldowns = {}, Sockets = {}, Pouch = {} }
+	-- Temp: skills lent for Training (shrines, the Forge's free test equip).
+	-- They're never saved and are taken back when the player leaves Training.
+	builds[player] = { Skills = {}, Copies = {}, Temp = {}, Slots = {}, Cooldowns = {}, Sockets = {}, Pouch = {} }
 
 	-- If the player already has a Nation attribute (rejoining player)
 	local currentNation = player:GetAttribute("Nation")
@@ -84,7 +86,25 @@ end
 -- the home skill was given. Runes and cooldowns are never saved.
 function BuildService.Export(player)
 	local b = builds[player]
-	return b and { Skills = table.clone(b.Skills), Copies = table.clone(b.Copies), Slots = table.clone(b.Slots), HomeGranted = b.HomeGranted == true }
+	if not b then
+		return nil
+	end
+	-- Training skills are left out; their slots save what was there before.
+	local skills, copies, slots = {}, {}, {}
+	for id, level in b.Skills do
+		if not b.Temp[id] then
+			skills[id] = level
+			copies[id] = b.Copies[id]
+		end
+	end
+	for _, slot in SLOTS do
+		local id = b.Slots[slot]
+		if id and b.Temp[id] then
+			id = b.SavedSlots and b.SavedSlots[slot]
+		end
+		slots[slot] = if id and skills[id] then id else nil
+	end
+	return { Skills = skills, Copies = copies, Slots = slots, HomeGranted = b.HomeGranted == true }
 end
 
 function BuildService.Import(player, saved)
@@ -120,14 +140,14 @@ end
 function BuildService.Snapshot(player)
 	local b = builds[player]
 	if not b then
-		return { Skills = {}, Copies = {}, Slots = {}, Sockets = {}, Pouch = {} }
+		return { Skills = {}, Copies = {}, Temp = {}, Slots = {}, Sockets = {}, Pouch = {} }
 	end
 	local sockets = {}
 	for skillId, list in b.Sockets do
 		sockets[skillId] = table.clone(list)
 	end
 	local offer = b.Offer and { Ids = table.clone(b.Offer.Ids), Ends = b.Offer.Ends }
-	return { Skills = table.clone(b.Skills), Copies = table.clone(b.Copies), Slots = table.clone(b.Slots), Sockets = sockets, Pouch = table.clone(b.Pouch), Offer = offer }
+	return { Skills = table.clone(b.Skills), Copies = table.clone(b.Copies), Temp = table.clone(b.Temp), Slots = table.clone(b.Slots), Sockets = sockets, Pouch = table.clone(b.Pouch), Offer = offer }
 end
 
 -------------------------------------------------------------------------------
@@ -297,14 +317,39 @@ local function addCopy(player, b, id)
 end
 
 -- Gives a skill; a skill you already own adds a duplicate copy instead.
--- Returns the skill's level, and whether it was a copy.
-function BuildService.Grant(player, id)
+-- With `temp`, the skill is only lent for Training (see ClearTemp) and an
+-- owned skill gains nothing. Returns the skill's level, and whether it was a copy.
+function BuildService.Grant(player, id, temp)
 	local b = builds[player]
 	local def = Skills.Defs[id]
 	if not b or not def or id == BASIC_ATTACK then
 		return nil
 	end
 	local level = b.Skills[id]
+	if temp then
+		if level then
+			return level, false
+		end
+		if next(b.Temp) == nil then
+			b.SavedSlots = table.clone(b.Slots) -- put back when Training ends
+		end
+		b.Temp[id] = true
+		b.Skills[id] = 1
+		local slot = firstFreeSlot(b)
+		if slot then
+			b.Slots[slot] = id
+		end
+		BuildService.OnNotify(player, `Training skill: {def.Name} (until you leave)`, Elements.ColorOf(def.Elements))
+		BuildService.OnChanged(player)
+		return 1, false
+	end
+	if level and b.Temp[id] then
+		-- A real copy of a skill you were only borrowing: now it's yours.
+		b.Temp[id] = nil
+		BuildService.OnNotify(player, `New skill: {def.Name}`, Elements.ColorOf(def.Elements))
+		BuildService.OnChanged(player)
+		return level, false
+	end
 	if level then
 		addCopy(player, b, id)
 		BuildService.OnChanged(player)
@@ -325,6 +370,51 @@ function BuildService.Owns(player, id)
 	return b ~= nil and b.Skills[id] ~= nil
 end
 
+function BuildService.IsTemp(player, id)
+	local b = builds[player]
+	return b ~= nil and b.Temp[id] == true
+end
+
+-- Takes back every Training skill and puts the slots back the way they were.
+function BuildService.ClearTemp(player)
+	local b = builds[player]
+	if not b or next(b.Temp) == nil then
+		return
+	end
+	for id in b.Temp do
+		b.Skills[id] = nil
+		b.Copies[id] = nil
+		b.Sockets[id] = nil
+		b.Cooldowns[id] = nil
+	end
+	table.clear(b.Temp)
+	local saved = b.SavedSlots or {}
+	b.SavedSlots = nil
+	for _, slot in SLOTS do
+		local id = b.Slots[slot]
+		if not id or not b.Skills[id] then
+			b.Slots[slot] = nil
+			local back = saved[slot]
+			if back and b.Skills[back] and b.Slots.Q ~= back and b.Slots.E ~= back then
+				b.Slots[slot] = back
+			end
+		end
+	end
+	-- Anything still empty gets another owned skill.
+	for _, slot in SLOTS do
+		if not b.Slots[slot] then
+			for id in b.Skills do
+				if b.Slots.Q ~= id and b.Slots.E ~= id then
+					b.Slots[slot] = id
+					break
+				end
+			end
+		end
+	end
+	BuildService.OnNotify(player, "Training skills returned", Color3.fromRGB(200, 190, 220))
+	BuildService.OnChanged(player)
+end
+
 -- Spends duplicate copies to raise a skill one level (Skills.LevelCost).
 -- Returns ok, message.
 function BuildService.LevelUp(player, id)
@@ -332,6 +422,9 @@ function BuildService.LevelUp(player, id)
 	local def = typeof(id) == "string" and Skills.Defs[id]
 	if not b or not def or not b.Skills[id] then
 		return false, "You don't own that skill"
+	end
+	if b.Temp[id] then
+		return false, "Training skills can't be levelled"
 	end
 	local level = b.Skills[id]
 	local need = Skills.CopiesToLevel(level)
@@ -373,6 +466,9 @@ function BuildService.Merge(player, idA, idB)
 	end
 	if not b.Skills[idA] or not b.Skills[idB] then
 		return false, "You don't own both skills"
+	end
+	if b.Temp[idA] or b.Temp[idB] then
+		return false, "Training skills can't be fused"
 	end
 	local result = Merge.Result(idA, idB)
 	if not result then
@@ -436,6 +532,9 @@ function BuildService.Awaken(player, baseSkillId, awakenedId)
 	end
 	if not b.Skills[baseSkillId] then
 		return false, "Base skill not owned"
+	end
+	if b.Temp[baseSkillId] then
+		return false, "Training skills can't be awakened"
 	end
 	if not Skills.Defs[awakenedId] then
 		return false, "Unknown awakened skill"

@@ -2277,8 +2277,25 @@ refreshBackpack = function()
 			ZIndex = 23,
 			Parent = cell,
 		})
+		-- Training skills are only borrowed: no levelling, gone when you leave.
+		local temp = (build.Temp or {})[id]
+		if temp then
+			local tag = text({
+				Position = UDim2.fromOffset(2, 82),
+				Size = UDim2.new(1, -4, 0, 24),
+				Text = "TRAINING",
+				FontFace = F.Label,
+				TextSize = 11,
+				TextColor3 = C.RiftHot,
+				BackgroundColor3 = Theme.C.Ink,
+				BackgroundTransparency = 0,
+				ZIndex = 24,
+				Parent = cell,
+			})
+			stroke(C.Rift, 1.5, 0.3).Parent = tag
+		end
 		-- Level Up: lights up once enough duplicate copies are collected.
-		if need then
+		if need and not temp then
 			local ready = copies >= need
 			local b = new("TextButton", {
 				Position = UDim2.fromOffset(2, 82),

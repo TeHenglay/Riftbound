@@ -192,8 +192,10 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 
 - Costs live in `Skills.LevelCost`. Copies are saved; spare copies carry over
   when a skill is awakened and are lost when it's fused away.
-- Training shrines only teach skills you don't have yet, so they can't be
-  farmed for copies.
+- Training skills are only borrowed: skills from the Training shrines and the
+  Forge's free test equip are never saved, can't be levelled, fused or
+  awakened, and are taken back (with your old Q/E restored) when you leave
+  Training, start a Story act or die.
 - Every pair has a fusion (10 total), e.g. Fire + Water = Steam Cloud.
 - Elemental reactions: Lightning on a Soaked enemy deals x1.5 ("Conduct"),
   Fire on Soaked x1.25, Air on Burning x1.3, Earth on Stunned x1.4.
