@@ -258,9 +258,9 @@ Crafting.AwakenOrder = {
 }
 
 -- Fused skills awaken too. They need the fusion at Crafting.AwakenLevel and, from both of
--- its nations, an Essence (Act 3) and Shards, plus Rift Shards. These recipes
+-- its nations, 2 Essences (Act 3) and Shards, plus Rift Shards. These recipes
 -- list their costs in Materials (base awakenings use Essence / Core / Shard).
-local AWAKEN_FUSED_SHARDS, AWAKEN_FUSED_RIFT = 6, 20
+local AWAKEN_FUSED_ESSENCE, AWAKEN_FUSED_SHARDS, AWAKEN_FUSED_RIFT = 2, 6, 20
 for _, fusionId in Crafting.ForgeOrder do
 	local forge = Crafting.ForgeRecipes[fusionId]
 	local awakened = Skills.Defs[fusionId .. "Awakened"]
@@ -268,7 +268,7 @@ for _, fusionId in Crafting.ForgeOrder do
 		local materials = { RiftShard = AWAKEN_FUSED_RIFT }
 		for _, skillId in forge.Skills do
 			local nation = NATION_OF[Skills.Defs[skillId].Elements[1]]
-			materials[nation .. "Essence"] = 1
+			materials[nation .. "Essence"] = AWAKEN_FUSED_ESSENCE
 			materials[Items.NationShards[nation]] = AWAKEN_FUSED_SHARDS
 		end
 		Crafting.AwakenRecipes[fusionId] = {
