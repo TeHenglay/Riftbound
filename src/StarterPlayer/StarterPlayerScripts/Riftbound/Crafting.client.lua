@@ -1286,8 +1286,9 @@ local function renderDetails()
 		s1Element.Text = baseElem
 		s1Element.TextColor3 = baseColor
 		s1Glow.ImageColor3 = baseColor
-		s1StatusText.TextColor3 = if baseOwned >= 5 then Color3.fromRGB(90, 205, 110) else Color3.fromRGB(205, 80, 80)
-		s1StatusText.Text = if baseOwned >= 5 then `MASTERY (LV5)` else `LV {baseOwned}/5`
+		local needLevel = recipe.RequiredLevel
+		s1StatusText.TextColor3 = if baseOwned >= needLevel then Color3.fromRGB(90, 205, 110) else Color3.fromRGB(205, 80, 80)
+		s1StatusText.Text = if baseOwned >= needLevel then `READY (LV{baseOwned})` else `LV {baseOwned}/{needLevel}`
 
 		-- Center Connector: Ascension Chevron (>>)
 		plusLabel.Text = ">>"

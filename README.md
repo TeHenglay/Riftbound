@@ -184,8 +184,8 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   Cores (Act 2) from each of the two nations and 10 Rift Shards
   (`Crafting.lua`: `FUSE_*`).
 - **Awakening** costs 10,000 gold (`Crafting.AwakenGold`). Base skills need
-  level 5, their nation's Essence (or 2 Cores), 8 Shards and 15 Rift Shards.
-- **Fused skills awaken too** (e.g. Steam Cloud Awakened): level 5, plus 1
+  level 2 (`Crafting.AwakenLevel`), their nation's Essence (or 2 Cores), 8 Shards and 15 Rift Shards.
+- **Fused skills awaken too** (e.g. Steam Cloud Awakened): level 2, plus 1
   Essence (Act 3) and 6 Shards from each nation and 20 Rift Shards. Awakened
   fusions are made in `Skills.lua` from the fusion: +20% damage, +25% area,
   effects last 25% longer (zones +1s), +30% knockback. Awakened skills reuse

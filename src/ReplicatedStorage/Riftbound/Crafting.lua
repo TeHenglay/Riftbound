@@ -145,6 +145,7 @@ Crafting.ForgeRecipes = {
 local FUSE_SHARDS, FUSE_CORES, FUSE_RIFT = 4, 3, 10
 local FUSE_GOLD = 10000 -- every fusion
 Crafting.AwakenGold = 10000 -- every awakening, base or fused
+Crafting.AwakenLevel = 2 -- skill level needed to awaken, base or fused
 local NATION_OF = { Fire = "Fire", Water = "Water", Earth = "Earth", Air = "Wind", Lightning = "Lightning" }
 
 for _, recipe in Crafting.ForgeRecipes do
@@ -173,7 +174,7 @@ Crafting.ForgeOrder = {
 }
 
 -- 2. Base Skill Awakening Recipes (The Awakening Altar)
--- Requires Base Skill at Level 5 Mastery + Nation Essence/Cores + 8 Nation Shards + 15 Rift Shards + gold
+-- Requires the skill at level Crafting.AwakenLevel (2) + Nation Essence/Cores + 8 Nation Shards + 15 Rift Shards + gold
 -- (Crafting.AwakenGold, set below; the Gold written here is replaced).
 Crafting.AwakenRecipes = {
 	Fireball = {
@@ -256,7 +257,7 @@ Crafting.AwakenOrder = {
 	"SparkBolt",
 }
 
--- Fused skills awaken too. They need the fusion at level 5 and, from both of
+-- Fused skills awaken too. They need the fusion at Crafting.AwakenLevel and, from both of
 -- its nations, an Essence (Act 3) and Shards, plus Rift Shards. These recipes
 -- list their costs in Materials (base awakenings use Essence / Core / Shard).
 local AWAKEN_FUSED_SHARDS, AWAKEN_FUSED_RIFT = 6, 20
@@ -286,6 +287,7 @@ end
 
 for _, recipe in Crafting.AwakenRecipes do
 	recipe.Gold = Crafting.AwakenGold
+	recipe.RequiredLevel = Crafting.AwakenLevel
 end
 
 -- Checks if a player meets all crafting conditions for a Forge recipe.
@@ -321,7 +323,7 @@ function Crafting.CanAwaken(baseSkillId, ownedSkills, inventory, playerGold)
 	end
 	local skillLevel = ownedSkills and ownedSkills[baseSkillId]
 	if not skillLevel or skillLevel < recipe.RequiredLevel then
-		return false, `Skill must reach Mastery Level {recipe.RequiredLevel} (Current: Lv {skillLevel or 0})`
+		return false, `Skill must reach level {recipe.RequiredLevel} (Current: Lv {skillLevel or 0})`
 	end
 	if (playerGold or 0) < recipe.Gold then
 		return false, `Insufficient Gold ({playerGold or 0}/{recipe.Gold})`
