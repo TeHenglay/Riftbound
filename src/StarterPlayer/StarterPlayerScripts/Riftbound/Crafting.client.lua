@@ -791,7 +791,7 @@ local s2Icon = new("ImageLabel", {
 -- shown on the Altar's "after" preview.
 local s2AwakenFrame = new("Frame", { Name = "AwakenFrame", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = s2Icon })
 local s2AwakenGradients = {}
-for i, spec in { { 0.74, 4, 0 }, { 0.9, 2, 0.35 } } do
+for i, spec in { { 0.62, 6, 0 }, { 0.9, 2, 0.35 } } do -- inner one covers the art's black edge
 	local ring = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -2147,7 +2147,7 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 		tween(icon, 0.55, { Size = UDim2.fromOffset(190, 190) }, Enum.EasingStyle.Back)
 		if awaken then
 			-- The awakened frame: turning gold-cyan-violet diamond borders.
-			for i, spec in { { 0.74, 6, 0 }, { 0.92, 3, 0.3 } } do
+			for i, spec in { { 0.62, 12, 0 }, { 0.92, 3, 0.3 } } do -- inner one covers the art's black edge
 				local ring = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(spec[1], spec[1]), Rotation = 45, BackgroundTransparency = 1, ZIndex = 89, Parent = icon })
 				local edge = new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = spec[2], Transparency = spec[3], LineJoinMode = Enum.LineJoinMode.Miter, Parent = ring })
 				local gradient = new("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, CINE_GOLD), ColorSequenceKeypoint.new(0.35, CINE_CYAN), ColorSequenceKeypoint.new(0.65, CINE_VIOLET), ColorSequenceKeypoint.new(1, CINE_GOLD) }), Parent = edge })

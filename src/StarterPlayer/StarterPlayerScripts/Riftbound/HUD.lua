@@ -185,7 +185,8 @@ local function awakenFrame(icon, size, z)
 		local gradient = new("UIGradient", { Color = AWAKEN_GRADIENT, Parent = edge })
 		return gradient, edge
 	end
-	local inner = diamond(0.74, math.max(2, size * 0.05), 0)
+	-- The inner border sits on the icon art's black edge and paints over it.
+	local inner = diamond(0.62, math.max(3, size * 0.065), 0)
 	local outerGradient, halo = diamond(0.9, math.max(1, size * 0.025), 0.35)
 	awakenFrames[inner] = { Speed = 1 }
 	awakenFrames[outerGradient] = { Speed = -0.6, Halo = halo }
