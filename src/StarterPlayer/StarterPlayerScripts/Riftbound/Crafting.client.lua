@@ -781,6 +781,49 @@ local s2Icon = new("ImageLabel", {
 	Parent = s2Box,
 })
 
+-- The awakened skill's living frame (matches the HUD's awakened icons),
+-- shown on the Altar's "after" preview.
+local s2AwakenFrame = new("Frame", { Name = "AwakenFrame", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = s2Icon })
+local s2AwakenGradients = {}
+for i, spec in { { 0.74, 4, 0 }, { 0.9, 2, 0.35 } } do
+	local ring = new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(spec[1], spec[1]),
+		Rotation = 45,
+		BackgroundTransparency = 1,
+		ZIndex = 5,
+		Parent = s2AwakenFrame,
+	})
+	local edge = new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = spec[2], Transparency = spec[3], LineJoinMode = Enum.LineJoinMode.Miter, Parent = ring })
+	s2AwakenGradients[i] = new("UIGradient", {
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 92)),
+			ColorSequenceKeypoint.new(0.35, Color3.fromRGB(110, 232, 255)),
+			ColorSequenceKeypoint.new(0.65, Color3.fromRGB(196, 124, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 214, 92)),
+		}),
+		Parent = edge,
+	})
+end
+new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0.5),
+	Position = UDim2.fromScale(0.5, 0.02),
+	Size = UDim2.fromOffset(10, 10),
+	Rotation = 45,
+	BackgroundColor3 = Color3.fromRGB(150, 240, 255),
+	BorderSizePixel = 0,
+	ZIndex = 6,
+	Parent = s2AwakenFrame,
+}, { new("UIStroke", { Color = Color3.fromRGB(255, 230, 140), Thickness = 1 }) })
+game:GetService("RunService").RenderStepped:Connect(function()
+	if gui.Enabled and s2AwakenFrame.Visible then
+		local t = os.clock()
+		s2AwakenGradients[1].Rotation = (t * 120) % 360
+		s2AwakenGradients[2].Rotation = (-t * 72) % 360
+	end
+end)
+
 local s2Name = text({
 	AnchorPoint = Vector2.new(0.5, 0),
 	Position = UDim2.new(0.5, 0, 0, 94),
@@ -1187,6 +1230,7 @@ local function renderDetails()
 		local s2Elem = getSkillElement(s2Id)
 		local s2Color = getSkillColor(s2Id)
 		s2Icon.Image = UIAssets.Icons[s2Id] or UIAssets.Icons.Empty
+		s2AwakenFrame.Visible = false
 		s2Name.Text = s2Def and s2Def.Name or s2Id
 		s2Element.Text = s2Elem
 		s2Element.TextColor3 = s2Color
@@ -1298,6 +1342,7 @@ local function renderDetails()
 		-- Skill 2 is Awakened Skill (Fireball >> Fireball Awakened)
 		local isAwakened = (cachedBuild.Skills[recipe.AwakenedSkill] ~= nil)
 		s2Icon.Image = UIAssets.Icons[recipe.BaseSkill] or UIAssets.Icons.Empty
+		s2AwakenFrame.Visible = true
 		s2Name.Text = if def then def.Name else recipe.AwakenedSkill
 		s2Element.Text = `{baseElem} • Awakened`
 		s2Element.TextColor3 = Color3.fromRGB(100, 220, 255)
@@ -1415,6 +1460,7 @@ local function renderDetails()
 		s1StatusText.Text = if isOwned then `OWNED LV{level}` else "READY TO TEST"
 
 		s2Icon.Image = UIAssets.Icons[selectedId] or UIAssets.Icons.Empty
+		s2AwakenFrame.Visible = false
 		s2Name.Text = "Elemental Shrine"
 		s2Element.Text = `{elem} Essence`
 		s2Element.TextColor3 = elemColor

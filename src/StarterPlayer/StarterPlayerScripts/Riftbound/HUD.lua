@@ -150,9 +150,77 @@ local function slab(props)
 end
 
 -- Crystal-shard icon for a skill (or "Dash" / nil for empty).
+-- Awakened skills get a living frame: a gold -> cyan -> violet diamond border
+-- that slowly turns and pulses, an outer halo and a crystal on the top tip.
+-- One loop animates every frame on screen.
+local AWAKEN_GRADIENT = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 214, 92)),
+	ColorSequenceKeypoint.new(0.35, Color3.fromRGB(110, 232, 255)),
+	ColorSequenceKeypoint.new(0.65, Color3.fromRGB(196, 124, 255)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 214, 92)),
+})
+local awakenFrames = setmetatable({}, { __mode = "k" }) -- [gradient] = { Halo = stroke }
+local awakenLoop
+
+local function awakenFrame(icon, size, z)
+	local function diamond(scale, thickness, transparency)
+		local frame = new("Frame", {
+			Name = "AwakenFrame",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(scale, scale),
+			Rotation = 45,
+			BackgroundTransparency = 1,
+			ZIndex = z + 1,
+			Parent = icon,
+		})
+		local edge = new("UIStroke", {
+			Color = Color3.new(1, 1, 1),
+			Thickness = thickness,
+			Transparency = transparency,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+			LineJoinMode = Enum.LineJoinMode.Miter,
+			Parent = frame,
+		})
+		local gradient = new("UIGradient", { Color = AWAKEN_GRADIENT, Parent = edge })
+		return gradient, edge
+	end
+	local inner = diamond(0.74, math.max(2, size * 0.05), 0)
+	local outerGradient, halo = diamond(0.9, math.max(1, size * 0.025), 0.35)
+	awakenFrames[inner] = { Speed = 1 }
+	awakenFrames[outerGradient] = { Speed = -0.6, Halo = halo }
+	-- Crystal on the top tip.
+	new("Frame", {
+		Name = "AwakenCrystal",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.02),
+		Size = UDim2.fromOffset(math.max(5, size * 0.11), math.max(5, size * 0.11)),
+		Rotation = 45,
+		BackgroundColor3 = Color3.fromRGB(150, 240, 255),
+		BorderSizePixel = 0,
+		ZIndex = z + 2,
+		Parent = icon,
+	}, { new("UIStroke", { Color = Color3.fromRGB(255, 230, 140), Thickness = 1 }) })
+	if not awakenLoop then
+		awakenLoop = RunService.RenderStepped:Connect(function()
+			local t = os.clock()
+			for gradient, info in awakenFrames do
+				if gradient:IsDescendantOf(game) then
+					gradient.Rotation = (t * 120 * info.Speed) % 360
+					if info.Halo then
+						info.Halo.Transparency = 0.35 + 0.3 * math.sin(t * 3)
+					end
+				else
+					awakenFrames[gradient] = nil
+				end
+			end
+		end)
+	end
+end
+
 local function shard(id, size, parent, z)
 	local image = if id == "Dash" then UIAssets.Icons.Dash elseif id and UIAssets.Icons[id] then UIAssets.Icons[id] else UIAssets.Icons.Empty
-	return new("ImageLabel", {
+	local icon = new("ImageLabel", {
 		Name = "Shard",
 		Size = UDim2.fromOffset(size, size),
 		BackgroundTransparency = 1,
@@ -160,6 +228,11 @@ local function shard(id, size, parent, z)
 		ZIndex = z or 1,
 		Parent = parent,
 	})
+	local def = id and Skills.Defs[id]
+	if def and def.Awakened then
+		awakenFrame(icon, size, z or 1)
+	end
+	return icon
 end
 
 local function skillInSlot(slot)
@@ -2046,10 +2119,10 @@ local function skillListRow(list, order, id)
 	text({
 		Position = UDim2.fromOffset(70, 28),
 		Size = UDim2.new(1, -170, 0, 14),
-		Text = `{NUMERALS[level]}   ·   {if #def.Elements == 2 then "Fusion" else (def.Elements[1] or "Rift")}`,
+		Text = `{NUMERALS[level]}   ·   {if def.Awakened then "Awakened" elseif #def.Elements == 2 then "Fusion" else (def.Elements[1] or "Rift")}`,
 		FontFace = F.Label,
 		TextSize = 11,
-		TextColor3 = C.Ash,
+		TextColor3 = if def.Awakened then Color3.fromRGB(110, 232, 255) else C.Ash,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		ZIndex = 24,
 		Parent = row,
