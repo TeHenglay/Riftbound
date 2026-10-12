@@ -87,6 +87,11 @@ local ItemNeonColors = {
 -------------------------------------------------------------------------------
 local function new(class, props, children)
 	local inst = Instance.new(class)
+	-- Strokes outline the box, never the text (the default "Contextual" mode
+	-- put a coloured glow around button text and made it hard to read).
+	if class == "UIStroke" and props.ApplyStrokeMode == nil then
+		inst.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	end
 	for k, v in props do
 		if k ~= "Parent" then
 			inst[k] = v
@@ -1402,27 +1407,28 @@ local function renderDetails()
 		-- Perk Details
 		statusText.Text = `PERK: {recipe.PerkName:upper()} • +20% Base Damage`
 
-		local canAwaken, _ = Crafting.CanAwaken(selectedId, cachedBuild.Skills, cachedInventory, gold)
+		-- Green when you can awaken; red (with the reason) when you can't.
+		local canAwaken, why = Crafting.CanAwaken(selectedId, cachedBuild.Skills, cachedInventory, gold)
 		actionBtn.Active = canAwaken
 		if canAwaken then
 			actionBtn.Text = "AWAKEN SKILL"
-			actionBtn.TextColor3 = Color3.fromRGB(225, 250, 255)
-			actionBtn.UIStroke.Color = Color3.fromRGB(100, 220, 255)
+			actionBtn.TextColor3 = Color3.fromRGB(240, 255, 240)
+			actionBtn.UIStroke.Color = Color3.fromRGB(110, 230, 130)
 			actionBtn.UIStroke.Thickness = 2
 			actionBtn.UIGradient.Color = ColorSequence.new({
-				ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 115, 210)),
-				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(50, 190, 255)),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 115, 210)),
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(24, 110, 52)),
+				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(46, 170, 84)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(24, 110, 52)),
 			})
 		else
-			actionBtn.Text = "INSUFFICIENT REQUIREMENTS"
-			actionBtn.TextColor3 = Color3.fromRGB(220, 235, 250)
-			actionBtn.UIStroke.Color = Color3.fromRGB(75, 120, 165)
+			actionBtn.Text = "CAN'T AWAKEN  ·  " .. tostring(why or "requirements not met"):upper()
+			actionBtn.TextColor3 = Color3.fromRGB(255, 230, 230)
+			actionBtn.UIStroke.Color = Color3.fromRGB(220, 80, 90)
 			actionBtn.UIStroke.Thickness = 1.5
 			actionBtn.UIGradient.Color = ColorSequence.new({
-				ColorSequenceKeypoint.new(0, Color3.fromRGB(32, 44, 62)),
-				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(46, 62, 88)),
-				ColorSequenceKeypoint.new(1, Color3.fromRGB(32, 44, 62)),
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(90, 24, 32)),
+				ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 38, 50)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 24, 32)),
 			})
 		end
 	else
