@@ -2839,134 +2839,135 @@ end
 local attributes
 local refreshAttributes
 
+local ATTR_W, ATTR_H = 760, 560
+local ATTR_CARD_W, ATTR_CARD_H = 351, 196
+local ATTR_GOLD = Color3.fromRGB(255, 214, 92)
+
 local function buildAttributes()
 	attributes = new("Frame", {
 		Name = "Attributes",
-		-- The banner sits above the body; centre the body itself on screen.
-		AnchorPoint = Vector2.new(0.5, (92 + (560 - 92) / 2) / 560),
+		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = screenCenter(),
-		Size = UDim2.fromOffset(680, 560),
-		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(ATTR_W, ATTR_H),
+		BackgroundColor3 = Theme.C.Panel,
 		Visible = false,
 		ZIndex = 20,
 		Parent = gui,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 18) }),
+		new("UIStroke", { Color = Color3.fromRGB(70, 60, 100), Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(Color3.fromRGB(34, 30, 52), Color3.fromRGB(16, 15, 24)) }),
 	})
 	new("UIScale", { Parent = attributes })
-	slab({ Name = "Body", Position = UDim2.fromOffset(10, 92), Size = UDim2.new(1, -20, 1, -92), ZIndex = 20, Parent = attributes })
 
-	local banner = new("ImageLabel", {
-		Name = "Banner",
-		Position = UDim2.fromOffset(-30, 0),
-		Size = UDim2.new(1, 60, 0, 104),
-		BackgroundTransparency = 1,
-		Image = UIAssets.Banner,
-		ScaleType = Enum.ScaleType.Slice,
-		SliceCenter = UIAssets.BannerSlice,
-		SliceScale = 0.8,
-		ZIndex = 22,
-		Parent = attributes,
+	-- Header.
+	text({ Position = UDim2.fromOffset(28, 22), Size = UDim2.fromOffset(400, 36), Text = "Attributes", FontFace = F.TitleBold, TextSize = 32, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = attributes })
+	text({ Position = UDim2.fromOffset(28, 60), Size = UDim2.fromOffset(460, 18), Text = "Every level gives you a point. Spend it to shape your power!", FontFace = F.Body, TextSize = 14, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = attributes })
+	-- Points medallion: a gold diamond with the unspent points, glowing when you have some.
+	local medal = new("Frame", { Name = "Medal", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -138, 0, 58), Size = UDim2.fromOffset(52, 52), Rotation = 45, BackgroundColor3 = ATTR_GOLD, ZIndex = 22, Parent = attributes }, {
+		new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
 	})
-	text({ Position = UDim2.fromOffset(0, 20), Size = UDim2.new(1, 0, 0, 40), Text = spaced("Attributes"), FontFace = F.Title, TextSize = 36, TextStrokeColor3 = C.RiftDeep, TextStrokeTransparency = 0.4, ZIndex = 23, Parent = banner })
-	text({ Position = UDim2.fromOffset(0, 62), Size = UDim2.new(1, 0, 0, 16), Text = "E A C H   L E V E L   G R A N T S   O N E   P O I N T", FontFace = F.Label, TextSize = 11, TextColor3 = C.Gold, ZIndex = 23, Parent = banner })
+	text({ Name = "Points", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(1, -138, 0, 58), Size = UDim2.fromOffset(52, 52), Text = "0", FontFace = F.TitleBold, TextSize = 26, TextColor3 = Theme.C.Ink, ZIndex = 23, Parent = attributes })
+	text({ Name = "PointsLabel", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -176, 0, 58), Size = UDim2.fromOffset(140, 18), Text = "POINTS TO SPEND", FontFace = F.Label, TextSize = 11, TextColor3 = ATTR_GOLD, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 22, Parent = attributes })
 
 	local close = new("TextButton", {
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -4, 0, 112),
-		Size = UDim2.fromOffset(34, 34),
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -20, 0, 20),
+		Size = UDim2.fromOffset(40, 40),
 		Text = "X",
 		FontFace = F.TitleBold,
 		TextSize = 18,
-		TextColor3 = C.Gold,
+		TextColor3 = C.Parchment,
 		AutoButtonColor = true,
-		BackgroundColor3 = C.Ink,
+		BackgroundColor3 = Color3.fromRGB(40, 34, 56),
 		ZIndex = 24,
 		Parent = attributes,
-	}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Bronze, 2) })
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 10) }), new("UIStroke", { Color = Color3.fromRGB(90, 80, 120), Thickness = 1.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }) })
 	close.Activated:Connect(function()
 		HUD.SetStats(false)
 	end)
 
-	text({ Position = UDim2.fromOffset(40, 114), Size = UDim2.fromOffset(360, 28), Text = "Shape your power", FontFace = F.TitleBold, TextSize = 24, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 22, Parent = attributes })
-	new("Frame", { Position = UDim2.fromOffset(40, 146), Size = UDim2.fromOffset(52, 2), BackgroundColor3 = C.Crimson, BorderSizePixel = 0, ZIndex = 22, Parent = attributes })
-	text({ Name = "PointsLabel", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -96, 0, 122), Size = UDim2.fromOffset(160, 16), Text = "U N S P E N T", FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 22, Parent = attributes })
-	text({ Name = "Points", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -50, 0, 110), Size = UDim2.fromOffset(44, 40), Text = "0", FontFace = F.TitleBold, TextSize = 34, TextColor3 = C.Gold, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.3, ZIndex = 22, Parent = attributes })
-
-	local list = new("Frame", {
+	local grid = new("Frame", {
 		Name = "Rows",
-		Position = UDim2.fromOffset(28, 160),
-		Size = UDim2.new(1, -56, 0, 380),
+		Position = UDim2.fromOffset(24, 112),
+		Size = UDim2.new(1, -48, 0, ATTR_CARD_H * 2 + 12),
 		BackgroundTransparency = 1,
 		ZIndex = 22,
 		Parent = attributes,
-	}, { new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	}, { new("UIGridLayout", { CellSize = UDim2.fromOffset(ATTR_CARD_W, ATTR_CARD_H), CellPadding = UDim2.fromOffset(10, 12), SortOrder = Enum.SortOrder.LayoutOrder }) })
+	text({ AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -14), Size = UDim2.fromOffset(500, 18), Text = "Press C anytime to open this page", FontFace = F.Italic, TextSize = 13, TextColor3 = Color3.fromRGB(130, 125, 150), ZIndex = 22, Parent = attributes })
 
 	for order, id in Stats.Order do
 		local def = Stats.Defs[id]
-		local row = new("ImageLabel", {
+		local color = def.Color
+		local card = new("Frame", {
 			Name = id,
-			Size = UDim2.new(1, 0, 0, 88),
-			BackgroundTransparency = 1,
-			Image = UIAssets.Row,
-			ScaleType = Enum.ScaleType.Slice,
-			SliceCenter = UIAssets.RowSlice,
-			SliceScale = 0.5,
+			BackgroundColor3 = Color3.new(1, 1, 1),
 			LayoutOrder = order,
 			ZIndex = 22,
-			Parent = list,
+			Parent = grid,
+		}, {
+			new("UICorner", { CornerRadius = UDim.new(0, 16) }),
+			new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Theme.C.Ink, 0.55), color:Lerp(Theme.C.Ink, 0.88)) }),
+			new("UIStroke", { Color = color, Thickness = 1.5, Transparency = 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
 		})
-		new("Frame", {
-			Position = UDim2.fromOffset(8, 8),
-			Size = UDim2.new(1, -16, 1, -16),
-			BackgroundColor3 = def.Color,
-			BorderSizePixel = 0,
-			ZIndex = 22,
-			Parent = row,
-		}, { new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.75), NumberSequenceKeypoint.new(0.5, 0.96), NumberSequenceKeypoint.new(1, 1) }) }) })
-		new("ImageLabel", {
-			Name = "Icon",
-			Position = UDim2.fromOffset(12, 8),
-			Size = UDim2.fromOffset(72, 72),
-			BackgroundTransparency = 1,
-			Image = UIAssets.Stats[id],
-			ZIndex = 23,
-			Parent = row,
+		new("ImageLabel", { Name = "Icon", Position = UDim2.fromOffset(12, 12), Size = UDim2.fromOffset(82, 82), BackgroundTransparency = 1, Image = UIAssets.Stats[id], ZIndex = 24, Parent = card })
+		text({ Position = UDim2.fromOffset(104, 14), Size = UDim2.new(1, -116, 0, 28), Text = def.Name, FontFace = F.TitleBold, TextSize = 24, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0.5, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = card })
+		text({ Position = UDim2.fromOffset(104, 44), Size = UDim2.new(1, -116, 0, 36), Text = def.Description, FontFace = F.Body, TextSize = 13, TextWrapped = true, TextColor3 = Color3.fromRGB(225, 222, 235), TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 24, Parent = card })
+		-- Current bonus and what the next point gives.
+		text({ Position = UDim2.fromOffset(16, 102), Size = UDim2.fromOffset(200, 14), Text = "YOUR BONUS", FontFace = F.Label, TextSize = 11, TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.35), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = card })
+		text({ Name = "Bonus", Position = UDim2.fromOffset(16, 116), Size = UDim2.new(1, -100, 0, 28), FontFace = F.TitleBold, TextSize = 24, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = card })
+		text({ Name = "Next", Position = UDim2.fromOffset(16, 144), Size = UDim2.new(1, -100, 0, 16), FontFace = F.BodyBold, TextSize = 13, TextColor3 = C.Good, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = card })
+		-- Rank: ten rounded segments and "4 / 10".
+		new("Frame", { Name = "Pips", Position = UDim2.fromOffset(16, 170), Size = UDim2.new(1, -150, 0, 12), BackgroundTransparency = 1, ZIndex = 24, Parent = card }, {
+			new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 4) }),
 		})
-		text({ Position = UDim2.fromOffset(96, 10), Size = UDim2.fromOffset(200, 24), Text = def.Name, FontFace = F.TitleBold, TextSize = 22, TextColor3 = def.Color, TextXAlignment = Enum.TextXAlignment.Left, TextStrokeColor3 = C.Ink, TextStrokeTransparency = 0.4, ZIndex = 23, Parent = row })
-		text({ Position = UDim2.fromOffset(96, 34), Size = UDim2.fromOffset(330, 18), Text = def.Description, FontFace = F.Body, TextSize = 12, TextColor3 = Color3.fromRGB(217, 201, 173), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = row })
-		new("Frame", {
-			Name = "Pips",
-			Position = UDim2.fromOffset(98, 60),
-			Size = UDim2.fromOffset(200, 14),
-			BackgroundTransparency = 1,
-			ZIndex = 23,
-			Parent = row,
-		}, { new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, VerticalAlignment = Enum.VerticalAlignment.Center, Padding = UDim.new(0, 8) }) })
-		text({ Name = "Bonus", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -80, 0, 14), Size = UDim2.fromOffset(170, 20), FontFace = F.Label, TextSize = 13, TextColor3 = C.Good, TextXAlignment = Enum.TextXAlignment.Right, RichText = true, ZIndex = 23, Parent = row })
-		text({ Name = "Rank", AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -80, 0, 56), Size = UDim2.fromOffset(120, 18), FontFace = F.Label, TextSize = 12, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 23, Parent = row })
+		text({ Name = "Rank", Position = UDim2.new(1, -132, 0, 166), Size = UDim2.fromOffset(50, 20), FontFace = F.Label, TextSize = 13, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = card })
+		-- The big + button.
 		local plus = new("TextButton", {
 			Name = "Plus",
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -18, 0.5, 0),
-			Size = UDim2.fromOffset(48, 48),
+			AnchorPoint = Vector2.new(1, 1),
+			Position = UDim2.new(1, -14, 1, -14),
+			Size = UDim2.fromOffset(64, 64),
 			Text = "+",
 			FontFace = F.TitleBold,
-			TextSize = 30,
+			TextSize = 38,
 			AutoButtonColor = true,
-			ZIndex = 24,
-			Parent = row,
-		}, { new("UICorner", { CornerRadius = UDim.new(0.5, 0) }), stroke(C.Gold, 2) })
+			ZIndex = 25,
+			Parent = card,
+		}, {
+			new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+			new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		})
+		local maxTag = new("Frame", { Name = "Max", AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -14, 1, -30), Size = UDim2.fromOffset(70, 28), BackgroundColor3 = ATTR_GOLD, Visible = false, ZIndex = 25, Parent = card }, {
+			new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		})
+		text({ Size = UDim2.fromScale(1, 1), Text = "MAX", FontFace = F.TitleBold, TextSize = 15, TextColor3 = Theme.C.Ink, ZIndex = 26, Parent = maxTag })
 		plus.Activated:Connect(function()
 			if (player:GetAttribute("StatPoints") or 0) <= 0 then
 				return
 			end
 			if remotes.SpendStat:InvokeServer(id) then
-				local icon = row.Icon
-				icon.Size = UDim2.fromOffset(84, 84)
-				icon.Position = UDim2.fromOffset(6, 2)
-				tween(icon, 0.35, { Size = UDim2.fromOffset(72, 72), Position = UDim2.fromOffset(12, 8) }, Enum.EasingStyle.Back)
+				-- Pop the icon and flash the card.
+				local icon = card.Icon
+				icon.Size = UDim2.fromOffset(98, 98)
+				icon.Position = UDim2.fromOffset(4, 4)
+				tween(icon, 0.4, { Size = UDim2.fromOffset(82, 82), Position = UDim2.fromOffset(12, 12) }, Enum.EasingStyle.Back)
+				local flash = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 0.6, ZIndex = 27, Parent = card }, { new("UICorner", { CornerRadius = UDim.new(0, 16) }) })
+				tween(flash, 0.35, { BackgroundTransparency = 1 })
+				task.delay(0.4, function()
+					flash:Destroy()
+				end)
 			end
 		end)
 	end
+	-- The medallion gently pulses while there are points to spend.
+	RunService.RenderStepped:Connect(function()
+		if attributes.Visible and (player:GetAttribute("StatPoints") or 0) > 0 then
+			local size = 52 + math.sin(os.clock() * 4) * 4
+			medal.Size = UDim2.fromOffset(size, size)
+		end
+	end)
 end
 
 refreshAttributes = function()
@@ -2975,42 +2976,46 @@ refreshAttributes = function()
 	end
 	local points = player:GetAttribute("StatPoints") or 0
 	attributes.Points.Text = tostring(points)
-	attributes.Points.TextColor3 = if points > 0 then C.Gold else C.Ash
+	attributes.Medal.BackgroundColor3 = if points > 0 then ATTR_GOLD else Color3.fromRGB(70, 66, 90)
+	attributes.Medal.Size = UDim2.fromOffset(52, 52)
+	attributes.Points.TextColor3 = if points > 0 then Theme.C.Ink else Color3.fromRGB(170, 165, 190)
+	attributes.PointsLabel.TextColor3 = if points > 0 then ATTR_GOLD else C.Ash
 	for _, id in Stats.Order do
 		local def = Stats.Defs[id]
-		local row = attributes.Rows[id]
+		local card = attributes.Rows[id]
 		local rank = player:GetAttribute("Stat_" .. id) or 0
-		for _, child in row.Pips:GetChildren() do
+		for _, child in card.Pips:GetChildren() do
 			if child:IsA("Frame") then
 				child:Destroy()
 			end
 		end
+		local segW = math.floor((ATTR_CARD_W - 150 - 4 * (Stats.MaxRank - 1)) / Stats.MaxRank)
 		for i = 1, Stats.MaxRank do
 			local full = i <= rank
 			new("Frame", {
-				Size = UDim2.fromOffset(9, 9),
-				Rotation = 45,
-				BackgroundColor3 = if full then def.Color else C.Ink,
+				Size = UDim2.fromOffset(segW, 12),
+				BackgroundColor3 = if full then def.Color:Lerp(Color3.new(1, 1, 1), 0.15) else Color3.fromRGB(14, 14, 20),
 				LayoutOrder = i,
-				ZIndex = 23,
-				Parent = row.Pips,
-			}, { stroke(if full then C.Parchment else C.Bronze, 1, if full then 0.4 else 0.2) })
+				ZIndex = 24,
+				Parent = card.Pips,
+			}, {
+				new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+				new("UIStroke", { Color = if full then Color3.new(1, 1, 1) else def.Color, Thickness = 1, Transparency = if full then 0.5 else 0.6, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+			})
 		end
 		local maxed = rank >= Stats.MaxRank
-		row.Rank.Text = `R A N K   {rank} / {Stats.MaxRank}`
-		if maxed then
-			row.Bonus.Text = def.Format(rank) .. "   ·   MAX"
-		elseif rank == 0 then
-			row.Bonus.Text = `<font color="{hex(C.Ash)}">none</font>   >   {def.Format(1)}`
-		else
-			row.Bonus.Text = `<font color="{hex(C.Ash)}">{def.Format(rank)}</font>   >   {def.Format(rank + 1)}`
-		end
+		card.Rank.Text = `{rank} / {Stats.MaxRank}`
+		card.Bonus.Text = if rank == 0 then "None yet" else def.Format(rank)
+		card.Bonus.TextColor3 = if rank == 0 then Color3.fromRGB(190, 185, 205) else Color3.new(1, 1, 1)
+		card.Next.Text = if maxed then "Fully trained!" else `next point:  {def.Format(rank + 1)}`
+		card.Next.TextColor3 = if maxed then ATTR_GOLD else C.Good
 		local canBuy = points > 0 and not maxed
-		row.Plus.Text = if maxed then "" else "+"
-		row.Plus.BackgroundColor3 = if canBuy then C.Gold else C.Ink
-		row.Plus.TextColor3 = if canBuy then C.Ink else C.Ash
-		row.Plus.UIStroke.Color = if canBuy then C.Gold else C.Bronze
-		row.Plus.AutoButtonColor = canBuy
+		card.Plus.Visible = not maxed
+		card.Max.Visible = maxed
+		card.Plus.BackgroundColor3 = if canBuy then def.Color else Color3.fromRGB(30, 30, 40)
+		card.Plus.TextColor3 = if canBuy then Theme.C.Ink else Color3.fromRGB(110, 108, 125)
+		card.Plus.UIStroke.Transparency = if canBuy then 0 else 0.7
+		card.Plus.AutoButtonColor = canBuy
 	end
 end
 
