@@ -1929,41 +1929,56 @@ end
 local CINE_GOLD, CINE_CYAN, CINE_VIOLET = Color3.fromRGB(255, 214, 92), Color3.fromRGB(110, 232, 255), Color3.fromRGB(196, 124, 255)
 local cinePlaying = false
 
-local function cineCircle(parent, size, color, thickness, z)
+-- A diamond outline (a square turned 45 degrees), matching the skill icons.
+-- `size` is the diamond's width tip to tip; tweening Size keeps it a diamond.
+local DIAMOND = 1 / math.sqrt(2)
+local function cineDiamond(parent, size, color, thickness, z)
 	return new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.fromOffset(size, size),
+		Size = UDim2.fromOffset(size * DIAMOND, size * DIAMOND),
+		Rotation = 45,
 		BackgroundTransparency = 1,
 		ZIndex = z,
 		Parent = parent,
 	}, {
-		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
-		new("UIStroke", { Color = color, Thickness = thickness }),
+		new("UIStroke", { Color = color, Thickness = thickness, LineJoinMode = Enum.LineJoinMode.Miter }),
 	})
 end
 
--- Light rays fanning out from the centre; returns the spinning holder.
+-- Soft light rays fanning out from the centre; returns the spinning holder.
+-- Each ray is a stretched soft glow passing through the centre (so it makes
+-- two opposite rays and spins around the middle), with blurry edges.
+local GLOW = UIAssets.Fx.Glow
 local function cineRays(parent, colors, count, length, z)
 	local holder = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.42), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = z, Parent = parent })
-	for i = 1, count do
-		new("Frame", {
-			AnchorPoint = Vector2.new(0.5, 1),
+	local beams = math.max(1, math.floor(count / 2))
+	for i = 1, beams do
+		new("ImageLabel", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
-			Size = UDim2.fromOffset(if i % 2 == 0 then 10 else 22, length),
-			Rotation = i / count * 360,
-			BackgroundColor3 = Color3.new(1, 1, 1),
-			BorderSizePixel = 0,
+			Size = UDim2.fromOffset(if i % 2 == 0 then 46 else 80, length * 2),
+			Rotation = i / beams * 180,
+			BackgroundTransparency = 1,
+			Image = GLOW,
+			ImageColor3 = colors[(i - 1) % #colors + 1],
+			ImageTransparency = if i % 2 == 0 then 0.35 else 0.15,
 			ZIndex = z,
 			Parent = holder,
-		}, {
-			new("UIGradient", {
-				Rotation = 90,
-				Color = ColorSequence.new(colors[(i - 1) % #colors + 1], Color3.new(1, 1, 1)),
-				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.6, 0.55), NumberSequenceKeypoint.new(1, 0.15) }),
-			}),
 		})
 	end
+	-- A big soft bloom behind everything.
+	new("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(length * 1.4, length * 1.4),
+		BackgroundTransparency = 1,
+		Image = GLOW,
+		ImageColor3 = colors[1],
+		ImageTransparency = 0.25,
+		ZIndex = z - 1,
+		Parent = holder,
+	})
 	return holder
 end
 
@@ -1988,12 +2003,24 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 	local resultDef = Skills.Defs[resultId]
 	local resultColor = getSkillColor(resultId)
 	local awaken = kind == "Awaken"
-	-- Step the Forge aside.
+	-- Step the Forge aside (everything on its screen, titles included) and
+	-- blur the world behind the reveal.
 	tween(panelScale, 0.25, { Scale = (panelScale.Scale or 1) * 0.85 })
+	local hidden = {}
 	task.delay(0.2, function()
-		panel.Visible = false
+		for _, child in gui:GetChildren() do
+			if child:IsA("GuiObject") and child ~= shade and child.Name ~= "Cinematic" and child.Visible then
+				child.Visible = false
+				table.insert(hidden, child)
+			end
+		end
 	end)
 	tween(shade, 0.3, { BackgroundTransparency = 1 })
+	local blur = Instance.new("BlurEffect")
+	blur.Name = "RiftCinematicBlur"
+	blur.Size = 0
+	blur.Parent = game:GetService("Lighting")
+	tween(blur, 0.4, { Size = 14 })
 
 	local cine = new("TextButton", { Name = "Cinematic", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 80, Parent = gui })
 	tween(cine, 0.4, { BackgroundTransparency = 0.6 })
@@ -2020,8 +2047,13 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 				tween(d, 0.3, { Transparency = 1 })
 			end
 		end
+		tween(blur, 0.4, { Size = 0 })
 		task.delay(0.4, function()
 			cine:Destroy()
+			blur:Destroy()
+			for _, child in hidden do
+				child.Visible = true
+			end
 			panel.Visible = true
 			tween(shade, 0.25, { BackgroundTransparency = 0.45 })
 			updateScale()
@@ -2035,18 +2067,18 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 	if awaken then
 		-- Power gathers: rings close in on the skill, which shakes and burns white.
 		local icon = cineIcon(cine, fromIds[1], 150, 86)
-		local aura = cineCircle(cine, 190, CINE_GOLD, 4, 85)
+		local aura = cineDiamond(cine, 190, CINE_GOLD, 4, 85)
 		aura.Position = UDim2.fromScale(0.5, 0.42)
 		for i = 1, 6 do
 			task.delay((i - 1) * 0.22, function()
 				if not live then
 					return
 				end
-				local r = cineCircle(cine, 900, if i % 3 == 1 then CINE_GOLD elseif i % 3 == 2 then CINE_CYAN else CINE_VIOLET, 5, 84)
+				local r = cineDiamond(cine, 900, if i % 3 == 1 then CINE_GOLD elseif i % 3 == 2 then CINE_CYAN else CINE_VIOLET, 5, 84)
 				r.Position = UDim2.fromScale(0.5, 0.42)
 				local edge = r:FindFirstChildOfClass("UIStroke")
 				edge.Transparency = 0.6
-				tween(r, 0.55, { Size = UDim2.fromOffset(150, 150) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				tween(r, 0.55, { Size = UDim2.fromOffset(170 * DIAMOND, 170 * DIAMOND) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 				tween(edge, 0.55, { Transparency = 0, Thickness = 10 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 				task.delay(0.56, function()
 					r:Destroy()
@@ -2059,7 +2091,8 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 			local jitter = t * t * 10
 			icon.Position = UDim2.new(0.5, math.random(-100, 100) / 100 * jitter, 0.42, math.random(-100, 100) / 100 * jitter)
 			icon.ImageColor3 = Color3.new(1, 1, 1):Lerp(Color3.fromRGB(255, 250, 230), t)
-			aura.Size = UDim2.fromOffset(190 + math.sin(os.clock() * 20) * 8 * t, 190 + math.sin(os.clock() * 20) * 8 * t)
+			local auraSize = (190 + math.sin(os.clock() * 20) * 8 * t) * DIAMOND
+			aura.Size = UDim2.fromOffset(auraSize, auraSize)
 		end))
 		task.delay(PEAK, function()
 			if not live then
@@ -2075,8 +2108,8 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 		a.Position = UDim2.fromScale(0.18, 0.42)
 		b.Position = UDim2.fromScale(0.82, 0.42)
 		for _, pair in { { a, getSkillColor(fromIds[1]) }, { b, getSkillColor(fromIds[2]) } } do
-			local glow = cineCircle(pair[1], 160, pair[2], 4, 85)
-			tween(glow, PEAK, { Size = UDim2.fromOffset(220, 220) })
+			local glow = cineDiamond(pair[1], 160, pair[2], 4, 85)
+			tween(glow, PEAK, { Size = UDim2.fromOffset(220 * DIAMOND, 220 * DIAMOND) })
 		end
 		tween(a, PEAK, { Position = UDim2.fromScale(0.5, 0.42), Rotation = 540 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		tween(b, PEAK, { Position = UDim2.fromScale(0.5, 0.42), Rotation = -540 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
@@ -2102,11 +2135,11 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 			rays.Rotation += dt * (if awaken then 25 else 15)
 		end))
 		for i = 1, 3 do
-			local wave = cineCircle(cine, 40, colors[i], 8, 83)
+			local wave = cineDiamond(cine, 40, colors[i], 8, 83)
 			wave.Position = UDim2.fromScale(0.5, 0.42)
 			local edge = wave:FindFirstChildOfClass("UIStroke")
 			task.delay((i - 1) * 0.12, function()
-				tween(wave, 0.9, { Size = UDim2.fromOffset(1100, 1100) }, Enum.EasingStyle.Quart)
+				tween(wave, 0.9, { Size = UDim2.fromOffset(1100 * DIAMOND, 1100 * DIAMOND) }, Enum.EasingStyle.Quart)
 				tween(edge, 0.9, { Transparency = 1, Thickness = 1 })
 			end)
 		end
