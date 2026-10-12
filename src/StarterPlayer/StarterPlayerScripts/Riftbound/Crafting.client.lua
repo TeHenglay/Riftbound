@@ -2022,7 +2022,26 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 	blur.Parent = game:GetService("Lighting")
 	tween(blur, 0.4, { Size = 14 })
 
-	local cine = new("TextButton", { Name = "Cinematic", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 80, Parent = gui })
+	-- A little bigger than the screen so the impact shake never shows an edge.
+	local CINE_HOME = UDim2.new(0, -30, 0, -30)
+	local cine = new("TextButton", { Name = "Cinematic", Position = CINE_HOME, Size = UDim2.new(1, 60, 1, 60), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 80, Parent = gui })
+	-- Shakes the whole reveal for `time` seconds, fading out.
+	local function shakeScreen(strength, time)
+		local began = os.clock()
+		local c
+		c = game:GetService("RunService").RenderStepped:Connect(function()
+			local t = (os.clock() - began) / time
+			if t >= 1 or not cine.Parent then
+				c:Disconnect()
+				if cine.Parent then
+					cine.Position = CINE_HOME
+				end
+				return
+			end
+			local k = strength * (1 - t) ^ 2
+			cine.Position = CINE_HOME + UDim2.fromOffset(math.random(-100, 100) / 100 * k, math.random(-100, 100) / 100 * k)
+		end)
+	end
 	tween(cine, 0.4, { BackgroundTransparency = 0.6 })
 	local live = true
 	local conns = {}
@@ -2129,6 +2148,7 @@ local function playCinematic(kind, resultId, fromIds, levelKept)
 		end
 		flashFrame.BackgroundTransparency = 0
 		tween(flashFrame, if awaken then 0.9 else 0.6, { BackgroundTransparency = 1 })
+		shakeScreen(if awaken then 22 else 14, if awaken then 0.7 else 0.5)
 		local colors = if awaken then { CINE_GOLD, CINE_CYAN, CINE_VIOLET } else { resultColor, getSkillColor(fromIds[1]), getSkillColor(fromIds[2]) }
 		local rays = cineRays(cine, colors, if awaken then 24 else 16, 520, 82)
 		table.insert(conns, game:GetService("RunService").RenderStepped:Connect(function(dt)

@@ -187,7 +187,9 @@ local function awakenFrame(icon, size, z)
 	end
 	-- The inner border sits on the icon art's black edge and paints over it.
 	local inner = diamond(0.62, math.max(3, size * 0.065), 0)
-	local outerGradient, halo = diamond(0.9, math.max(1, size * 0.025), 0.35)
+	-- The outer halo stays inside the icon's own square so it never runs into
+	-- the icons beside it.
+	local outerGradient, halo = diamond(0.69, math.max(1, size * 0.02), 0.35)
 	awakenFrames[inner] = { Speed = 1 }
 	awakenFrames[outerGradient] = { Speed = -0.6, Halo = halo }
 	-- Crystal on the top tip.
