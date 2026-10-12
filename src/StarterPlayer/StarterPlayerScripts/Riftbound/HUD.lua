@@ -5,6 +5,7 @@
 -- Contains the vitals (level/HP/XP), gold, ability shards, the Arsenal list,
 -- tooltips, toasts and the Forge ("choose one fusion").
 local GuiService = game:GetService("GuiService")
+local screenCenter -- defined with HUD.Style below
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -2444,7 +2445,7 @@ local function buildBackpack()
 	backpack = new("Frame", {
 		Name = "Backpack",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
+		Position = screenCenter(),
 		Size = UDim2.fromOffset(BP_W, BP_H),
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -2841,8 +2842,9 @@ local refreshAttributes
 local function buildAttributes()
 	attributes = new("Frame", {
 		Name = "Attributes",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.52),
+		-- The banner sits above the body; centre the body itself on screen.
+		AnchorPoint = Vector2.new(0.5, (92 + (560 - 92) / 2) / 560),
+		Position = screenCenter(),
 		Size = UDim2.fromOffset(680, 560),
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -3188,6 +3190,13 @@ function HUD.MenuOpen()
 	local craftingOpen = craftingGui and craftingGui.Enabled
 	return lobbyMenuOpen or craftingOpen or (forge ~= nil and forge.Visible) or (backpack ~= nil and backpack.Visible) or (attributes ~= nil and attributes.Visible) or (offerScreen ~= nil and offerScreen.Visible)
 end
+
+-- Middle of the real screen for panels in this ScreenGui: it starts below
+-- Roblox's top bar, so plain 0.5 lands half a top bar too low.
+screenCenter = function()
+	return UDim2.new(0.5, 0, 0.5, -GuiService:GetGuiInset().Y / 2)
+end
+HUD.ScreenCenter = screenCenter
 
 -- Shared look for other screens (the lobby menu) so they match the HUD.
 HUD.Style = {

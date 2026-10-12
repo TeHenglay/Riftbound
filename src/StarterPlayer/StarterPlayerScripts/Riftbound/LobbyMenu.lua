@@ -88,8 +88,10 @@ end
 local function buildPanel()
 	panel = new("Frame", {
 		Name = "Panel",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.52),
+		-- Centre the body (the banner sits on top of it); centerPanel() adds
+		-- the top-bar correction.
+		AnchorPoint = Vector2.new(0.5, (92 + (460 - 92) / 2) / 460),
+		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(620, 460),
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -797,11 +799,21 @@ local function setShown(on)
 end
 
 -- Keeps the columns readable on small screens (1 at 1000px tall and up).
+-- The holder starts below Roblox's top bar and is scaled, so the panel needs
+-- an offset to sit in the middle of the real screen.
+local function centerPanel()
+	if panel then
+		local inset = game:GetService("GuiService"):GetGuiInset().Y
+		panel.Position = UDim2.new(0.5, 0, 0.5, -inset / 2 / holder.UIScale.Scale)
+	end
+end
+
 local function fitToScreen()
 	local camera = workspace.CurrentCamera
 	if camera then
 		holder.UIScale.Scale = math.clamp(camera.ViewportSize.Y / 1000, 0.6, 1)
 	end
+	centerPanel()
 end
 
 function LobbyMenu.Init(remoteFolder, hud)
@@ -841,6 +853,7 @@ function LobbyMenu.Init(remoteFolder, hud)
 
 	buildColumns()
 	buildPanel()
+	centerPanel()
 	PlayScreen.Init(holder, HUD, remotes)
 	-- The lobby columns step aside while the full-screen Play page is up.
 	PlayScreen.OnToggle = function(open)

@@ -302,8 +302,9 @@ end
 local function buildPanel()
 	local shade = new("TextButton", {
 		Name = "PartyShade",
-		Position = UDim2.fromOffset(0, -80),
-		Size = UDim2.new(1, 0, 1, 80),
+		-- Covers the whole screen, top bar included, so the panel centres on it.
+		Position = UDim2.fromOffset(0, -game:GetService("GuiService"):GetGuiInset().Y),
+		Size = UDim2.new(1, 0, 1, game:GetService("GuiService"):GetGuiInset().Y),
 		BackgroundColor3 = C.Ink,
 		BackgroundTransparency = 0.35,
 		Text = "",

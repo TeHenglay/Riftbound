@@ -231,7 +231,9 @@ end
 local function buildPanel()
 	panel = new("Frame", {
 		Name = "Panel",
-		AnchorPoint = Vector2.new(0.5, 0.5),
+		-- Centre the body (the banner sits on top of it); centerPanel() adds
+		-- the top-bar correction.
+		AnchorPoint = Vector2.new(0.5, (84 + (330 - 84) / 2) / 330),
 		Position = UDim2.fromScale(0.5, 0.5),
 		Size = UDim2.fromOffset(440, 330),
 		BackgroundTransparency = 1,
@@ -353,11 +355,21 @@ local function setShown(on)
 	end
 end
 
+-- The holder starts below Roblox's top bar and is scaled, so the panel needs
+-- an offset to sit in the middle of the real screen.
+local function centerPanel()
+	if panel then
+		local inset = game:GetService("GuiService"):GetGuiInset().Y
+		panel.Position = UDim2.new(0.5, 0, 0.5, -inset / 2 / holder.UIScale.Scale)
+	end
+end
+
 local function fitToScreen()
 	local camera = workspace.CurrentCamera
 	if camera then
 		holder.UIScale.Scale = math.clamp(camera.ViewportSize.Y / 1000, 0.6, 1)
 	end
+	centerPanel()
 end
 
 function MatchMenu.Init(remoteFolder, hud)
@@ -388,6 +400,7 @@ function MatchMenu.Init(remoteFolder, hud)
 
 	buildGear()
 	buildPanel()
+	centerPanel()
 
 	-- A HUD menu (Forge, Backpack) opening hides this panel, after the lobby menu's own handler.
 	local previous = HUD.OnHudMenuOpened
