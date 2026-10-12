@@ -2025,6 +2025,47 @@ local backpackTab = "Items"
 local SK_LIST_W = 400
 local SK_DETAIL_X = BP_PAD + SK_LIST_W + 28
 local SK_DETAIL_W = BP_W - SK_DETAIL_X - BP_PAD
+local SK_CARD_GAP = 10
+local SK_CARD_W = math.floor((SK_LIST_W - 10 - SK_CARD_GAP) / 2)
+local SK_CARD_H = 196
+local SK_GOLD = Color3.fromRGB(255, 214, 92)
+local SK_GREEN = Color3.fromRGB(90, 220, 120)
+local SK_PURPLE = Color3.fromRGB(178, 120, 255)
+
+-- A rounded colour pill with text (element chips, badges).
+local function pill(parent, label, bg, fg, x, y, h, z)
+	local p = new("Frame", {
+		Position = UDim2.fromOffset(x, y),
+		Size = UDim2.fromOffset(0, h),
+		AutomaticSize = Enum.AutomaticSize.X,
+		BackgroundColor3 = bg,
+		ZIndex = z,
+		Parent = parent,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIPadding", { PaddingLeft = UDim.new(0, 10), PaddingRight = UDim.new(0, 10) }),
+	})
+	text({ Size = UDim2.fromScale(0, 1), AutomaticSize = Enum.AutomaticSize.X, Text = label, FontFace = F.Label, TextSize = math.floor(h * 0.55), TextColor3 = fg, ZIndex = z + 1, Parent = p })
+	return p
+end
+
+-- Rounded progress bar; returns the bar.
+local function progressBar(parent, x, y, w, h, ratio, color, label, z)
+	local bar = new("Frame", { Position = UDim2.fromOffset(x, y), Size = UDim2.fromOffset(w, h), BackgroundColor3 = Color3.fromRGB(12, 12, 18), ZIndex = z, Parent = parent }, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIStroke", { Color = color, Thickness = 1, Transparency = 0.5, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	if ratio > 0 then
+		new("Frame", { Size = UDim2.new(math.clamp(ratio, 0.06, 1), 0, 1, 0), BackgroundColor3 = color, ZIndex = z + 1, Parent = bar }, {
+			new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+			new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Color3.new(1, 1, 1), 0.35), color) }),
+		})
+	end
+	if label then
+		text({ Size = UDim2.fromScale(1, 1), Text = label, FontFace = F.Label, TextSize = math.floor(h * 0.62), TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0.4, ZIndex = z + 2, Parent = bar })
+	end
+	return bar
+end
 
 local function cooldownAt(id, level)
 	return Skills.CooldownOf(id, level) * Stats.CooldownMult(player:GetAttribute("Stat_Focus")) * Nations.CooldownMult(player)
@@ -2069,8 +2110,9 @@ local function buildSkillsTab(tab)
 		ZIndex = 22,
 		Parent = tab,
 	}, {
-		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
-		new("UIPadding", { PaddingRight = UDim.new(0, 8) }),
+		-- Two big cards per row.
+		new("UIGridLayout", { CellSize = UDim2.fromOffset(SK_CARD_W, SK_CARD_H), CellPadding = UDim2.fromOffset(SK_CARD_GAP, SK_CARD_GAP), SortOrder = Enum.SortOrder.LayoutOrder }),
+		new("UIPadding", { PaddingTop = UDim.new(0, 4), PaddingLeft = UDim.new(0, 2), PaddingRight = UDim.new(0, 8) }),
 	})
 	new("Frame", {
 		Position = UDim2.fromOffset(SK_DETAIL_X - 14, BP_HEAD_Y),
@@ -2084,7 +2126,8 @@ local function buildSkillsTab(tab)
 	new("Frame", { Name = "Detail", Position = UDim2.fromOffset(SK_DETAIL_X, BP_HEAD_Y), Size = UDim2.fromOffset(SK_DETAIL_W, BP_H - BP_HEAD_Y - 24), BackgroundTransparency = 1, ZIndex = 22, Parent = tab })
 end
 
--- One row in the skill list: icon, name, level, copies bar.
+-- One card in the skill grid: big icon tinted in the skill's colour, name,
+-- level diamonds, a copies bar and badges (equipped key, ready / max).
 local function skillListRow(list, order, id)
 	local def = Skills.Defs[id]
 	local level = build.Skills[id]
@@ -2093,67 +2136,81 @@ local function skillListRow(list, order, id)
 	local need = Skills.CopiesToLevel(level)
 	local temp = (build.Temp or {})[id]
 	local selected = id == skillsSelected
-	local row = new("TextButton", {
-		Size = UDim2.new(1, 0, 0, 64),
+	local ready = need ~= nil and copies >= need and not temp
+	local card = new("TextButton", {
 		Text = "",
 		AutoButtonColor = true,
-		BackgroundColor3 = if selected then color:Lerp(Theme.C.Raised, 0.75) else Theme.C.Raised,
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		LayoutOrder = order,
 		ZIndex = 23,
 		Parent = list,
-	}, { Theme.Edged(2) })
-	if selected then
-		stroke(color, 2).Parent = row
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 12) }),
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(color:Lerp(Theme.C.Ink, if selected then 0.45 else 0.62), color:Lerp(Theme.C.Ink, 0.88)) }),
+		new("UIStroke", {
+			Color = if selected then Color3.new(1, 1, 1) elseif def.Awakened then SK_GOLD else color,
+			Thickness = if selected then 3 else 1.5,
+			Transparency = if selected then 0 else 0.35,
+			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+		}),
+	})
+	local icon = shard(id, 88, card, 24)
+	icon.AnchorPoint = Vector2.new(0.5, 0)
+	icon.Position = UDim2.new(0.5, 0, 0, 12)
+	-- Equipped key in the top-left corner.
+	local equippedOn = if build.Slots.Q == id then "Q" elseif build.Slots.E == id then "E" else nil
+	if equippedOn then
+		local key = new("Frame", { Position = UDim2.fromOffset(8, 8), Size = UDim2.fromOffset(28, 28), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 27, Parent = card }, {
+			new("UICorner", { CornerRadius = UDim.new(0, 7) }),
+			new("UIStroke", { Color = color, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		})
+		text({ Size = UDim2.fromScale(1, 1), Text = equippedOn, FontFace = F.TitleBold, TextSize = 16, TextColor3 = Theme.C.Ink, ZIndex = 28, Parent = key })
 	end
-	new("Frame", { Size = UDim2.new(0, 4, 1, 0), BackgroundColor3 = color, BorderSizePixel = 0, ZIndex = 24, Parent = row })
-	local icon = shard(id, 50, row, 24)
-	icon.Position = UDim2.fromOffset(10, 7)
+	-- Status badge in the top-right corner.
+	local badge = if temp then { "TRAINING", SK_PURPLE } elseif not need then { "MAX", SK_GOLD } elseif ready then { "LEVEL UP!", SK_GREEN } else nil
+	if badge then
+		local b = pill(card, badge[1], badge[2], Theme.C.Ink, 0, 8, 20, 27)
+		b.AnchorPoint = Vector2.new(1, 0)
+		b.Position = UDim2.new(1, -8, 0, 8)
+	end
 	text({
-		Position = UDim2.fromOffset(70, 8),
-		Size = UDim2.new(1, -170, 0, 20),
+		Position = UDim2.fromOffset(8, 106),
+		Size = UDim2.new(1, -16, 0, 34),
 		Text = def.Name,
 		FontFace = F.BodyBold,
-		TextSize = 16,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+		TextSize = 15,
+		TextWrapped = true,
+		TextColor3 = if def.Awakened then SK_GOLD else Color3.new(1, 1, 1),
+		TextStrokeTransparency = 0.6,
 		ZIndex = 24,
-		Parent = row,
+		Parent = card,
 	})
-	text({
-		Position = UDim2.fromOffset(70, 28),
-		Size = UDim2.new(1, -170, 0, 14),
-		Text = `{NUMERALS[level]}   ·   {if def.Awakened then "Awakened" elseif #def.Elements == 2 then "Fusion" else (def.Elements[1] or "Rift")}`,
-		FontFace = F.Label,
-		TextSize = 11,
-		TextColor3 = if def.Awakened then Color3.fromRGB(110, 232, 255) else C.Ash,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		ZIndex = 24,
-		Parent = row,
-	})
-	-- Copies toward the next level.
-	local bar = new("Frame", { Position = UDim2.fromOffset(70, 46), Size = UDim2.new(1, -170, 0, 6), BackgroundColor3 = Theme.C.Ink, BorderSizePixel = 0, ZIndex = 24, Parent = row })
-	local ratio = if need then math.clamp(copies / need, 0, 1) else 1
-	new("Frame", { Size = UDim2.fromScale(ratio, 1), BackgroundColor3 = if need and copies >= need then C.Good else color, BorderSizePixel = 0, ZIndex = 25, Parent = bar })
-	local ready = need ~= nil and copies >= need and not temp
-	text({
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.fromOffset(88, 20),
-		Text = if temp then "TRAINING" elseif not need then "MAX" elseif ready then "▲ READY" else `{copies} / {need}`,
-		FontFace = F.Label,
-		TextSize = 12,
-		TextColor3 = if temp then C.RiftHot elseif not need then C.Gold elseif ready then C.Good else C.Ash,
-		TextXAlignment = Enum.TextXAlignment.Right,
-		ZIndex = 24,
-		Parent = row,
-	})
-	row.Activated:Connect(function()
+	-- Level diamonds.
+	local pipsW = Skills.MaxLevel * 16
+	for pip = 1, Skills.MaxLevel do
+		new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, -pipsW / 2 + (pip - 0.5) * 16, 0, 152),
+			Size = UDim2.fromOffset(9, 9),
+			Rotation = 45,
+			BackgroundColor3 = if pip <= level then color:Lerp(Color3.new(1, 1, 1), 0.2) else Color3.fromRGB(16, 16, 22),
+			BorderSizePixel = 0,
+			ZIndex = 24,
+			Parent = card,
+		}, { new("UIStroke", { Color = if pip <= level then Color3.new(1, 1, 1) else color, Thickness = 1, Transparency = if pip <= level then 0.4 else 0.5 }) })
+	end
+	progressBar(card, 14, 168, SK_CARD_W - 28, 16, if need then copies / need else 1, if ready then SK_GREEN elseif not need then SK_GOLD else color, if temp then "BORROWED" elseif need then `{copies} / {need}` else "MAX LEVEL", 24)
+	card.Activated:Connect(function()
 		skillsSelected = id
 		refreshSkillsTab()
 	end)
+	hoverable(card, function()
+		return id, build.Skills[id]
+	end)
 end
 
--- The right side: everything about the selected skill, and Level Up.
+-- The right side: a colourful banner for the selected skill, stat tiles,
+-- the copies bar, a big Level Up button and the Q / E keys.
 local function skillDetail(panel, id)
 	local def = Skills.Defs[id]
 	local level = build.Skills[id]
@@ -2161,99 +2218,115 @@ local function skillDetail(panel, id)
 	local copies = (build.Copies or {})[id] or 0
 	local need = Skills.CopiesToLevel(level)
 	local temp = (build.Temp or {})[id]
+	local ready = need ~= nil and copies >= need and not temp
+	local W = SK_DETAIL_W
 
-	local icon = shard(id, 92, panel, 23)
-	icon.Position = UDim2.fromOffset(0, 0)
-	text({ Position = UDim2.fromOffset(108, 4), Size = UDim2.new(1, -108, 0, 30), Text = def.Name, FontFace = F.TitleBold, TextSize = 26, TextColor3 = color, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 23, Parent = panel })
-	local elements = if #def.Elements > 0 then table.concat(def.Elements, " + ") else "Rift"
-	text({ Position = UDim2.fromOffset(108, 36), Size = UDim2.new(1, -108, 0, 16), Text = spaced(`{elements}  ·  {def.Kind}`), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
-	-- Level pips.
+	-- Banner.
+	local banner = new("Frame", { Size = UDim2.new(1, 0, 0, 150), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 23, Parent = panel }, {
+		new("UICorner", { CornerRadius = UDim.new(0, 14) }),
+		new("UIGradient", { Rotation = 20, Color = ColorSequence.new(color:Lerp(Theme.C.Ink, 0.35), color:Lerp(Theme.C.Ink, 0.85)) }),
+		new("UIStroke", { Color = if def.Awakened then SK_GOLD else color, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	local icon = shard(id, 118, banner, 25)
+	icon.Position = UDim2.fromOffset(14, 16)
+	text({ Position = UDim2.fromOffset(146, 16), Size = UDim2.new(1, -160, 0, 32), Text = def.Name, FontFace = F.TitleBold, TextSize = 26, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0.5, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 25, Parent = banner })
+	-- Element chips in each element's own colour, then the kind.
+	local chips = new("Frame", { Position = UDim2.fromOffset(146, 54), Size = UDim2.new(1, -160, 0, 22), BackgroundTransparency = 1, ZIndex = 25, Parent = banner }, {
+		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+	for i, el in def.Elements do
+		pill(chips, el:upper(), Elements.List[el].Color, Theme.C.Ink, 0, 0, 22, 25).LayoutOrder = i
+	end
+	pill(chips, def.Kind:upper(), Color3.fromRGB(30, 30, 42), Color3.fromRGB(220, 220, 235), 0, 0, 22, 25).LayoutOrder = 9
+	if def.Awakened then
+		pill(banner, "AWAKENED", SK_GOLD, Theme.C.Ink, 146, 116, 22, 25)
+	end
+	-- Level: big badge + diamonds.
+	local lvl = new("Frame", { Position = UDim2.fromOffset(146, 84), Size = UDim2.fromOffset(62, 26), BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 25, Parent = banner }, {
+		new("UICorner", { CornerRadius = UDim.new(0, 8) }),
+	})
+	text({ Size = UDim2.fromScale(1, 1), Text = `LV {level}`, FontFace = F.TitleBold, TextSize = 16, TextColor3 = Theme.C.Ink, ZIndex = 26, Parent = lvl })
 	for pip = 1, Skills.MaxLevel do
 		new("Frame", {
-			Position = UDim2.fromOffset(112 + (pip - 1) * 22, 66),
-			Size = UDim2.fromOffset(12, 12),
+			Position = UDim2.fromOffset(222 + (pip - 1) * 22, 90),
+			Size = UDim2.fromOffset(13, 13),
 			Rotation = 45,
-			BackgroundColor3 = if pip <= level then color else Theme.C.Ink,
+			BackgroundColor3 = if pip <= level then Color3.new(1, 1, 1) else Color3.fromRGB(16, 16, 22),
 			BorderSizePixel = 0,
-			ZIndex = 23,
-			Parent = panel,
-		}, { stroke(if pip <= level then color else C.Bronze, 1, 0.3) })
+			ZIndex = 25,
+			Parent = banner,
+		}, { new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 1, Transparency = 0.5 }) })
 	end
-	text({ Position = UDim2.fromOffset(112 + Skills.MaxLevel * 22 + 6, 62), Size = UDim2.fromOffset(160, 20), Text = `LEVEL {NUMERALS[level]} / {NUMERALS[Skills.MaxLevel]}`, FontFace = F.Label, TextSize = 13, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
 
-	text({ Position = UDim2.fromOffset(0, 106), Size = UDim2.new(1, 0, 0, 58), Text = emphasize(def.Description), RichText = true, FontFace = F.Body, TextSize = 14, TextWrapped = true, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 23, Parent = panel })
+	text({ Position = UDim2.fromOffset(4, 160), Size = UDim2.new(1, -8, 0, 50), Text = emphasize(def.Description), RichText = true, FontFace = F.Body, TextSize = 14, TextWrapped = true, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 23, Parent = panel })
 
-	-- Now -> next level.
-	local statsBox = new("Frame", { Position = UDim2.fromOffset(0, 172), Size = UDim2.new(1, 0, 0, 92), BackgroundColor3 = Theme.C.Raised, ZIndex = 23, Parent = panel }, { Theme.Edged(2) })
-	text({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -28, 0, 14), Text = if need then spaced("Now  →  Next level") else spaced("Max level"), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = statsBox })
+	-- Stat tiles: now, and what the next level brings.
 	local label, now = headlineStat(def, level)
 	local _, nextValue = headlineStat(def, math.min(level + 1, Skills.MaxLevel))
-	local rows = {
-		{ label, now, nextValue },
-		{ "Cooldown", string.format("%.2fs", cooldownAt(id, level)), string.format("%.2fs", cooldownAt(id, math.min(level + 1, Skills.MaxLevel))) },
+	local tiles = {
+		{ string.upper(label), now, nextValue, Color3.fromRGB(255, 120, 80) },
+		{ "COOLDOWN", string.format("%.2fs", cooldownAt(id, level)), string.format("%.2fs", cooldownAt(id, math.min(level + 1, Skills.MaxLevel))), Color3.fromRGB(90, 170, 255) },
 	}
-	for i, r in rows do
-		local y = 28 + (i - 1) * 28
-		text({ Position = UDim2.fromOffset(14, y), Size = UDim2.fromOffset(170, 22), Text = r[1], FontFace = F.Body, TextSize = 15, TextColor3 = C.Gold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 24, Parent = statsBox })
-		text({
-			Position = UDim2.fromOffset(184, y),
-			Size = UDim2.new(1, -198, 0, 22),
-			Text = if need then `{r[2]}   <font color="{hex(C.Ash)}">→</font>   <font color="{hex(C.Good)}">{r[3]}</font>` else r[2],
-			RichText = true,
-			FontFace = F.BodyBold,
-			TextSize = 15,
-			TextXAlignment = Enum.TextXAlignment.Right,
-			ZIndex = 24,
-			Parent = statsBox,
+	local tileW = math.floor((W - 10) / 2)
+	for i, t in tiles do
+		local tile = new("Frame", { Position = UDim2.fromOffset((i - 1) * (tileW + 10), 216), Size = UDim2.fromOffset(tileW, 78), BackgroundColor3 = t[4]:Lerp(Theme.C.Ink, 0.78), ZIndex = 23, Parent = panel }, {
+			new("UICorner", { CornerRadius = UDim.new(0, 12) }),
+			new("UIStroke", { Color = t[4], Thickness = 1.5, Transparency = 0.2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
 		})
+		text({ Position = UDim2.fromOffset(14, 8), Size = UDim2.new(1, -28, 0, 14), Text = t[1], FontFace = F.Label, TextSize = 11, TextColor3 = t[4]:Lerp(Color3.new(1, 1, 1), 0.3), TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 24, Parent = tile })
+		text({ Position = UDim2.fromOffset(14, 24), Size = UDim2.new(1, -28, 0, 28), Text = t[2], FontFace = F.TitleBold, TextSize = 22, TextColor3 = Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, TextScaled = false, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 24, Parent = tile })
+		text({ Position = UDim2.fromOffset(14, 54), Size = UDim2.new(1, -28, 0, 16), Text = if need then `next level  →  {t[3]}` else "max level", FontFace = F.BodyBold, TextSize = 13, TextColor3 = if need then SK_GREEN else SK_GOLD, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd, ZIndex = 24, Parent = tile })
 	end
 
-	-- Duplicate copies.
-	text({ Position = UDim2.fromOffset(0, 278), Size = UDim2.new(1, 0, 0, 14), Text = spaced("Duplicate copies"), FontFace = F.Label, TextSize = 11, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
-	text({ AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 276), Size = UDim2.fromOffset(160, 18), Text = if need then `{copies} / {need}` else `{copies}`, FontFace = F.TitleBold, TextSize = 16, TextColor3 = if need and copies >= need then C.Good else C.Parchment, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 23, Parent = panel })
-	local bar = new("Frame", { Position = UDim2.fromOffset(0, 300), Size = UDim2.new(1, 0, 0, 14), BackgroundColor3 = Theme.C.Ink, BorderSizePixel = 0, ZIndex = 23, Parent = panel }, { Theme.Edged(2) })
-	new("Frame", { Size = UDim2.fromScale(if need then math.clamp(copies / need, 0, 1) else 1, 1), BackgroundColor3 = if need and copies >= need then C.Good else color, BorderSizePixel = 0, ZIndex = 24, Parent = bar })
-	text({ Position = UDim2.fromOffset(0, 320), Size = UDim2.new(1, 0, 0, 32), Text = "Get copies from Story skill drops and by fusing into a skill you already own.", FontFace = F.Italic, TextSize = 13, TextWrapped = true, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 23, Parent = panel })
+	-- Copies.
+	text({ Position = UDim2.fromOffset(2, 306), Size = UDim2.new(1, 0, 0, 16), Text = "DUPLICATE COPIES", FontFace = F.Label, TextSize = 12, TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.4), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
+	progressBar(panel, 0, 326, W, 24, if need then copies / need else 1, if ready then SK_GREEN elseif not need then SK_GOLD else color, if temp then "BORROWED FOR TRAINING" elseif need then `{copies} / {need}  copies` else "MAX LEVEL", 23)
+	text({ Position = UDim2.fromOffset(2, 354), Size = UDim2.new(1, 0, 0, 16), Text = "Copies drop from Story skill rewards and from fusing into a skill you own.", FontFace = F.Italic, TextSize = 12, TextColor3 = C.Ash, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 23, Parent = panel })
 
 	-- Level Up.
-	local ready = need ~= nil and copies >= need and not temp
-	local label2 = if temp then "TRAINING SKILL  ·  CAN'T LEVEL UP"
-		elseif not need then "MAX LEVEL"
-		elseif ready then `LEVEL UP  ·  USE {need} COPIES`
-		else `NEED {need - copies} MORE {if need - copies == 1 then "COPY" else "COPIES"}`
-	local up = new("TextButton", {
-		Position = UDim2.fromOffset(0, 362),
-		Size = UDim2.new(1, 0, 0, 54),
-		Text = label2,
-		FontFace = F.Title,
-		TextSize = 18,
-		TextColor3 = if ready then C.Parchment else C.Ash,
-		BackgroundColor3 = if ready then Color3.fromRGB(40, 120, 64) elseif not need then Color3.fromRGB(60, 50, 24) else Theme.C.Ink,
-		AutoButtonColor = ready,
-		ZIndex = 24,
-		Parent = panel,
-	}, { stroke(if ready then C.Good elseif not need then Color3.fromRGB(255, 200, 80) else C.Bronze, 2, if ready or not need then 0 else 0.4) })
+	local top, sub, bg, edge
+	if temp then
+		top, sub, bg, edge = "TRAINING SKILL", "borrowed skills can't level up", SK_PURPLE:Lerp(Theme.C.Ink, 0.7), SK_PURPLE
+	elseif not need then
+		top, sub, bg, edge = "MAX LEVEL", "this skill is fully powered up", SK_GOLD:Lerp(Theme.C.Ink, 0.7), SK_GOLD
+	elseif ready then
+		top, sub, bg, edge = "LEVEL UP!", `uses {need} copies  ·  becomes level {level + 1}`, Color3.fromRGB(40, 150, 72), SK_GREEN
+	else
+		top, sub, bg, edge = `COLLECT {need - copies} MORE {if need - copies == 1 then "COPY" else "COPIES"}`, `then level up to level {level + 1}`, Color3.fromRGB(26, 26, 36), Color3.fromRGB(80, 80, 100)
+	end
+	local up = new("TextButton", { Position = UDim2.fromOffset(0, 378), Size = UDim2.new(1, 0, 0, 62), Text = "", AutoButtonColor = ready, BackgroundColor3 = Color3.new(1, 1, 1), ZIndex = 24, Parent = panel }, {
+		new("UICorner", { CornerRadius = UDim.new(0, 14) }),
+		new("UIGradient", { Rotation = 90, Color = ColorSequence.new(bg:Lerp(Color3.new(1, 1, 1), if ready then 0.2 else 0.05), bg) }),
+		new("UIStroke", { Color = edge, Thickness = 2, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+	})
+	text({ Position = UDim2.fromOffset(0, 8), Size = UDim2.new(1, 0, 0, 28), Text = top, FontFace = F.TitleBold, TextSize = 24, TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0.5, ZIndex = 25, Parent = up })
+	text({ Position = UDim2.fromOffset(0, 36), Size = UDim2.new(1, 0, 0, 18), Text = sub, FontFace = F.Body, TextSize = 13, TextColor3 = Color3.fromRGB(225, 225, 235), ZIndex = 25, Parent = up })
 	if ready then
 		up.Activated:Connect(function()
 			levelUp(id)
 		end)
 	end
 
-	-- Equip on Q / E.
+	-- Equip keys.
 	for i, slot in { "Q", "E" } do
 		local on = build.Slots[slot] == id
 		local b = new("TextButton", {
-			Position = UDim2.new((i - 1) * 0.5, if i == 1 then 0 else 5, 0, 428),
-			Size = UDim2.new(0.5, -5, 0, 40),
-			Text = if on then `EQUIPPED ON {slot}` else `EQUIP ON {slot}`,
-			FontFace = F.Label,
-			TextSize = 13,
-			TextColor3 = if on then Theme.C.Ink else C.Parchment,
-			BackgroundColor3 = if on then color else Theme.C.Raised,
+			Position = UDim2.new((i - 1) * 0.5, if i == 1 then 0 else 5, 0, 450),
+			Size = UDim2.new(0.5, -5, 0, 46),
+			Text = "",
 			AutoButtonColor = not on,
+			BackgroundColor3 = if on then color else Color3.fromRGB(28, 28, 40),
 			ZIndex = 24,
 			Parent = panel,
-		}, { Theme.Edged(2) })
+		}, {
+			new("UICorner", { CornerRadius = UDim.new(0, 12) }),
+			new("UIStroke", { Color = color, Thickness = 2, Transparency = if on then 0 else 0.3, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		})
+		local key = new("Frame", { Position = UDim2.fromOffset(10, 8), Size = UDim2.fromOffset(30, 30), BackgroundColor3 = if on then Theme.C.Ink else color, ZIndex = 25, Parent = b }, {
+			new("UICorner", { CornerRadius = UDim.new(0, 8) }),
+		})
+		text({ Size = UDim2.fromScale(1, 1), Text = slot, FontFace = F.TitleBold, TextSize = 17, TextColor3 = if on then color else Theme.C.Ink, ZIndex = 26, Parent = key })
+		text({ Position = UDim2.fromOffset(48, 0), Size = UDim2.new(1, -56, 1, 0), Text = if on then "EQUIPPED" else `EQUIP ON {slot}`, FontFace = F.Label, TextSize = 14, TextColor3 = if on then Theme.C.Ink else Color3.new(1, 1, 1), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 25, Parent = b })
 		if not on then
 			b.Activated:Connect(function()
 				remotes.Equip:FireServer(slot, id)
