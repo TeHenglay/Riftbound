@@ -150,48 +150,16 @@ for i, s in SHRINES do
 	model.Parent = shrines
 end
 
--- The Forge ------------------------------------------------------------------
-local forge = Instance.new("Model")
-forge.Name = "Forge"
-local forgeBase = part(forge, {
-	Name = "Base",
-	Size = Vector3.new(8, 3, 6),
-	Position = Vector3.new(-52, FLOOR_TOP + 1.5, 40),
-	Material = Enum.Material.Basalt,
-	Color = Color3.fromRGB(40, 32, 56),
-})
-part(forge, {
-	Name = "Top",
-	Size = Vector3.new(10, 1, 7),
-	Position = Vector3.new(-52, FLOOR_TOP + 3.5, 40),
-	Material = Enum.Material.Marble,
-	Color = Color3.fromRGB(80, 70, 100),
-})
-local core = part(forge, {
-	Name = "Core",
-	Shape = Enum.PartType.Ball,
-	Size = Vector3.new(3, 3, 3),
-	Position = Vector3.new(-52, FLOOR_TOP + 6, 40),
-	Material = Enum.Material.Neon,
-	Color = Color3.fromRGB(170, 120, 255),
+-- The Skill Trainer spot: TestArena.server stands the Skill Trainer here at
+-- runtime (borrow any base, fused or awakened skill for Training).
+part(arena, {
+	Name = "SkillTrainerSpot",
+	Size = Vector3.new(4, 1, 4),
+	Position = Vector3.new(-52, FLOOR_TOP + 0.5, 40),
+	Transparency = 1,
 	CanCollide = false,
+	CanQuery = false,
 })
-local forgeLight = Instance.new("PointLight")
-forgeLight.Color = Color3.fromRGB(170, 120, 255)
-forgeLight.Range = 20
-forgeLight.Brightness = 3
-forgeLight.Parent = core
-billboard(core, "THE FORGE", "Equip & Test Skills", Color3.fromRGB(190, 150, 255))
-local forgePrompt = Instance.new("ProximityPrompt")
-forgePrompt.ActionText = "Equip & Test Skills"
-forgePrompt.ObjectText = "The Forge"
-forgePrompt.KeyboardKeyCode = Enum.KeyCode.F
-forgePrompt.HoldDuration = 0
-forgePrompt.MaxActivationDistance = 12
-forgePrompt.RequiresLineOfSight = false
-forgePrompt:SetAttribute("Forge", true)
-forgePrompt.Parent = forgeBase
-forge.Parent = arena
 
 -- The Rift Well: refills flasks (F) ---------------------------------------------
 local WELL_POS = Vector3.new(30, FLOOR_TOP, 44)

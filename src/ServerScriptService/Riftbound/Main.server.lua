@@ -128,8 +128,18 @@ TestEquipSkill.OnServerInvoke = function(player, slot, id)
 		return false, "Slot must be Q or E"
 	end
 	local Skills = require(Shared:WaitForChild("Skills"))
-	if not Skills.Defs[id] then
+	local def = Skills.Defs[id]
+	if not def or id == "RiftBolt" then
 		return false, "Unknown skill"
+	end
+	-- Never mid-story; fused and awakened skills only at the Skill Trainer in
+	-- Training (base skills can also be tried from the Forge in the lobby).
+	local area = player:GetAttribute("Area")
+	if area == "Story" then
+		return false, "You can't borrow skills in a story"
+	end
+	if (#def.Elements ~= 1 or def.Awakened) and area ~= "Rift" then
+		return false, "Try fused and awakened skills at the Skill Trainer in Training"
 	end
 	-- Free test skills are only lent: never saved, gone when you leave Training.
 	local b = BuildService.Snapshot(player)

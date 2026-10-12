@@ -3114,6 +3114,19 @@ function HUD.SetLobbyPanel(open)
 	menuShade(open)
 end
 
+-- Skill icon (with the awakened frame) and colour, for other screens.
+HUD.SkillIcon = function(id, size, parent, z)
+	return shard(id, size, parent, z)
+end
+HUD.SkillColor = function(id)
+	return skillColor(id)
+end
+
+-- The current build snapshot (skills, slots, temp skills).
+function HUD.Build()
+	return build
+end
+
 -- The skill id equipped in a slot ("M1", "Q", "E"), or nil.
 function HUD.SkillInSlot(slot)
 	return (skillInSlot(slot))

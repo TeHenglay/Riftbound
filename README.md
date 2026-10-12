@@ -17,7 +17,7 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 | Hold left mouse | Rift Bolt (basic attack, aims at cursor) |
 | Q / E | Equipped skills |
 | Shift | Dash |
-| F | Interact (take a shrine's skill, open the Forge, refill at the Rift Well) |
+| F | Interact (take a shrine's skill, talk to the Skill Trainer, refill at the Rift Well) |
 | R | Drink the Rift Flask |
 | B | Open the Backpack |
 | C | Open Attributes (spend stat points) |
@@ -178,6 +178,17 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   fused skill at **level 1**, whatever the levels of the two skills (if you
   already own it, it keeps its level and you get a duplicate copy instead).
 
+## Skill Trainer (Training Grounds)
+
+- The Forge is gone from the Training Grounds; the **Skill Trainer** stands in
+  its place (spawned by `TestArena.server.lua` at the old Forge spot, or at
+  `SkillTrainerSpot` from `tools/BuildTestArena.luau`). Press F to open the
+  picker (`SkillTrainer.lua`): **Base**, **Fused** and **Awakened** tabs, click
+  a skill to see it, then **Equip on Q / E**.
+- Skills you don't own are borrowed (Training skills: never saved, taken back
+  when you leave). Fused and awakened skills can only be borrowed in Training;
+  nothing can be borrowed during a story.
+
 ## Forge and Awakening costs
 
 - **Fusing** two base skills costs 10,000 gold, plus 4 Shards (Act 1) and 3
@@ -227,7 +238,7 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
   - `BuildService` – owned skills, slots, levels, fusion
   - `SkillEffects` – hit detection, damage and visuals per skill kind
   - `Enemies` – enemy registry, damage, status effects, test dummy rig
-  - `TestArena` – shrines, Forge and dummy respawns; Studio-only debug hook
+  - `TestArena` – shrines, the Skill Trainer and dummy respawns; Studio-only debug hook
 - `StarterPlayer/StarterPlayerScripts/Riftbound/` – `ClientMain`, `CameraRig`
   (top-down camera), `Controls`, `HUD` (skill bar, skill list, Forge screen)
 
