@@ -3,7 +3,9 @@
 -- Shift to dash, R to drink the flask, B for the backpack, C for stats, 1/2/3 to
 -- socket a found rune into LMB/Q/E. Skills aim at the cursor.
 -- (F is the interact key.)
+local CollectionService = game:GetService("CollectionService")
 local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -13,6 +15,10 @@ local DASH_TIME = 0.18
 local DASH_COOLDOWN = 0.9
 
 local CastAnimator = require(script.Parent:WaitForChild("CastAnimator"))
+local Skills = require(ReplicatedStorage:WaitForChild("Riftbound"):WaitForChild("Skills"))
+
+local ENEMY_TAG = "RiftEnemy"
+local AUTO_SEARCH = 0.1 -- seconds between auto-cast target searches
 
 local Controls = {}
 
@@ -47,7 +53,8 @@ function Controls.Init(Remotes, HUD)
 		return ray.Origin + ray.Direction * math.max(t, 0)
 	end
 
-	local function cast(slot)
+	-- `at` aims somewhere else than the cursor (auto-cast's target).
+	local function cast(slot, at)
 		local root = getRoot()
 		if not root or HUD.MenuOpen() then
 			return
@@ -55,7 +62,7 @@ function Controls.Init(Remotes, HUD)
 		if not HUD.TryStartCooldown(slot) then
 			return
 		end
-		local target = aimPoint(root)
+		local target = at or aimPoint(root)
 		local flat = Vector3.new(target.X, root.Position.Y, target.Z)
 		if (flat - root.Position).Magnitude > 0.5 then
 			root.CFrame = CFrame.lookAt(root.Position, flat)
@@ -138,9 +145,41 @@ function Controls.Init(Remotes, HUD)
 		end
 	end)
 
+	-- Auto-cast: the nearest living enemy the slot's skill can reach.
+	local function autoTarget(root, slot)
+		local id = HUD.SkillInSlot(slot)
+		local def = id and Skills.Defs[id]
+		if not def then
+			return nil
+		end
+		local reach = if def.Kind == "Nova" then (def.Radius or 12) + 2 else (def.Range or def.Length or 60)
+		local best, bestDist = nil, reach
+		for _, model in CollectionService:GetTagged(ENEMY_TAG) do
+			local hum = model:FindFirstChildOfClass("Humanoid")
+			local part = model.PrimaryPart or model:FindFirstChild("HumanoidRootPart")
+			if hum and hum.Health > 0 and part then
+				local d = (part.Position - root.Position).Magnitude
+				if d < bestDist then
+					best, bestDist = part.Position, d
+				end
+			end
+		end
+		return best
+	end
+
+	local lastSearch = 0
 	RunService.Heartbeat:Connect(function()
 		if attackHeld then
 			cast("M1")
+		end
+		local slot = HUD.AutoSlot()
+		if slot and not (slot == "M1" and attackHeld) and os.clock() - lastSearch >= AUTO_SEARCH then
+			lastSearch = os.clock()
+			local root = getRoot()
+			local target = root and autoTarget(root, slot)
+			if target then
+				cast(slot, target)
+			end
 		end
 	end)
 end

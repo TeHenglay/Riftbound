@@ -19,6 +19,7 @@ after each room, (d) a boss, permanent upgrades and saving, (e) art and polish.
 | Shift | Dash |
 | F | Interact (take a shrine's skill, talk to the Skill Trainer, refill at the Rift Well) |
 | R | Drink the Rift Flask |
+| Click the diamond above LMB / Q / E | Auto-cast that slot at the nearest enemy (one slot at a time) |
 | B | Open the Backpack |
 | C | Open Attributes (spend stat points) |
 | Mouse wheel | Zoom |

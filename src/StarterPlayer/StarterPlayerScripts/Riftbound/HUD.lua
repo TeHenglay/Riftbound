@@ -50,6 +50,7 @@ local ICON = 84
 local DIAMOND = ICON + 8
 local SKILL_ART = 512 -- source pixel size of the skill icons (for cropping)
 local FIXED_INFO = {
+	AutoCast = { Name = "Auto-cast", Meta = "CLICK TO TOGGLE  ·  ONE SLOT", Subtitle = "A U T O", Description = "Casts this slot by itself at the nearest enemy whenever it's ready. Only one slot can auto-cast at a time; click again to turn it off." },
 	Dash = { Name = "Dash", Meta = "MOVEMENT  ·  SHIFT", Subtitle = "M O V E M E N T", Description = "A swift dash through danger. Use it to reposition and escape." },
 	Block = { Name = "Block", Meta = "DEFENSE  ·  HOLD RMB", Subtitle = "D E F E N S E", Description = "Hold to raise a rift shield that stops enemy attacks. You move at half speed and it breaks after 3 seconds. Block right as a hit lands to parry: the attacker is stunned and knocked back." },
 }
@@ -1113,6 +1114,30 @@ end
 -- Ability shards (bottom-left)
 -------------------------------------------------------------------------------
 
+-- Auto-cast: one skill slot (LMB, Q or E) can cast itself at the nearest
+-- enemy whenever it's ready. A small diamond above each skill slot toggles
+-- it: green fill (black edge) when on, and the slot's border turns green.
+local AUTO_GREEN = Color3.fromRGB(80, 230, 110)
+local autoSlot -- "M1" | "Q" | "E" | nil
+local autoToggles = {} -- [slot] = { Button, Ring }
+
+local function refreshAuto()
+	for slot, ui in autoToggles do
+		local on = slot == autoSlot
+		ui.Button.BackgroundColor3 = if on then AUTO_GREEN else Color3.fromRGB(24, 24, 32)
+		ui.Ring.Visible = on
+	end
+end
+
+function HUD.AutoSlot()
+	return autoSlot
+end
+
+function HUD.SetAutoSlot(slot)
+	autoSlot = if slot == autoSlot then nil else slot -- clicking the active one turns it off
+	refreshAuto()
+end
+
 local function makeSlot(parent, entry, index)
 	local holder = new("Frame", {
 		Name = entry.Slot,
@@ -1183,6 +1208,43 @@ local function makeSlot(parent, entry, index)
 		Parent = holder,
 	})
 	slotCards[entry.Slot] = { Halo = halo, IconHolder = iconHolder, Shade = shade, Timer = timer, Name = name, Shown = false, Cooling = false }
+	-- Auto-cast toggle (skill slots only; not Block, Dash or the flask).
+	if not entry.Fixed then
+		local ring = new("Frame", {
+			Name = "AutoRing",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0, ICON / 2),
+			Size = UDim2.fromOffset(DIAMOND * 0.62, DIAMOND * 0.62),
+			Rotation = 45,
+			BackgroundTransparency = 1,
+			Visible = false,
+			ZIndex = 5,
+			Parent = holder,
+		}, {
+			-- Sits on the icon art's black edge and turns it green.
+			new("UIStroke", { Color = AUTO_GREEN, Thickness = math.max(3, DIAMOND * 0.065), LineJoinMode = Enum.LineJoinMode.Miter, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }),
+		})
+		local toggle = new("TextButton", {
+			Name = "AutoToggle",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(0.5, 0, 0, -32),
+			Size = UDim2.fromOffset(17, 17),
+			Rotation = 45,
+			Text = "",
+			AutoButtonColor = true,
+			BackgroundColor3 = Color3.fromRGB(24, 24, 32),
+			ZIndex = 8,
+			Parent = holder,
+		}, { new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2.5, LineJoinMode = Enum.LineJoinMode.Miter, ApplyStrokeMode = Enum.ApplyStrokeMode.Border }) })
+		toggle.Activated:Connect(function()
+			HUD.SetAutoSlot(entry.Slot)
+		end)
+		toggle.MouseEnter:Connect(function()
+			showTooltip("AutoCast")
+		end)
+		toggle.MouseLeave:Connect(hideTooltip)
+		autoToggles[entry.Slot] = { Button = toggle, Ring = ring }
+	end
 	-- Rune socket pips above the shard (only skill slots have sockets).
 	if Runes.SlotKeys[entry.Slot] then
 		local pips = {}
