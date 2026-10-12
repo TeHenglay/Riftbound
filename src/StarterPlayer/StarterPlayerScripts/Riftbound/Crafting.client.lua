@@ -114,6 +114,7 @@ local function tween(inst, t, goal, style, dir)
 end
 
 local currentTab = "Forge" -- "Forge" or "Awaken"
+local BaseOrder = { "Fireball", "TidalWave", "StoneSpike", "Gust", "SparkBolt" } -- the Base tab's list
 local selectedId = nil
 local searchQuery = ""
 local cachedBuild = { Skills = {}, Slots = {} }
@@ -1915,10 +1916,278 @@ local function confirmFusion(recipe, onYes)
 	confirmShade.Visible = true
 end
 
+-------------------------------------------------------------------------------
+-- Fusion / Awakening cinematic: the Forge panel steps aside (so the world
+-- effect around your character shows) and a full-screen reveal plays.
+-------------------------------------------------------------------------------
+local CINE_GOLD, CINE_CYAN, CINE_VIOLET = Color3.fromRGB(255, 214, 92), Color3.fromRGB(110, 232, 255), Color3.fromRGB(196, 124, 255)
+local cinePlaying = false
+
+local function cineCircle(parent, size, color, thickness, z)
+	return new("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(size, size),
+		BackgroundTransparency = 1,
+		ZIndex = z,
+		Parent = parent,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIStroke", { Color = color, Thickness = thickness }),
+	})
+end
+
+-- Light rays fanning out from the centre; returns the spinning holder.
+local function cineRays(parent, colors, count, length, z)
+	local holder = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.42), Size = UDim2.fromOffset(0, 0), BackgroundTransparency = 1, ZIndex = z, Parent = parent })
+	for i = 1, count do
+		new("Frame", {
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(if i % 2 == 0 then 10 else 22, length),
+			Rotation = i / count * 360,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BorderSizePixel = 0,
+			ZIndex = z,
+			Parent = holder,
+		}, {
+			new("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(colors[(i - 1) % #colors + 1], Color3.new(1, 1, 1)),
+				Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.6, 0.55), NumberSequenceKeypoint.new(1, 0.15) }),
+			}),
+		})
+	end
+	return holder
+end
+
+local function cineIcon(parent, id, size, z)
+	return new("ImageLabel", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.42),
+		Size = UDim2.fromOffset(size, size),
+		BackgroundTransparency = 1,
+		Image = UIAssets.Icons[id] or UIAssets.Icons.Empty,
+		ZIndex = z,
+		Parent = parent,
+	})
+end
+
+-- kind: "Fusion" or "Awaken". resultId: the new skill; fromIds: what went in.
+local function playCinematic(kind, resultId, fromIds, levelKept)
+	if cinePlaying then
+		return
+	end
+	cinePlaying = true
+	local resultDef = Skills.Defs[resultId]
+	local resultColor = getSkillColor(resultId)
+	local awaken = kind == "Awaken"
+	-- Step the Forge aside.
+	tween(panelScale, 0.25, { Scale = (panelScale.Scale or 1) * 0.85 })
+	task.delay(0.2, function()
+		panel.Visible = false
+	end)
+	tween(shade, 0.3, { BackgroundTransparency = 1 })
+
+	local cine = new("TextButton", { Name = "Cinematic", Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0), BackgroundTransparency = 1, Text = "", AutoButtonColor = false, ZIndex = 80, Parent = gui })
+	tween(cine, 0.4, { BackgroundTransparency = 0.6 })
+	local live = true
+	local conns = {}
+	local function finish()
+		if not live then
+			return
+		end
+		live = false
+		for _, c in conns do
+			c:Disconnect()
+		end
+		tween(cine, 0.35, { BackgroundTransparency = 1 })
+		for _, d in cine:GetDescendants() do
+			if d:IsA("GuiObject") then
+				tween(d, 0.3, { BackgroundTransparency = 1 })
+				if d:IsA("TextLabel") then
+					tween(d, 0.3, { TextTransparency = 1, TextStrokeTransparency = 1 })
+				elseif d:IsA("ImageLabel") then
+					tween(d, 0.3, { ImageTransparency = 1 })
+				end
+			elseif d:IsA("UIStroke") then
+				tween(d, 0.3, { Transparency = 1 })
+			end
+		end
+		task.delay(0.4, function()
+			cine:Destroy()
+			panel.Visible = true
+			tween(shade, 0.25, { BackgroundTransparency = 0.45 })
+			updateScale()
+			cinePlaying = false
+		end)
+	end
+
+	local PEAK = if awaken then 1.4 else 1.1
+	local flashFrame = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1), BackgroundTransparency = 1, ZIndex = 95, Parent = cine })
+
+	if awaken then
+		-- Power gathers: rings close in on the skill, which shakes and burns white.
+		local icon = cineIcon(cine, fromIds[1], 150, 86)
+		local aura = cineCircle(cine, 190, CINE_GOLD, 4, 85)
+		aura.Position = UDim2.fromScale(0.5, 0.42)
+		for i = 1, 6 do
+			task.delay((i - 1) * 0.22, function()
+				if not live then
+					return
+				end
+				local r = cineCircle(cine, 900, if i % 3 == 1 then CINE_GOLD elseif i % 3 == 2 then CINE_CYAN else CINE_VIOLET, 5, 84)
+				r.Position = UDim2.fromScale(0.5, 0.42)
+				local edge = r:FindFirstChildOfClass("UIStroke")
+				edge.Transparency = 0.6
+				tween(r, 0.55, { Size = UDim2.fromOffset(150, 150) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				tween(edge, 0.55, { Transparency = 0, Thickness = 10 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+				task.delay(0.56, function()
+					r:Destroy()
+				end)
+			end)
+		end
+		local start = os.clock()
+		table.insert(conns, game:GetService("RunService").RenderStepped:Connect(function()
+			local t = math.clamp((os.clock() - start) / PEAK, 0, 1)
+			local jitter = t * t * 10
+			icon.Position = UDim2.new(0.5, math.random(-100, 100) / 100 * jitter, 0.42, math.random(-100, 100) / 100 * jitter)
+			icon.ImageColor3 = Color3.new(1, 1, 1):Lerp(Color3.fromRGB(255, 250, 230), t)
+			aura.Size = UDim2.fromOffset(190 + math.sin(os.clock() * 20) * 8 * t, 190 + math.sin(os.clock() * 20) * 8 * t)
+		end))
+		task.delay(PEAK, function()
+			if not live then
+				return
+			end
+			icon:Destroy()
+			aura:Destroy()
+		end)
+	else
+		-- The two skills spin in from the sides and smash together.
+		local a = cineIcon(cine, fromIds[1], 130, 86)
+		local b = cineIcon(cine, fromIds[2], 130, 86)
+		a.Position = UDim2.fromScale(0.18, 0.42)
+		b.Position = UDim2.fromScale(0.82, 0.42)
+		for _, pair in { { a, getSkillColor(fromIds[1]) }, { b, getSkillColor(fromIds[2]) } } do
+			local glow = cineCircle(pair[1], 160, pair[2], 4, 85)
+			tween(glow, PEAK, { Size = UDim2.fromOffset(220, 220) })
+		end
+		tween(a, PEAK, { Position = UDim2.fromScale(0.5, 0.42), Rotation = 540 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		tween(b, PEAK, { Position = UDim2.fromScale(0.5, 0.42), Rotation = -540 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		task.delay(PEAK, function()
+			if not live then
+				return
+			end
+			a:Destroy()
+			b:Destroy()
+		end)
+	end
+
+	-- The reveal.
+	task.delay(PEAK, function()
+		if not live then
+			return
+		end
+		flashFrame.BackgroundTransparency = 0
+		tween(flashFrame, if awaken then 0.9 else 0.6, { BackgroundTransparency = 1 })
+		local colors = if awaken then { CINE_GOLD, CINE_CYAN, CINE_VIOLET } else { resultColor, getSkillColor(fromIds[1]), getSkillColor(fromIds[2]) }
+		local rays = cineRays(cine, colors, if awaken then 24 else 16, 520, 82)
+		table.insert(conns, game:GetService("RunService").RenderStepped:Connect(function(dt)
+			rays.Rotation += dt * (if awaken then 25 else 15)
+		end))
+		for i = 1, 3 do
+			local wave = cineCircle(cine, 40, colors[i], 8, 83)
+			wave.Position = UDim2.fromScale(0.5, 0.42)
+			local edge = wave:FindFirstChildOfClass("UIStroke")
+			task.delay((i - 1) * 0.12, function()
+				tween(wave, 0.9, { Size = UDim2.fromOffset(1100, 1100) }, Enum.EasingStyle.Quart)
+				tween(edge, 0.9, { Transparency = 1, Thickness = 1 })
+			end)
+		end
+		local icon = cineIcon(cine, resultId, 10, 88)
+		tween(icon, 0.55, { Size = UDim2.fromOffset(190, 190) }, Enum.EasingStyle.Back)
+		if awaken then
+			-- The awakened frame: turning gold-cyan-violet diamond borders.
+			for i, spec in { { 0.74, 6, 0 }, { 0.92, 3, 0.3 } } do
+				local ring = new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(spec[1], spec[1]), Rotation = 45, BackgroundTransparency = 1, ZIndex = 89, Parent = icon })
+				local edge = new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = spec[2], Transparency = spec[3], LineJoinMode = Enum.LineJoinMode.Miter, Parent = ring })
+				local gradient = new("UIGradient", { Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, CINE_GOLD), ColorSequenceKeypoint.new(0.35, CINE_CYAN), ColorSequenceKeypoint.new(0.65, CINE_VIOLET), ColorSequenceKeypoint.new(1, CINE_GOLD) }), Parent = edge })
+				table.insert(conns, game:GetService("RunService").RenderStepped:Connect(function()
+					gradient.Rotation = (os.clock() * (if i == 1 then 140 else -90)) % 360
+				end))
+			end
+		end
+		local title = text({
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0.42, 150),
+			Size = UDim2.fromOffset(900, 64),
+			Text = if awaken then "A W A K E N E D" else "F U S I O N   C O M P L E T E",
+			FontFace = F.TitleBold,
+			TextSize = if awaken then 60 else 46,
+			TextColor3 = Color3.new(1, 1, 1),
+			TextStrokeColor3 = Color3.new(0, 0, 0),
+			TextStrokeTransparency = 0.2,
+			TextTransparency = 1,
+			ZIndex = 90,
+			Parent = cine,
+		})
+		local titleGradient = new("UIGradient", {
+			Color = if awaken
+				then ColorSequence.new({ ColorSequenceKeypoint.new(0, CINE_GOLD), ColorSequenceKeypoint.new(0.5, CINE_CYAN), ColorSequenceKeypoint.new(1, CINE_VIOLET) })
+				else ColorSequence.new(Color3.new(1, 1, 1), resultColor),
+			Parent = title,
+		})
+		table.insert(conns, game:GetService("RunService").RenderStepped:Connect(function()
+			titleGradient.Offset = Vector2.new(math.sin(os.clock() * 2) * 0.3, 0)
+		end))
+		title.Position = UDim2.new(0.5, 0, 0.42, 190)
+		tween(title, 0.45, { Position = UDim2.new(0.5, 0, 0.42, 150), TextTransparency = 0 }, Enum.EasingStyle.Back)
+		local sub = text({
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0.42, 218),
+			Size = UDim2.fromOffset(900, 30),
+			Text = if awaken
+				then `{resultDef and resultDef.Name or resultId}   ·   {resultDef and resultDef.PerkName or ""}   ·   Level {levelKept or 1} kept`
+				else `{resultDef and resultDef.Name or resultId}   ·   starts at Level 1`,
+			FontFace = F.Bold,
+			TextSize = 22,
+			TextColor3 = if awaken then CINE_CYAN else resultColor,
+			TextStrokeTransparency = 0.3,
+			TextTransparency = 1,
+			ZIndex = 90,
+			Parent = cine,
+		})
+		task.delay(0.25, function()
+			tween(sub, 0.4, { TextTransparency = 0 })
+		end)
+		local hint = text({
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -40),
+			Size = UDim2.fromOffset(400, 20),
+			Text = "click to continue",
+			FontFace = F.Body,
+			TextSize = 14,
+			TextColor3 = Color3.fromRGB(200, 200, 210),
+			TextTransparency = 1,
+			ZIndex = 90,
+			Parent = cine,
+		})
+		task.delay(1, function()
+			tween(hint, 0.4, { TextTransparency = 0.3 })
+		end)
+		cine.MouseButton1Click:Connect(finish)
+		task.delay(if awaken then 4.5 else 3.8, finish)
+	end)
+end
+
 local function forgeSelected()
 	actionBtn.Text = "FORGING..."
+	local recipe = Crafting.ForgeRecipes[selectedId]
 	local success, result = CraftSkill:InvokeServer(selectedId)
 	if success then
+		if recipe then
+			playCinematic("Fusion", recipe.Result, recipe.Skills)
+		end
 		task.spawn(function()
 			cachedBuild = GetBuild:InvokeServer() or cachedBuild
 			cachedInventory = GetInventory:InvokeServer() or cachedInventory
@@ -1945,8 +2214,13 @@ actionBtn.MouseButton1Click:Connect(function()
 		end
 	else
 		actionBtn.Text = "ASCENDING..."
+		local recipe = Crafting.AwakenRecipes[selectedId]
+		local levelBefore = recipe and cachedBuild.Skills and cachedBuild.Skills[recipe.BaseSkill]
 		local success, result = AwakenSkill:InvokeServer(selectedId)
 		if success then
+			if recipe then
+				playCinematic("Awaken", recipe.AwakenedSkill, { recipe.BaseSkill }, levelBefore)
+			end
 			task.spawn(function()
 				cachedBuild = GetBuild:InvokeServer() or cachedBuild
 				cachedInventory = GetInventory:InvokeServer() or cachedInventory

@@ -271,6 +271,18 @@ local PLAYER_EVENTS = {
 	Heal = function(_e, pos)
 		SoundFX.PlayAt("Heal", pos)
 	end,
+	-- Ceremonies: a charge-up, then the boom when the effect peaks (SkillVFX
+	-- times: fusion collides at 1.1s, awakening erupts at 1.4s).
+	Fusion = function(e, pos)
+		local play = if isMine(e) then function(name) SoundFX.Play(name) end else function(name) SoundFX.PlayAt(name, pos) end
+		play("CeremonyCharge")
+		task.delay(1.1, play, "FusionBoom")
+	end,
+	Awaken = function(e, pos)
+		local play = if isMine(e) then function(name) SoundFX.Play(name) end else function(name) SoundFX.PlayAt(name, pos) end
+		play("AwakenHum")
+		task.delay(1.4, play, "AwakenBoom")
+	end,
 	LevelUp = function(e, pos)
 		if isMine(e) then
 			SoundFX.Play("LevelUp")

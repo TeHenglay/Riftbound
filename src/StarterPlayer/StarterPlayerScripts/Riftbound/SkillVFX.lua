@@ -4180,7 +4180,212 @@ local function onLevelUp(e)
 	end
 end
 
+-------------------------------------------------------------------------------
+-- Fusion and Awakening ceremonies (fired by CraftingService on success)
+-------------------------------------------------------------------------------
+
+local function paletteOf(skillId)
+	local def = skillId and Skills.Defs[skillId]
+	local elements = def and def.Elements or {}
+	return PAL[elements[1] or "Rift"] or PAL.Rift, PAL[elements[2] or elements[1] or "Rift"] or PAL.Rift
+end
+
+-- A glowing orb with a trail, for the two elements spiralling together.
+local function elementOrb(at, pal)
+	local orb = Instance.new("Part")
+	orb.Shape = Enum.PartType.Ball
+	orb.Size = Vector3.new(1.6, 1.6, 1.6)
+	orb.Material = Enum.Material.Neon
+	orb.Color = pal.Main
+	orb.Anchored = true
+	orb.CanCollide = false
+	orb.CanQuery = false
+	orb.CanTouch = false
+	orb.CastShadow = false
+	orb.CFrame = CFrame.new(at)
+	orb.Parent = folder
+	local light = Instance.new("PointLight")
+	light.Color = pal.Main
+	light.Range = 12
+	light.Brightness = 3
+	light.Parent = orb
+	emitter(orb, { Enabled = true, Rate = 60, Texture = TEX.Glow, Size = ns(0, 1.6, 1, 0), Lifetime = NumberRange.new(0.35, 0.5), Color = cs(pal.Core, pal.Main, pal.Dark), Light = 1 })
+	emitter(orb, { Enabled = true, Rate = 18, Texture = TEX.Spark, Size = ns(0, 0.6, 1, 0), Lifetime = NumberRange.new(0.3, 0.5), Speed = NumberRange.new(2, 5), Spread = Vector2.new(180, 180), Color = cs(Color3.new(1, 1, 1), pal.Main), Light = 1 })
+	return orb
+end
+
+-- A column of light that flares up and fades.
+local function lightPillar(ground, color, width, height, life)
+	local pillar = anchor(CFrame.new(ground + Vector3.new(0, height / 2, 0)) * CFrame.Angles(0, 0, math.rad(90)), Vector3.new(height, width, width), life + 0.1)
+	pillar.Shape = Enum.PartType.Cylinder
+	pillar.Material = Enum.Material.Neon
+	pillar.Color = color
+	pillar.Transparency = 0.1
+	tween(pillar, life, { Transparency = 1, Size = Vector3.new(height, width * 0.15, width * 0.15) }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	return pillar
+end
+
+-- Fusion: the two elements orbit in from either side, spiral faster and
+-- tighter, then collide in a white-hot burst: shockwaves in both colours,
+-- lightning lashing out, a pillar of light, and sparks drifting up after.
+local function onFusion(e)
+	local root = e.Target
+	if not (root and root.Parent) then
+		return
+	end
+	local palA = paletteOf(e.A)
+	local palB = paletteOf(e.B)
+	local palR, palR2 = paletteOf(e.Result)
+	local floorY = root.Position.Y - 2.9
+	local ground = Vector3.new(root.Position.X, floorY, root.Position.Z)
+	local orbA, orbB = elementOrb(root.Position + Vector3.new(8, 2, 0), palA), elementOrb(root.Position - Vector3.new(8, 2, 0), palB)
+	local swirl = burst(root.Position, {
+		{ Texture = TEX.Swirl, Count = 2, Size = ns(0, 2, 1, 9), Lifetime = NumberRange.new(1.1), RotSpeed = NumberRange.new(-180, 180), Color = cs(palA.Main, palB.Main), Light = 1 },
+	}, 1.4)
+	groundDecal(ground, TEX.Ring, palR.Main, 4, 18, 1.2, { Floor = floorY, Spin = math.pi * 2, FadeIn = 0.2, Hold = 0.8 })
+	local start = os.clock()
+	local DURATION = 1.1
+	local conn
+	conn = RunService.RenderStepped:Connect(function()
+		local t = math.clamp((os.clock() - start) / DURATION, 0, 1)
+		local center = if root.Parent then root.Position + Vector3.new(0, 1.5, 0) else swirl.Position
+		local angle = t * t * math.pi * 6
+		local radius = 8 * (1 - t) ^ 1.4 + 0.2
+		local lift = math.sin(t * math.pi) * 2.5
+		orbA.CFrame = CFrame.new(center + Vector3.new(math.cos(angle) * radius, lift, math.sin(angle) * radius))
+		orbB.CFrame = CFrame.new(center + Vector3.new(math.cos(angle + math.pi) * radius, lift, math.sin(angle + math.pi) * radius))
+		if t >= 1 then
+			conn:Disconnect()
+			orbA:Destroy()
+			orbB:Destroy()
+			local at = center
+			-- The collision.
+			burst(at, {
+				{ Texture = TEX.Shockwave, Count = 2, Size = ns(0, 1, 1, 22), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.5), Color = cs(Color3.new(1, 1, 1), palR.Main), Light = 1, ZOffset = 2 },
+				{ Texture = TEX.Glow, Count = 3, Size = ns(0, 6, 1, 16), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.35), Color = cs(Color3.new(1, 1, 1), palR.Core), Light = 1, ZOffset = 3 },
+				{ Texture = TEX.Spark, Count = 40, Parallel = true, Size = ns(0, 1.6, 1, 0), Lifetime = NumberRange.new(0.4, 0.8), Speed = NumberRange.new(30, 55), Spread = Vector2.new(180, 180), Drag = 3, Color = cs(Color3.new(1, 1, 1), palA.Main, palB.Main), Light = 1 },
+				{ Texture = TEX.Sparkle, Count = 18, Size = ns(0, 1.4, 1, 0), Lifetime = NumberRange.new(0.8, 1.4), Speed = NumberRange.new(8, 18), Spread = Vector2.new(180, 180), Drag = 2, Color = cs(palR.Core, palR2.Main), Light = 1 },
+				{ Texture = TEX.SwirlBurst, Count = 2, Size = ns(0, 3, 1, 14), Lifetime = NumberRange.new(0.6), Color = cs(palA.Main, palB.Main), Light = 1, ZOffset = 1 },
+			}, 2)
+			for i = 1, 8 do
+				local a = i / 8 * math.pi * 2 + math.random() * 0.3
+				local tip = at + Vector3.new(math.cos(a) * 13, math.random(-2, 5), math.sin(a) * 13)
+				lightning(at, tip, if i % 2 == 0 then palA.Main else palB.Main, { Width = 0.6, Life = 0.35, Halo = palR.Dark })
+			end
+			ring(ground, palA.Main, 2, 30, 0.7, floorY)
+			task.delay(0.08, ring, ground, palB.Main, 2, 38, 0.8, floorY)
+			task.delay(0.16, ring, ground, Color3.new(1, 1, 1), 2, 46, 0.9, floorY)
+			groundDecal(ground, TEX.Crack, palR.Dark, 4, 16, 1.4, { Floor = floorY, Lift = 0.02, Hold = 0.7, GrowTime = 0.1, StartAlpha = 0.1 })
+			lightPillar(ground, palR.Core, 7, 70, 1.1)
+			lightPillar(ground, palR.Main, 12, 50, 0.8)
+			flash(at, palR.Main, 40, 10, 0.7)
+			shake(0.5, at)
+			-- Sparks keep drifting up from the player for a moment.
+			if root.Parent then
+				local sparkle = emitter(root, { Enabled = true, Rate = 30, Texture = TEX.Sparkle, Size = ns(0, 0.9, 1, 0), Lifetime = NumberRange.new(1, 1.6), Speed = NumberRange.new(3, 6), Spread = Vector2.new(60, 60), Accel = Vector3.new(0, 4, 0), Color = cs(palR.Core, palR.Main, palR2.Main), Light = 1 })
+				task.delay(1.8, function()
+					sparkle.Enabled = false
+					Debris:AddItem(sparkle, 2)
+				end)
+			end
+		end
+	end)
+end
+
+-- Awakening: power gathers (particles pour inward, three rune rings turn,
+-- lightning strikes all around), then a gold-and-cyan column of light
+-- erupts, the ground cracks, and a crown of light circles above the head.
+local AWAKEN_GOLD, AWAKEN_CYAN, AWAKEN_VIOLET = rgb(255, 214, 92), rgb(110, 232, 255), rgb(196, 124, 255)
+local function onAwaken(e)
+	local root = e.Target
+	if not (root and root.Parent) then
+		return
+	end
+	local pal = paletteOf(e.Result)
+	local floorY = root.Position.Y - 2.9
+	local ground = Vector3.new(root.Position.X, floorY, root.Position.Z)
+	local CHARGE = 1.4
+	-- Phase 1: gathering.
+	local gather = anchor(root.Position, Vector3.new(22, 22, 22), CHARGE + 1)
+	local inward = emitter(gather, { Enabled = true, Rate = 140, Texture = TEX.Glow, Shape = Enum.ParticleEmitterShape.Sphere, InOut = Enum.ParticleEmitterShapeInOut.Inward, Style = Enum.ParticleEmitterShapeStyle.Surface, Size = ns(0, 0.2, 0.5, 0.9, 1, 0), Lifetime = NumberRange.new(0.5, 0.7), Speed = NumberRange.new(16, 22), Color = cs(AWAKEN_GOLD, AWAKEN_CYAN, AWAKEN_VIOLET), Light = 1 })
+	emitter(gather, { Enabled = true, Rate = 6, Texture = TEX.Electric, Size = ns(0, 2, 1, 5), Lifetime = NumberRange.new(0.25), RotSpeed = NumberRange.new(-200, 200), Color = cs(Color3.new(1, 1, 1), AWAKEN_CYAN), Light = 1 })
+	for i, color in { AWAKEN_GOLD, AWAKEN_CYAN, AWAKEN_VIOLET } do
+		groundDecal(ground, TEX.Ring, color, 6 + i * 5, 4 + i * 3, CHARGE + 0.3, { Floor = floorY, Lift = i * 0.01, Spin = (if i % 2 == 0 then -1 else 1) * math.pi * 3, FadeIn = 0.25, Hold = CHARGE - 0.2, GrowTime = CHARGE })
+	end
+	for i = 1, 5 do
+		task.delay((i - 1) * CHARGE / 5, function()
+			local a = math.random() * math.pi * 2
+			local spot = ground + Vector3.new(math.cos(a) * math.random(5, 11), 0, math.sin(a) * math.random(5, 11))
+			lightning(spot + Vector3.new(0, 30, 0), spot, if i % 2 == 0 then AWAKEN_CYAN else AWAKEN_GOLD, { Width = 0.7, Life = 0.25, Halo = AWAKEN_VIOLET })
+			ring(spot, AWAKEN_CYAN, 1, 7, 0.35, floorY)
+			flash(spot, AWAKEN_CYAN, 14, 4, 0.2)
+		end)
+	end
+	task.delay(CHARGE, function()
+		inward.Enabled = false
+		local at = if root.Parent then root.Position else gather.Position
+		ground = Vector3.new(at.X, floorY, at.Z)
+		-- Phase 2: eruption.
+		lightPillar(ground, Color3.new(1, 1, 1), 6, 120, 1.4)
+		lightPillar(ground, AWAKEN_GOLD, 11, 100, 1.1)
+		lightPillar(ground, AWAKEN_CYAN, 16, 70, 0.8)
+		burst(at, {
+			{ Texture = TEX.ThunderWave, Count = 2, Size = ns(0, 2, 1, 26), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.6), Color = cs(Color3.new(1, 1, 1), AWAKEN_CYAN), Light = 1, ZOffset = 2 },
+			{ Texture = TEX.Shockwave, Count = 2, Size = ns(0, 2, 1, 30), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.7), Color = cs(AWAKEN_GOLD, AWAKEN_VIOLET), Light = 1, ZOffset = 1 },
+			{ Texture = TEX.Glow, Count = 4, Size = ns(0, 8, 1, 22), Transparency = ns(0, 0, 1, 1), Lifetime = NumberRange.new(0.4), Color = cs(Color3.new(1, 1, 1), AWAKEN_GOLD), Light = 1, ZOffset = 3 },
+			{ Texture = TEX.Spark, Count = 60, Parallel = true, Size = ns(0, 2, 1, 0), Lifetime = NumberRange.new(0.5, 1), Speed = NumberRange.new(40, 70), Spread = Vector2.new(180, 180), Drag = 3, Color = cs(Color3.new(1, 1, 1), AWAKEN_GOLD, AWAKEN_CYAN), Light = 1 },
+			{ Texture = TEX.Crescent, Count = 6, Size = ns(0, 4, 1, 10), Lifetime = NumberRange.new(0.35), Spread = Vector2.new(180, 180), Speed = NumberRange.new(2, 4), Color = cs(AWAKEN_CYAN, AWAKEN_VIOLET), Light = 1 },
+			{ Texture = TEX.Sparkle, Count = 30, Size = ns(0, 1.6, 1, 0), Lifetime = NumberRange.new(1, 2), Speed = NumberRange.new(10, 24), Spread = Vector2.new(180, 180), Drag = 2, Accel = Vector3.new(0, 6, 0), Color = cs(AWAKEN_GOLD, pal.Main, AWAKEN_CYAN), Light = 1 },
+		}, 2.5)
+		for i = 1, 10 do
+			local a = i / 10 * math.pi * 2
+			lightning(at, at + Vector3.new(math.cos(a) * 16, math.random(-1, 8), math.sin(a) * 16), if i % 2 == 0 then AWAKEN_GOLD else AWAKEN_CYAN, { Width = 0.7, Life = 0.4, Halo = AWAKEN_VIOLET })
+		end
+		ring(ground, AWAKEN_GOLD, 3, 40, 0.8, floorY)
+		task.delay(0.1, ring, ground, AWAKEN_CYAN, 3, 52, 0.9, floorY)
+		task.delay(0.2, ring, ground, AWAKEN_VIOLET, 3, 64, 1, floorY)
+		groundDecal(ground, TEX.Crack, rgb(30, 20, 50), 6, 26, 2, { Floor = floorY, Lift = 0.02, Hold = 1.2, GrowTime = 0.12, StartAlpha = 0 })
+		flash(at, AWAKEN_GOLD, 60, 14, 1)
+		shake(0.8, at)
+		-- Phase 3: a crown of light turning over the head, and lingering embers.
+		if root.Parent then
+			local crown = Instance.new("Part")
+			crown.Shape = Enum.PartType.Cylinder
+			crown.Size = Vector3.new(0.05, 4, 4)
+			crown.Transparency = 1
+			crown.Anchored = true
+			crown.CanCollide = false
+			crown.CanQuery = false
+			crown.CanTouch = false
+			crown.Parent = folder
+			local halo = Instance.new("Decal")
+			halo.Texture = TEX.Ring
+			halo.Face = Enum.NormalId.Right
+			halo.Color3 = AWAKEN_GOLD
+			halo.Parent = crown
+			local glow = emitter(root, { Enabled = true, Rate = 40, Texture = TEX.Sparkle, Size = ns(0, 1, 1, 0), Lifetime = NumberRange.new(1, 1.8), Speed = NumberRange.new(2, 5), Spread = Vector2.new(180, 180), Accel = Vector3.new(0, 5, 0), Color = cs(AWAKEN_GOLD, AWAKEN_CYAN, AWAKEN_VIOLET), Light = 1 })
+			local born = os.clock()
+			local spin
+			spin = RunService.RenderStepped:Connect(function()
+				local age = os.clock() - born
+				if age > 2.6 or not root.Parent then
+					spin:Disconnect()
+					crown:Destroy()
+					glow.Enabled = false
+					Debris:AddItem(glow, 2)
+					return
+				end
+				halo.Transparency = math.clamp((age - 2) / 0.6, 0, 1)
+				halo.Color3 = AWAKEN_GOLD:Lerp(AWAKEN_CYAN, (math.sin(age * 4) + 1) / 2)
+				crown.CFrame = CFrame.new(root.Position + Vector3.new(0, 4.2, 0)) * CFrame.Angles(0, age * 3, math.rad(90))
+			end)
+		end
+	end)
+end
+
 local HANDLERS = {
+	Fusion = onFusion,
+	Awaken = onAwaken,
 	Shield = onShield,
 	Blocked = onBlocked,
 	Roller = onRoller,

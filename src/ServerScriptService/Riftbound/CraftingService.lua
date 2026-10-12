@@ -10,6 +10,17 @@ local ProgressionService = require(script.Parent.ProgressionService)
 
 local CraftingService = {}
 
+-- Everyone nearby sees the ceremony (SkillVFX: Fusion / Awaken).
+local function ceremony(player, payload)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	local remotes = Shared:FindFirstChild("Remotes")
+	local fx = remotes and remotes:FindFirstChild("SkillFx")
+	if root and fx then
+		payload.Target = root
+		fx:FireAllClients(payload)
+	end
+end
+
 -- Fuses two base skills at The Forge, consuming required materials and gold.
 function CraftingService.Craft(player, recipeId)
 	if typeof(recipeId) ~= "string" then
@@ -51,6 +62,7 @@ function CraftingService.Craft(player, recipeId)
 		return false, result
 	end
 
+	ceremony(player, { Type = "Fusion", A = skillA, B = skillB, Result = result })
 	return true, result
 end
 
@@ -104,6 +116,8 @@ function CraftingService.Awaken(player, baseSkillId)
 		ProgressionService.AddGold(player, recipe.Gold)
 		return false, result
 	end
+
+	ceremony(player, { Type = "Awaken", Base = baseSkillId, Result = recipe.AwakenedSkill })
 
 	return true, result
 end

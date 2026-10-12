@@ -142,6 +142,12 @@ SoundLibrary.Sounds = {
 	Fuse = { Id = 9113445305, Volume = 0.55, Pitch = 0.9, Length = 1.5, Group = "UI", Layer = { "FuseShimmer" } },
 	FuseShimmer = { Id = 107149510023542, Volume = 0.55, Group = "UI" },
 
+	-- Fusion / Awakening ceremonies (SoundFX, on the Fusion / Awaken events) ------
+	CeremonyCharge = { Id = 119095676067671, Volume = 0.6, Pitch = 0.9 },
+	FusionBoom = { Ids = { 132877989312932, 121728950168783 }, Volume = 0.9, Layer = { "ThunderCrack", "FuseShimmer" } },
+	AwakenHum = { Id = 9125550012, Volume = 0.6, Pitch = 0.9, Length = 1.5 },
+	AwakenBoom = { Ids = { 132877989312932, 121728950168783 }, Volume = 1, Pitch = 0.85, Layer = { "ThunderCrack", "LevelUp", "ParryRing" } },
+
 	-- Rune pick screen (played by the HUD) -----------------------------------
 	-- A rift whoosh and shimmer as the screen opens, a chime per card as it
 	-- flips in (a fanfare for Legendary), and a confirm when you take one.
