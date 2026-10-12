@@ -610,7 +610,7 @@ local statusText = text({
 -- Middle Row: Formula Section (Skill 1 + Skill 2)
 -------------------------------------------------------------------------------
 local formulaCard = new("Frame", {
-	Position = UDim2.fromOffset(12, 142),
+	Position = UDim2.fromOffset(12, 156),
 	Size = UDim2.new(1, -24, 0, 150),
 	BackgroundTransparency = 1,
 	BorderSizePixel = 0,
@@ -880,7 +880,7 @@ local s2StatusText = text({
 -- Bottom Section: Requirements with Modern Progress Bars
 -------------------------------------------------------------------------------
 local reqSection = new("Frame", {
-	Position = UDim2.fromOffset(12, 298),
+	Position = UDim2.fromOffset(12, 312),
 	Size = UDim2.new(1, -24, 0, 140),
 	BackgroundTransparency = 1,
 	ZIndex = 3,
